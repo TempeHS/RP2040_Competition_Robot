@@ -31,6 +31,9 @@ jobs:
       - name: Copy firmware files to app directory
         run: cp -r _Firmware app/
 
+      - name: Copy docs to app directory
+        run: cp -r docs app/
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

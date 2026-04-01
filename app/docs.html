@@ -367,11 +367,9 @@
     </script>
 
     <script>
-      // GitHub raw content base URL
-      const GITHUB_RAW_BASE =
-        "https://raw.githubusercontent.com/TempeHS/AIDriver_MicroPython_Challanges/main/docs/";
-      const GITHUB_IMAGES_BASE =
-        "https://raw.githubusercontent.com/TempeHS/AIDriver_MicroPython_Challanges/main/docs/images/";
+      // Docs base URL — relative so it works regardless of repo owner
+      const DOCS_BASE = "docs/";
+      const DOCS_IMAGES_BASE = "docs/images/";
 
       // Configure marked
       marked.setOptions({
@@ -386,12 +384,12 @@
         return params.get("doc") || "Assembly_Instructions";
       }
 
-      // Fix image URLs in markdown to point to GitHub
+      // Fix image URLs in markdown to use relative docs path
       function fixImageUrls(html) {
-        // Replace relative image paths with GitHub raw URLs
+        // Replace relative image paths with docs images path
         return html
-          .replace(/src="images\//g, `src="${GITHUB_IMAGES_BASE}`)
-          .replace(/src="\.\/images\//g, `src="${GITHUB_IMAGES_BASE}`);
+          .replace(/src="images\//g, `src="${DOCS_IMAGES_BASE}`)
+          .replace(/src="\.\/images\//g, `src="${DOCS_IMAGES_BASE}`);
       }
 
       // Convert GitHub-style alerts to the same HTML structure GitHub renders
@@ -453,7 +451,7 @@
         errorDiv.style.display = "none";
 
         try {
-          const url = `${GITHUB_RAW_BASE}${docName}.md`;
+          const url = `${DOCS_BASE}${docName}.md`;
           const response = await fetch(url);
 
           if (!response.ok) {
