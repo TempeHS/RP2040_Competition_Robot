@@ -128,12 +128,9 @@ const Editor = {
       new Range(lineIndex, 0, lineIndex, 1),
       "ace_error-line",
       "fullLine",
-      true
+      true,
     );
     this.markers.push(markerId);
-
-    // Scroll to error line
-    this.instance.gotoLine(line, 0, true);
   },
 
   /**
@@ -177,7 +174,7 @@ const Editor = {
       new Range(lineIndex, 0, lineIndex, 1),
       "ace_executing-line",
       "fullLine",
-      true
+      true,
     );
 
     // Scroll to line if not visible
