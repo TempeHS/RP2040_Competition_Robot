@@ -2205,11 +2205,15 @@ my_robot = AIDriver()
 # ═══════════════════════════════════════════════════════
 BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
-FRONT_THRESHOLD = 250      # Distance to trigger a turn (mm)
+
+# Front sensor P-controlled approach
+FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
+FRONT_STOP_DISTANCE = 120  # Stop and turn (mm)
+FRONT_Kp = 0.5             # Front deceleration gain
 TURN_SPEED = 180
 TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
-# PID gains (from Challenge 3)
+# Side PID gains (from Challenge 3)
 Kp = 0.5
 Ki = 0.01
 Kd = 0.3
@@ -2225,17 +2229,29 @@ integral = 0
 while True:
     front = my_robot.read_distance()
 
-    # Priority 1: Wall ahead — stop and turn
-    if front != -1 and front < FRONT_THRESHOLD:
-        my_robot.brake()
-        hold_state(0.3)
-        my_robot.rotate_left(TURN_SPEED)
-        hold_state(TURN_TIME)
-        my_robot.brake()
-        hold_state(0.3)
-        integral = 0
-        previous_error = 0
-        continue
+    # Priority 1: Wall ahead — P-controlled deceleration then turn
+    if front != -1 and front < FRONT_SLOW_DISTANCE:
+        if front <= FRONT_STOP_DISTANCE:
+            # Close enough — stop and turn
+            my_robot.brake()
+            hold_state(0.3)
+            my_robot.rotate_left(TURN_SPEED)
+            hold_state(TURN_TIME)
+            my_robot.brake()
+            hold_state(0.3)
+            integral = 0
+            previous_error = 0
+            continue
+        else:
+            # Approaching — slow down proportionally
+            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
+            if approach_speed < 120:
+                approach_speed = 120
+            if approach_speed > BASE_SPEED:
+                approach_speed = BASE_SPEED
+            my_robot.drive(approach_speed, approach_speed)
+            hold_state(0.05)
+            continue
 
     # Priority 2: Side wall following with PID
     wall_distance = my_robot.read_distance_2()
@@ -2268,7 +2284,7 @@ while True:
     hold_state(0.05)
 `,
     5: `# Challenge 5: Maze Solver — Hand on Wall
-# Full PID wall following + front detection + hand-on-wall algorithm
+# Full PID wall following + front P deceleration + hand-on-wall algorithm
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -2281,11 +2297,15 @@ my_robot = AIDriver()
 # ═══════════════════════════════════════════════════════
 BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
-FRONT_THRESHOLD = 250
+
+# Front sensor P-controlled approach
+FRONT_SLOW_DISTANCE = 400
+FRONT_STOP_DISTANCE = 120
+FRONT_Kp = 0.5
 TURN_SPEED = 180
 TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
-# PID gains
+# Side PID gains
 Kp = 0.5
 Ki = 0.01
 Kd = 0.3
@@ -2304,16 +2324,24 @@ while True:
     front = my_robot.read_distance()
     side = my_robot.read_distance_2()
 
-    # Priority 1: Wall ahead — must turn
-    if front != -1 and front < FRONT_THRESHOLD:
-        my_robot.brake()
-        hold_state(0.3)
-        my_robot.rotate_left(TURN_SPEED)
-        hold_state(TURN_TIME)
-        my_robot.brake()
-        hold_state(0.3)
-        integral = 0
-        previous_error = 0
+    # Priority 1: Wall ahead — P-controlled deceleration then turn
+    if front != -1 and front < FRONT_SLOW_DISTANCE:
+        if front <= FRONT_STOP_DISTANCE:
+            my_robot.brake()
+            hold_state(0.3)
+            my_robot.rotate_left(TURN_SPEED)
+            hold_state(TURN_TIME)
+            my_robot.brake()
+            hold_state(0.3)
+            integral = 0
+            previous_error = 0
+        else:
+            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
+            if approach_speed < 120:
+                approach_speed = 120
+            if approach_speed > BASE_SPEED:
+                approach_speed = BASE_SPEED
+            my_robot.drive(approach_speed, approach_speed)
 
     # Priority 2: Lost the wall — gentle turn toward it
     elif side == -1:

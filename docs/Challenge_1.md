@@ -87,6 +87,53 @@ steering = Kp × error
 - **Bigger Kp** → stronger correction → faster response, but may overshoot.
 - **Smaller Kp** → gentler correction → smoother, but may not correct fast enough.
 
+### How Differential Steering Corrects the Distance
+
+The robot steers by making one wheel go **faster** than the other. The formula is:
+
+```
+right_speed = BASE_SPEED - steering
+left_speed  = BASE_SPEED + steering
+```
+
+The wall is on the **right** side. Here is what happens in each situation:
+
+#### Too far from the wall (need to steer RIGHT, closer to wall)
+
+The sensor reads 200mm but your target is 150mm, so `error = 200 - 150 = +50`. With `Kp = 0.5`, `steering = +25`.
+
+```
+right_speed = 160 - 25 = 135   ← right wheel SLOWER
+left_speed  = 160 + 25 = 185   ← left wheel FASTER
+```
+
+The **left wheel pushes harder** than the right, so the robot curves **right toward the wall**.
+
+#### Too close to the wall (need to steer LEFT, away from wall)
+
+The sensor reads 100mm but your target is 150mm, so `error = 100 - 150 = -50`. With `Kp = 0.5`, `steering = -25`.
+
+```
+right_speed = 160 - (-25) = 185   ← right wheel FASTER
+left_speed  = 160 + (-25) = 135   ← left wheel SLOWER
+```
+
+The **right wheel pushes harder** than the left, so the robot curves **left away from the wall**.
+
+#### At the perfect distance (drive straight)
+
+The sensor reads 150mm and your target is 150mm, so `error = 0`. `steering = 0`.
+
+```
+right_speed = 160 - 0 = 160   ← same speed
+left_speed  = 160 + 0 = 160   ← same speed
+```
+
+Both wheels run at the **same speed**, so the robot drives **straight ahead**.
+
+> [!Tip]
+> Think of it like rowing a boat: if you paddle harder on the left, the boat turns right. If you paddle harder on the right, the boat turns left. Equal paddling goes straight.
+
 ### What is `drive()`?
 
 The `drive()` method accepts **signed speeds** for the right and left wheels:
@@ -187,10 +234,13 @@ After the sensor check, calculate the error and apply P control:
         steering = -MAX_STEERING
 ```
 
-Then apply differential steering — one wheel speeds up, the other slows down:
+Then apply differential steering — one wheel speeds up, the other slows down (see "How Differential Steering Corrects the Distance" above for why this works):
 
 ```python
     # Apply differential steering (wall on RIGHT side)
+    # Too far from wall → steering positive → left faster, right slower → curves right
+    # Too close to wall → steering negative → right faster, left slower → curves left
+    # At perfect distance → steering zero → both same speed → straight
     right_speed = BASE_SPEED - steering
     left_speed = BASE_SPEED + steering
 
