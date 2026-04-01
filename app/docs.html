@@ -360,6 +360,11 @@
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <!-- DOMPurify for sanitization -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <!-- Mermaid.js for flowchart rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+      mermaid.initialize({ startOnLoad: false, theme: "default" });
+    </script>
 
     <script>
       // GitHub raw content base URL
@@ -476,6 +481,18 @@
           content.innerHTML = html;
           content.style.display = "block";
           spinner.style.display = "none";
+
+          // Render Mermaid diagrams
+          content
+            .querySelectorAll("pre code.language-mermaid")
+            .forEach((codeBlock) => {
+              const pre = codeBlock.parentElement;
+              const mermaidDiv = document.createElement("div");
+              mermaidDiv.className = "mermaid";
+              mermaidDiv.textContent = codeBlock.textContent;
+              pre.replaceWith(mermaidDiv);
+            });
+          mermaid.run({ nodes: content.querySelectorAll(".mermaid") });
 
           // Update page title
           const docTitle = docName.replace(/_/g, " ");
