@@ -49,10 +49,14 @@ hold_state(2)
 robot.brake()
 hold_state(1)
 
-# Test 5: Ultrasonic Sensor
-print("Test 5: ultrasonic distance readings")
+# Test 5: Ultrasonic Sensors
+print("Test 5: ultrasonic distance readings (sensor 1 + sensor 2)")
 for i in range(5):
-    distance = robot.read_distance()
+    distance_1 = robot.read_distance()
+    distance_2 = robot.read_distance_2()
+    print(
+        "Reading", i + 1, "- Sensor 1:", distance_1, "mm | Sensor 2:", distance_2, "mm"
+    )
     hold_state(0.5)
 
 print("All hardware tests completed.")
