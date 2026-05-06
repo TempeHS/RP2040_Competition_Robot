@@ -3,7 +3,7 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
-  "workspaceFolder": "/workspaces/AIDriver_MicroPython_Challanges",
+  "workspaceFolder": "/workspaces/RP2040_Competition_Robot",
   "customizations": {
     "vscode": {
       "settings": {

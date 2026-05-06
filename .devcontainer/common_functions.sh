@@ -13,7 +13,10 @@ export CYAN='\033[0;36m'
 export NC='\033[0m' # No Color
 
 # Configuration - centralized paths and settings
-export PROJECT_BASE="/workspaces/AIDriver_MicroPython_Challanges"
+# Resolve project root dynamically from this file location so scripts work
+# regardless of the checked-out workspace folder name.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PROJECT_BASE="$(cd "$SCRIPT_DIR/.." && pwd)"
 export PROJECT_DIR="$PROJECT_BASE/project"
 export PROJECT_LIB_DIR="$PROJECT_DIR/lib"
 export PROJECT_MAIN="$PROJECT_DIR/main.py"
@@ -64,21 +67,7 @@ validate_environment() {
     # Check if project directory exists
     if [ ! -d "$PROJECT_DIR" ]; then
         log_error "❌ Error: Project directory not found at $PROJECT_DIR"
-        log_warning "💡 Make sure the AIDriver_MicroPython_Challanges folder is properly mounted"
-        return 1
-    fi
-    
-    # Check if MicroPython directory exists
-    if [ ! -d "$MICROPYTHON_DIR" ]; then
-        log_error "❌ Error: MicroPython directory not found at $MICROPYTHON_DIR"
-        log_warning "💡 Make sure you're running this in the devcontainer environment"
-        return 1
-    fi
-    
-    # Check if modules directory exists
-    if [ ! -d "$MODULES_DIR" ]; then
-        log_error "❌ Error: MicroPython modules directory not found at $MODULES_DIR"
-        log_warning "💡 Run 'cd $BUILD_DIR && make submodules' first"
+        log_warning "💡 Make sure the repository folder is properly mounted"
         return 1
     fi
     
@@ -91,6 +80,34 @@ validate_environment() {
     if [ ${#missing_tools[@]} -ne 0 ]; then
         log_error "❌ Missing required tools: ${missing_tools[*]}"
         return 1
+    fi
+
+    # Ensure MicroPython source tree is present (submodule may be uninitialized)
+    if [ ! -d "$BUILD_DIR" ]; then
+        log_warning "⚠️  MicroPython source tree not found at $BUILD_DIR"
+        log_info "🔧 Initializing MicroPython submodule..."
+
+        if (cd "$PROJECT_BASE" && git submodule update --init --recursive micropython); then
+            log_success "✅ MicroPython submodule initialized"
+        else
+            log_error "❌ Failed to initialize MicroPython submodule"
+            log_warning "💡 Run 'cd $PROJECT_BASE && git submodule update --init --recursive micropython' and retry"
+            return 1
+        fi
+    fi
+
+    # Ensure modules directory exists (first-time setup)
+    if [ ! -d "$MODULES_DIR" ]; then
+        log_warning "⚠️  MicroPython modules directory not found at $MODULES_DIR"
+        log_info "🔧 Running first-time setup: make submodules"
+
+        if (cd "$BUILD_DIR" && make submodules); then
+            log_success "✅ Submodules initialized"
+        else
+            log_error "❌ Failed to initialize submodules"
+            log_warning "💡 Run 'cd $BUILD_DIR && make submodules' manually and retry"
+            return 1
+        fi
     fi
     
     log_success "✅ Environment validation passed"
