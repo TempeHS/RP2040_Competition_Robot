@@ -332,16 +332,26 @@ class UltrasonicSensor:
                 sleep_us(10)
                 self.trig_pin.off()
                 duration = time_pulse_us(self.echo_pin, 1, self.timeout_us)
-                
+
                 # If still failing after retry, report error
                 if duration < 0:
-                    _ultrasonic_warn_inline("Sensor error – check wiring")
-                    # Only log to eventlog on first few failures to avoid log spam
-                    if _ultrasonic_fail_count <= 3 and eventlog is not None:
-                        try:
-                            eventlog.log_event("ultrasonic timeout or invalid echo")
-                        except Exception:
-                            pass
+                    if duration == -1:
+                        # Timeout means no echo returned in time. This is expected
+                        # when the target is too far away or open space is ahead.
+                        _ultrasonic_warn_inline("No echo (out of range/open space)")
+                        if _ultrasonic_fail_count <= 3 and eventlog is not None:
+                            try:
+                                eventlog.log_event("ultrasonic no echo (out of range)")
+                            except Exception:
+                                pass
+                    else:
+                        _ultrasonic_warn_inline("Sensor error – check wiring")
+                        # Only log to eventlog on first few failures to avoid log spam
+                        if _ultrasonic_fail_count <= 3 and eventlog is not None:
+                            try:
+                                eventlog.log_event("ultrasonic invalid echo state")
+                            except Exception:
+                                pass
                     return -1
 
             # Calculate distance in mm using integer math (avoids floating point)
@@ -354,13 +364,11 @@ class UltrasonicSensor:
                 # Clear any inline warning since we got a good reading
                 _ultrasonic_warn_clear()
                 result = int(distance_mm)
-                
+
                 # Log AFTER timing-sensitive measurement is complete
                 if eventlog is not None:
                     try:
-                        eventlog.log_event(
-                            "distance reading: {} mm".format(result)
-                        )
+                        eventlog.log_event("distance reading: {} mm".format(result))
                     except Exception:
                         pass
                 return result
@@ -795,17 +803,17 @@ class AIDriver:
             self.motor_right.backward()  # backward() = forward motion for right wheel
         elif right_speed < 0:
             self.motor_right.set_speed(abs(right_speed))
-            self.motor_right.forward()   # forward() = backward motion for right wheel
+            self.motor_right.forward()  # forward() = backward motion for right wheel
         else:
             self.motor_right.stop()
 
         # Handle left motor
         if left_speed > 0:
             self.motor_left.set_speed(left_speed)
-            self.motor_left.forward()    # forward() = forward motion for left wheel
+            self.motor_left.forward()  # forward() = forward motion for left wheel
         elif left_speed < 0:
             self.motor_left.set_speed(abs(left_speed))
-            self.motor_left.backward()   # backward() = backward motion for left wheel
+            self.motor_left.backward()  # backward() = backward motion for left wheel
         else:
             self.motor_left.stop()
 

@@ -80,7 +80,7 @@ main() {
     log_section "Build Complete"
     log_success "✅ AIDriver firmware build complete!"
     log_info "📦 Firmware location: $FIRMWARE_DEST"
-    log_info "💡 Flash to Pico: Copy AI_Driver_RP2040.uf2 to Pico while holding BOOTSEL"
+    log_info "💡 Flash to Pico: Copy THS_Comp_RP2040.uf2 to Pico while holding BOOTSEL"
 }
 
 # Function to update MicroPython repository

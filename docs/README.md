@@ -51,7 +51,7 @@ cd /workspaces/AIDriver_MicroPython_Challanges/.devcontainer
 ./build_firmware.sh
 ```
 
-**�️ Recovery Mode:** If `main.py` becomes corrupted, connect **GPIO pin 4 to ground** during boot to restore the original code.
+**�️ Recovery Mode:** If `main.py` becomes corrupted, connect **GPIO pin 2 to ground** during boot to restore the original code.
 
 **📖 Complete Documentation:** [Build_Custom_MicroPython_Firmware.md](Build_Custom_MicroPython_Firmware.md) - Comprehensive build guide with recovery features
 
@@ -59,7 +59,7 @@ cd /workspaces/AIDriver_MicroPython_Challanges/.devcontainer
 
 - Turn on richer console output by setting `aidriver.DEBUG_AIDRIVER = True` in your `main.py`. The library prints sensor sanity checks, motor actions, and student-friendly error hints without changing behaviour.
 - Every boot creates a run-once `event_log.txt` next to `main.py`. It records high-level actions (drive/rotate/brake) with human-readable speed bands and notes when speeds are too low to move or will arc left/right. Clear or delete the file to capture the next run.
-- In recovery mode (GPIO4 held low during boot), both `main.py` and `event_log.txt` are restored to their defaults so students start from a clean slate.
+- In recovery mode (GPIO2 held low during boot), both `main.py` and `event_log.txt` are restored to their defaults so students start from a clean slate.
 
 ### Challenges
 

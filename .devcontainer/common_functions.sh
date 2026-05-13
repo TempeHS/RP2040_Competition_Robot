@@ -23,7 +23,7 @@ export PROJECT_MAIN="$PROJECT_DIR/main.py"
 export MICROPYTHON_DIR="$PROJECT_BASE/micropython"
 export MODULES_DIR="$MICROPYTHON_DIR/ports/rp2/modules"
 export BUILD_DIR="$MICROPYTHON_DIR/ports/rp2"
-export FIRMWARE_DEST="$PROJECT_BASE/_Firmware/AI_Driver_RP2040.uf2"
+export FIRMWARE_DEST="$PROJECT_BASE/_Firmware/THS_Comp_RP2040.uf2"
 
 # Custom module files to copy to frozen modules (centralized list)
 # Note: main.py is excluded from frozen modules - it goes to filesystem instead
