@@ -149,8 +149,7 @@ const Challenges = (function () {
         "Reset side_integral and side_previous_error after turning",
         "Tune TURN_TIME_90 so the robot turns approximately 90 degrees",
       ],
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      spawnXRange: { min: 110, max: 410 },
+      startPosition: { x: 200, y: 1700, heading: 0 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 1600, y: 300, width: 200, height: 300 },

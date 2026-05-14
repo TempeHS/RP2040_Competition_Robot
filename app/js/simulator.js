@@ -185,8 +185,18 @@ const Simulator = (function () {
 
     var r = updateKinematics(robot, dt);
     r = applyBoundaryConstraints(r);
-    r = checkCollision(r);
-    return r;
+    var afterCollision = checkCollision(r);
+    // If the kinematic step pushed the body into a wall, revert the
+    // translation/heading to the pre-step pose (but keep the updated
+    // motor velocities and collision counter). This prevents the robot
+    // from passing through walls while still letting it back out when
+    // the user code commands a reversal.
+    if (afterCollision.collisionCount !== (robot.collisionCount || 0)) {
+      afterCollision.x = robot.x;
+      afterCollision.y = robot.y;
+      afterCollision.heading = robot.heading;
+    }
+    return afterCollision;
   }
 
   // ═══════════════════════════════════════════════════════════════════

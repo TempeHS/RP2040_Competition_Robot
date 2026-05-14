@@ -555,6 +555,54 @@ describe("§9 Collision", () => {
     expect(c[2].x).toBeCloseTo(1060, 1); // rear-right
     expect(c[2].y).toBeCloseTo(1075, 1);
   });
+
+  // ── Regression: robot must not drive THROUGH walls ──
+  // Drive the robot at full speed straight into a horizontal wall and
+  // verify that after many simulation steps the body has not crossed
+  // to the far side of the wall. Previously checkCollision only flashed
+  // and incremented a counter without restoring position, so the robot
+  // would pass through walls.
+  test("Robot does not pass through a wall when driving forward", () => {
+    // Horizontal wall spanning the arena at y = 500..530.
+    S.clearObstacles();
+    S.setMazeWalls([{ x: 0, y: 500, width: 2000, height: 30 }]);
+    // Heading 0 = facing -Y (up). Start below the wall.
+    var r = makeRobot({
+      x: 1000,
+      y: 900,
+      heading: 0,
+      leftSpeed: 255,
+      rightSpeed: 255,
+      isMoving: true,
+    });
+    for (var i = 0; i < 400; i++) {
+      r = S.step(r, 0.05); // 20 simulated seconds at full PWM
+    }
+    // The front-most edge of the body is at robot.y - ROBOT_LENGTH/2 (75).
+    // It must remain on the near (high-y) side of the wall's far edge (530).
+    expect(r.y - 75).toBeGreaterThanOrEqual(530);
+    expect(r.collisionCount).toBeGreaterThan(0);
+  });
+
+  test("Robot does not pass through a wall when reversing", () => {
+    S.clearObstacles();
+    S.setMazeWalls([{ x: 0, y: 1500, width: 2000, height: 30 }]);
+    // Heading 0, reversing → moves in +Y direction.
+    var r = makeRobot({
+      x: 1000,
+      y: 1100,
+      heading: 0,
+      leftSpeed: -255,
+      rightSpeed: -255,
+      isMoving: true,
+    });
+    for (var i = 0; i < 400; i++) {
+      r = S.step(r, 0.05);
+    }
+    // Rear-most edge of the body is at robot.y + ROBOT_LENGTH/2 (75).
+    expect(r.y + 75).toBeLessThanOrEqual(1500);
+    expect(r.collisionCount).toBeGreaterThan(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
