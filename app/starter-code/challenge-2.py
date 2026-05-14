@@ -1,23 +1,16 @@
 # Challenge 2: Wall Follow — PD Control
-# ====================================================================
-# GOAL: Add a Derivative (D) term to your Challenge 1 controller to
-#       dampen the oscillations that appear when the robot starts
-#       off-centre and at an angle.
+# --------------------------------------------------------------------
+# Adds a Derivative (D) term to the Challenge 1 controller to dampen
+# the zig-zag oscillation. The full algorithm is already written for
+# you. Your job is to choose two values:
 #
-# WHAT'S ALREADY DONE FOR YOU:
-#   - All of Challenge 1 (P controller + clamp + differential drive).
+#     side_Kp   carry forward your tuned Challenge 1 value
+#     side_Kd   the Derivative gain
 #
-# WHAT YOU NEED TO ADD:
-#   1. A new gain  side_Kd  (start small — try 0.10).
-#   2. A variable  side_previous_error  initialised to 0 BEFORE the loop.
-#   3. Inside the loop:  side_derivative = error - side_previous_error
-#   4. A new steering formula:
-#         steering = (side_Kp * error) + (side_Kd * side_derivative)
-#   5. At the END of the loop, save  side_previous_error = error
-#      (forgetting this is the most common bug — the D term will read 0).
+# Tuning guide: docs.html?doc=PID_Real_World_Tuning_Quickstart
 #
-# READ THIS FIRST: docs/Challenge_2.md
-# ====================================================================
+# Goal: smooth, oscillation-free wall follow to the green exit zone.
+# --------------------------------------------------------------------
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -32,19 +25,18 @@ MAX_STEERING = 40
 # === BLOCK: CONFIG_BASE END ===
 
 # === BLOCK: SIDE_KP START ===
-side_Kp = 0.40  # Carry forward your tuned value from Challenge 1
+side_Kp = 0.0  # ← TUNE ME (use your Challenge 1 result as a starting point)
 # === BLOCK: SIDE_KP END ===
 
 # === BLOCK: SIDE_KD START ===
-side_Kd = 0.0  # TODO: pick a starting value (try 0.10, then raise in 0.05 steps)
+side_Kd = 0.0  # ← TUNE ME (raise in 0.05 steps until oscillation stops)
 # === BLOCK: SIDE_KD END ===
 
-# TODO: add a `side_previous_error` variable initialised to 0 here
+side_previous_error = 0
 
 
 # === MAIN LOOP ===
 while True:
-    # === BLOCK: SIDE_FOLLOW_PD START ===
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
@@ -53,11 +45,9 @@ while True:
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
+    side_derivative = error - side_previous_error
 
-    # TODO: calculate side_derivative = error - side_previous_error
-
-    # TODO: replace this P-only formula with a PD formula
-    steering = side_Kp * error
+    steering = (side_Kp * error) + (side_Kd * side_derivative)
 
     if steering > MAX_STEERING:
         steering = MAX_STEERING
@@ -69,7 +59,5 @@ while True:
 
     my_robot.drive(int(right_speed), int(left_speed))
 
-    # TODO: save side_previous_error = error  (must be LAST thing before hold_state)
-    # === BLOCK: SIDE_FOLLOW_PD END ===
-
+    side_previous_error = error  # MUST be the last update before hold_state
     hold_state(0.05)
