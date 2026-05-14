@@ -152,7 +152,6 @@ const Challenges = (function () {
       startPosition: { x: 200, y: 1700, heading: 0 },
       successCriteria: {
         type: "reach_zone",
-        zone: { x: 1600, y: 300, width: 200, height: 300 },
       },
       path: null,
       obstacles: [],
@@ -284,8 +283,14 @@ const Challenges = (function () {
       case "run_without_error":
         return checkRunWithoutError(robotState, sessionData, criteria);
 
-      case "reach_zone":
-        return checkReachZone(robotState, criteria);
+      case "reach_zone": {
+        let zone = criteria.zone;
+        if (!zone && challenge.maze && typeof Mazes !== "undefined") {
+          const maze = Mazes.get(challenge.maze);
+          if (maze && maze.endZone) zone = maze.endZone;
+        }
+        return checkReachZone(robotState, { zone });
+      }
 
       case "complete_circle":
         return checkCompleteCircle(robotState, sessionData, criteria);
