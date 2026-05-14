@@ -2028,20 +2028,20 @@ function getStarterCodes() {
   return {
     // debug: loaded dynamically from project/main.py
     1: `# Challenge 1: Wall Follow — P Control
-# Follow the right wall using Proportional steering
+# Follow the side wall using Proportional steering
 
 from aidriver import AIDriver, hold_state
 import aidriver
 
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+aidriver.DEBUG_AIDRIVER = False  # Set True for full motor debug (slows loop)
+my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
 
 # ═══════════════════════════════════════════════════════
 # CONFIGURATION — Adjust these values
 # ═══════════════════════════════════════════════════════
 BASE_SPEED = 160           # Forward speed (must be > 120!)
 TARGET_WALL_DISTANCE = 150 # Distance to maintain from wall (mm)
-side_Kp = 0.10             # Start LOW — raise in 0.10 steps (see PID Tuning guide)
+side_Kp = 0.30             # Start here — raise in 0.10 steps until zig-zag starts
 MAX_STEERING = 40          # Max wheel speed difference
 
 # Rule: BASE_SPEED - MAX_STEERING must be >= 120 (dead zone)
@@ -2050,12 +2050,19 @@ MAX_STEERING = 40          # Max wheel speed difference
 # MAIN LOOP
 # ═══════════════════════════════════════════════════════
 while True:
-    wall_distance = my_robot.read_distance_2()
+    # Average 3 readings to filter sensor noise
+    r1 = my_robot.read_distance_2()
+    r2 = my_robot.read_distance_2()
+    r3 = my_robot.read_distance_2()
+    valid = [r for r in (r1, r2, r3) if r != -1]
 
-    if wall_distance == -1:
+    if not valid:
+        # No valid readings — drive straight and try again
         my_robot.drive(BASE_SPEED, BASE_SPEED)
         hold_state(0.05)
         continue
+
+    wall_distance = sum(valid) // len(valid)
 
     error = wall_distance - TARGET_WALL_DISTANCE
     steering = side_Kp * error
@@ -2065,8 +2072,11 @@ while True:
     elif steering < -MAX_STEERING:
         steering = -MAX_STEERING
 
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
+
+    # Debug print — comment out once working
+    print("dist:", wall_distance, "err:", error, "steer:", int(steering), "R:", int(right_speed), "L:", int(left_speed))
 
     my_robot.drive(int(right_speed), int(left_speed))
     hold_state(0.05)
@@ -2079,7 +2089,7 @@ from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
 
 # ═══════════════════════════════════════════════════════
 # CONFIGURATION
@@ -2116,8 +2126,8 @@ while True:
     elif steering < -MAX_STEERING:
         steering = -MAX_STEERING
 
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
 
     my_robot.drive(int(right_speed), int(left_speed))
 
@@ -2132,7 +2142,7 @@ from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
 
 # ═══════════════════════════════════════════════════════
 # CONFIGURATION
@@ -2180,8 +2190,8 @@ while True:
     elif steering < -MAX_STEERING:
         steering = -MAX_STEERING
 
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
 
     my_robot.drive(int(right_speed), int(left_speed))
 
@@ -2196,7 +2206,7 @@ from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
 
 # ═══════════════════════════════════════════════════════
 # CONFIGURATION
@@ -2274,8 +2284,8 @@ while True:
     elif steering < -MAX_STEERING:
         steering = -MAX_STEERING
 
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
     my_robot.drive(int(right_speed), int(left_speed))
 
     side_previous_error = error
@@ -2288,7 +2298,7 @@ from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
 
 # ═══════════════════════════════════════════════════════
 # CONFIGURATION
@@ -2304,15 +2314,7 @@ TURN_SPEED = 180
 TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
 # Side PID gains
-side_Kp = 0.40
-side_Kd = 0.25
-side_Ki = 0.003
-MAX_STEERING = 40
-side_INTEGRAL_MAX = 1200
-
-WALL_SIDE = "right"        # Follow the right wall
-
-# ═══════════════════════════════════════════════════════
+side_Kp = 0.40════════════════════════════════════════════════════
 # MAIN LOOP — Hand on Wall Algorithm
 # ═══════════════════════════════════════════════════════
 side_previous_error = 0
@@ -2341,12 +2343,11 @@ while True:
                 approach_speed = BASE_SPEED
             my_robot.drive(approach_speed, approach_speed)
 
-    # Priority 2: Lost the wall — gentle turn toward it
+    # Priority 2: Lost the wall — drift toward it to reacquire
     elif side == -1:
-        if WALL_SIDE == "right":
-            my_robot.drive(BASE_SPEED, int(BASE_SPEED * 0.6))
-        else:
-            my_robot.drive(int(BASE_SPEED * 0.6), BASE_SPEED)
+        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * 0.4)
+        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * 0.4)
+        my_robot.drive(r, l)
 
     # Priority 3: Wall visible — PID follow
     else:
@@ -2364,12 +2365,8 @@ while True:
         elif steering < -MAX_STEERING:
             steering = -MAX_STEERING
 
-        if WALL_SIDE == "right":
-            right_speed = BASE_SPEED - steering
-            left_speed = BASE_SPEED + steering
-        else:
-            right_speed = BASE_SPEED + steering
-            left_speed = BASE_SPEED - steering
+        right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+        left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
 
         my_robot.drive(int(right_speed), int(left_speed))
         side_previous_error = error

@@ -80,7 +80,7 @@ FRONT_STOP_DISTANCE = 120
 ```
 
 - Use **all-caps** for constants and thresholds.
-- Use **side_** and **front_** prefixes for PID gains and variables.
+- Use **side\_** and **front\_** prefixes for PID gains and variables.
 - Use **SIDE_DISTANCE** and **FRONT_DISTANCE** for sensor readings.
 
 ---
@@ -122,18 +122,22 @@ while True:
 
 ## Step 1 — Start from Your Challenge 4 Code
 
-Copy your working Challenge 4 code. You will modify the "wall lost" handling (when `side == -1`) and add the `WALL_SIDE` variable.
+Copy your working Challenge 4 code. You will modify the "wall lost" handling (when `side == -1`) to use `my_robot.wall_sign` for automatic direction.
 
 ---
 
-## Step 2 — Add the Wall Side Variable
+## Step 2 — Set the Wall Side
+
+The wall side is set when you create the robot:
 
 ```python
-WALL_SIDE = "right"        # Follow the right wall
+my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
 ```
 
+`AIDriver("left")` sets `my_robot.wall_sign = -1`. All steering formulas use `wall_sign` automatically, so no other code needs to change if you switch sides.
+
 > [!Tip]
-> If the default maze doesn't work with `"right"`, try `"left"`. Some mazes are easier to solve with one rule than the other.
+> If the default maze doesn't work with `"left"`, try `"right"`. Some mazes are easier to solve from one side.
 
 ---
 
@@ -163,8 +167,8 @@ This uses the same P-controlled deceleration from Challenge 4:
             hold_state(TURN_TIME)
             my_robot.brake()
             hold_state(0.3)
-            integral = 0
-            previous_error = 0
+            side_integral = 0
+            side_previous_error = 0
         else:
             approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
             if approach_speed < 120:
@@ -181,16 +185,15 @@ This uses the same P-controlled deceleration from Challenge 4:
 This is **new**. When the side sensor returns -1, curve gently toward where the wall should be:
 
 ```python
-    # Priority 2: Lost the wall — gentle turn toward it
+    # Priority 2: Lost the wall — drift toward it to reacquire
     elif side == -1:
-        if WALL_SIDE == "right":
-            my_robot.drive(BASE_SPEED, int(BASE_SPEED * 0.6))
-        else:
-            my_robot.drive(int(BASE_SPEED * 0.6), BASE_SPEED)
+        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * 0.4)
+        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * 0.4)
+        my_robot.drive(r, l)
 ```
 
 > [!Note]
-> The `0.6` factor means the wall-side wheel runs at 60% speed. This creates a gentle curve. You can adjust this value — lower = tighter curve, higher = gentler curve.
+> `wall_sign` automatically curves toward the correct wall side. Adjust the `0.4` factor — lower = tighter curve, higher = gentler.
 
 ---
 
@@ -202,34 +205,27 @@ This is your existing PID code, now inside an `else` block:
     # Priority 3: Wall visible — PID follow
     else:
         error = side - TARGET_WALL_DISTANCE
-        integral = integral + error
-        if integral > INTEGRAL_MAX:
-            integral = INTEGRAL_MAX
-        elif integral < -INTEGRAL_MAX:
-            integral = -INTEGRAL_MAX
-        derivative = error - previous_error
+        side_integral = side_integral + error
+        if side_integral > side_INTEGRAL_MAX:
+            side_integral = side_INTEGRAL_MAX
+        elif side_integral < -side_INTEGRAL_MAX:
+            side_integral = -side_INTEGRAL_MAX
+        side_derivative = error - side_previous_error
 
-        steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+        steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
         if steering > MAX_STEERING:
             steering = MAX_STEERING
         elif steering < -MAX_STEERING:
             steering = -MAX_STEERING
 
-        if WALL_SIDE == "right":
-            right_speed = BASE_SPEED - steering
-            left_speed = BASE_SPEED + steering
-        else:
-            right_speed = BASE_SPEED + steering
-            left_speed = BASE_SPEED - steering
+        right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+        left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
 
         my_robot.drive(int(right_speed), int(left_speed))
-        previous_error = error
+        side_previous_error = error
 
     hold_state(0.05)
 ```
-
-> [!Important]
-> Notice the steering direction flips depending on `WALL_SIDE`. When following the left wall, the correction signs are reversed.
 
 ---
 
@@ -252,7 +248,7 @@ Use the **maze selector** in the simulator to try different mazes:
 | Robot keeps spinning at junctions       | Turning too aggressively      | Increase the 0.6 factor (try 0.7, 0.8)   |
 | Robot crashes into walls on tight turns | FRONT_SLOW_DISTANCE too small | Increase FRONT_SLOW_DISTANCE             |
 | Robot takes too long (> 60 seconds)     | BASE_SPEED too slow           | Increase BASE_SPEED (but test carefully) |
-| Robot follows wrong wall after turn     | Steering signs wrong          | Check WALL_SIDE and steering direction   |
+| Robot follows wrong wall after turn     | Wrong wall side set           | Check `AIDriver("left"/"right")` setting |
 
 ---
 
@@ -263,72 +259,75 @@ Use the **maze selector** in the simulator to try different mazes:
 from aidriver import AIDriver, hold_state
 import aidriver
 
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+aidriver.DEBUG_AIDRIVER = False
+my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
 
-BASE_SPEED = 165
+BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
 MAX_STEERING = 40
-side_Kp = 0.55
-side_Ki = 0.0
-side_Kd = 0.0
-front_Kp = 0.7
-FRONT_SLOW_DISTANCE = 220
+side_Kp = 0.40
+side_Ki = 0.003
+side_Kd = 0.15
+side_INTEGRAL_MAX = 1200
+FRONT_Kp = 0.5
+FRONT_SLOW_DISTANCE = 400
 FRONT_STOP_DISTANCE = 120
+TURN_SPEED = 180
+TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
-WALL_SIDE = "right"
-
-previous_error = 0
-integral = 0
+side_previous_error = 0
+side_integral = 0
 
 while True:
-    FRONT_DISTANCE = my_robot.read_distance()
-    SIDE_DISTANCE = my_robot.read_distance_2()
+    front = my_robot.read_distance()
+    side = my_robot.read_distance_2()
 
     # Priority 1: Wall ahead — P-controlled deceleration then turn
-    if FRONT_DISTANCE <= FRONT_STOP_DISTANCE:
-        # Stop and turn
-        my_robot.brake()
-        hold_state(0.3)
-        my_robot.rotate_left(TURN_SPEED)
-        hold_state(TURN_TIME)
-        my_robot.brake()
-        hold_state(0.3)
-        integral = 0
-        previous_error = 0
-    elif FRONT_DISTANCE < FRONT_SLOW_DISTANCE:
-        # Slow down
-        speed = front_Kp * (FRONT_DISTANCE - FRONT_STOP_DISTANCE)
-        if speed < 120:
-            speed = 120
-        if speed > BASE_SPEED:
-            speed = BASE_SPEED
-        my_robot.drive(speed, speed)
-    elif SIDE_DISTANCE != -1:
-        # PID wall follow
-        error = SIDE_DISTANCE - TARGET_WALL_DISTANCE
-        integral = integral + error
-        if integral > INTEGRAL_MAX:
-            integral = INTEGRAL_MAX
-        elif integral < -INTEGRAL_MAX:
-            integral = -INTEGRAL_MAX
-        derivative = error - previous_error
+    if front != -1 and front < FRONT_SLOW_DISTANCE:
+        if front <= FRONT_STOP_DISTANCE:
+            my_robot.brake()
+            hold_state(0.3)
+            my_robot.rotate_left(TURN_SPEED)
+            hold_state(TURN_TIME)
+            my_robot.brake()
+            hold_state(0.3)
+            side_integral = 0
+            side_previous_error = 0
+        else:
+            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
+            if approach_speed < 120:
+                approach_speed = 120
+            if approach_speed > BASE_SPEED:
+                approach_speed = BASE_SPEED
+            my_robot.drive(approach_speed, approach_speed)
 
-        steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+    # Priority 2: Lost the wall — drift toward it to reacquire
+    elif side == -1:
+        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * 0.4)
+        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * 0.4)
+        my_robot.drive(r, l)
+
+    # Priority 3: Wall visible — PID follow
+    else:
+        error = side - TARGET_WALL_DISTANCE
+        side_integral = side_integral + error
+        if side_integral > side_INTEGRAL_MAX:
+            side_integral = side_INTEGRAL_MAX
+        elif side_integral < -side_INTEGRAL_MAX:
+            side_integral = -side_INTEGRAL_MAX
+        side_derivative = error - side_previous_error
+
+        steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
         if steering > MAX_STEERING:
             steering = MAX_STEERING
         elif steering < -MAX_STEERING:
             steering = -MAX_STEERING
 
-        if WALL_SIDE == "right":
-            right_speed = BASE_SPEED - steering
-            left_speed = BASE_SPEED + steering
-        else:
-            right_speed = BASE_SPEED + steering
-            left_speed = BASE_SPEED - steering
+        right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+        left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
 
         my_robot.drive(int(right_speed), int(left_speed))
-        previous_error = error
+        side_previous_error = error
 
     hold_state(0.05)
 ```
@@ -341,7 +340,7 @@ while True:
 - Watch the simulator trace to see where the robot is getting stuck.
 - If the robot circles forever at a junction, the gentle turn may not be strong enough. Try reducing the 0.6 factor.
 - If the robot works in the simulator but not on the real robot, remember that real motors and sensors behave slightly differently. You may need to re-tune TURN_TIME and the PID gains.
-- Use `WALL_SIDE = "left"` if the maze is easier to solve from the other side.
+- Use `AIDriver("left")` or `AIDriver("right")` if the maze is easier to solve from the other side.
 
 ---
 

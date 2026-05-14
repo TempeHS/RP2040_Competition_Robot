@@ -122,7 +122,9 @@ describe("Full Application Integration", () => {
 
   describe("Code Execution Flow", () => {
     test("should run code through PythonRunner", async () => {
-      Editor.setCode("from aidriver import AIDriver\\nrobot = AIDriver()");
+      Editor.setCode(
+        'from aidriver import AIDriver\\nrobot = AIDriver(\\"left\\")',
+      );
 
       const result = await PythonRunner.run(Editor.getCode());
 

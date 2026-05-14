@@ -38,7 +38,7 @@ flowchart TD
     G --> H["Calculate side_derivative = error - side_previous_error"]
     H --> I["steering = (side_Kp × error) + (side_Kd × side_derivative)"]
     I --> J[Clamp steering to MAX_STEERING]
-    J --> K["Drive: right = BASE_SPEED - steering, left = BASE_SPEED + steering"]
+    K --> L["Drive: right = BASE_SPEED - (wall_sign × steering), left = BASE_SPEED + (wall_sign × steering)"]
     K --> L["Save side_previous_error = error"]
     L --> C
 
@@ -87,11 +87,11 @@ steering = (side_Kp * error) + (side_Kd * side_derivative)
 ## Example Starting Values
 
 ```python
-BASE_SPEED = 165
+BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
 MAX_STEERING = 40
-side_Kp = 0.55
-side_Kd = 0.25
+side_Kp = 0.40
+side_Kd = 0.15
 side_previous_error = 0
 ```
 
@@ -104,28 +104,28 @@ side_previous_error = 0
 
 Copy your working Challenge 1 code. You will add two things:
 
-1. A new variable `Kd` in the configuration section.
-2. A `previous_error` variable before the loop.
+1. A new variable `side_Kd` in the configuration section.
+2. A `side_previous_error` variable before the loop.
 3. The derivative calculation inside the loop.
 
 ---
 
 ## Step 2 — Add the New Variables
 
-Add `Kd` to your configuration and `previous_error` before the loop:
+Add `side_Kd` to your configuration and `side_previous_error` before the loop:
 
 ```python
-BASE_SPEED = 165
+BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
-Kp = 0.5
-Kd = 0.3                  # Derivative gain — dampens oscillations
+side_Kp = 0.40
+side_Kd = 0.15            # Derivative gain — dampens oscillations
 MAX_STEERING = 40
 
-previous_error = 0
+side_previous_error = 0
 ```
 
 > [!Note]
-> `previous_error` starts at 0 because on the first loop iteration, there is no previous reading.
+> `side_previous_error` starts at 0 because on the first loop iteration, there is no previous reading.
 
 ---
 
@@ -137,10 +137,10 @@ Inside your loop, after calculating the error, add the derivative calculation:
     error = wall_distance - TARGET_WALL_DISTANCE
 
     # Derivative: how fast is the error changing?
-    derivative = error - previous_error
+    side_derivative = error - side_previous_error
 
     # PD output
-    steering = (Kp * error) + (Kd * derivative)
+    steering = (side_Kp * error) + (side_Kd * side_derivative)
 ```
 
 ---
@@ -152,12 +152,12 @@ At the **end** of each loop iteration (after setting motor speeds), save the cur
 ```python
     my_robot.drive(int(right_speed), int(left_speed))
 
-    previous_error = error
+    side_previous_error = error
     hold_state(0.05)
 ```
 
 > [!Important]
-> If you forget this line, `previous_error` will always be 0 and the D term won't work at all.
+> If you forget this line, `side_previous_error` will always be 0 and the D term won't work at all.
 
 ---
 
@@ -193,16 +193,16 @@ The difference should be obvious, especially at the start where the robot begins
 from aidriver import AIDriver, hold_state
 import aidriver
 
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+aidriver.DEBUG_AIDRIVER = False
+my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
 
-BASE_SPEED = 165
+BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
-Kp = 0.5
-Kd = 0.3                  # Derivative gain — dampens oscillations
+side_Kp = 0.40             # Use the Kp you found in Challenge 1
+side_Kd = 0.15             # Derivative gain — dampens oscillations
 MAX_STEERING = 40
 
-previous_error = 0
+side_previous_error = 0
 
 while True:
     wall_distance = my_robot.read_distance_2()
@@ -214,21 +214,21 @@ while True:
 
     error = wall_distance - TARGET_WALL_DISTANCE
 
-    derivative = error - previous_error
+    side_derivative = error - side_previous_error
 
-    steering = (Kp * error) + (Kd * derivative)
+    steering = (side_Kp * error) + (side_Kd * side_derivative)
 
     if steering > MAX_STEERING:
         steering = MAX_STEERING
     elif steering < -MAX_STEERING:
         steering = -MAX_STEERING
 
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
 
     my_robot.drive(int(right_speed), int(left_speed))
 
-    previous_error = error
+    side_previous_error = error
     hold_state(0.05)
 ```
 
@@ -237,5 +237,5 @@ while True:
 ## Debugging Tips
 
 - Add `print("D:", derivative, "steer:", steering)` inside the loop to see how the derivative affects steering.
-- If both numbers look the same as Challenge 1, check that you are updating `previous_error` at the end of each loop.
+- If both numbers look the same as Challenge 1, check that you are updating `side_previous_error` at the end of each loop.
 - The D term should be largest in the first few loops (when the initial error is large and changing fast) and settle near zero once the robot is at the right distance.

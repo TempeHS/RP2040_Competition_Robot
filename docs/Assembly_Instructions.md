@@ -92,7 +92,7 @@ def main():
     print("Initialising AIDriver hardware test...")
 
     try:
-        robot = AIDriver()
+        robot = AIDriver("left")
     except Exception as exc:
         print("Failed to initialise AIDriver:", exc)
         print("Check that 'aidriver.py' is in the 'lib' folder on the device.")

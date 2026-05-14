@@ -62,10 +62,10 @@ flowchart TD
 
 **Sensor fusion** means using data from multiple sensors to make better decisions. In this challenge:
 
-| Sensor                         | Purpose                              | Code                         |
-| ------------------------------ | ------------------------------------ | ---------------------------- |
-| **Front** (`FRONT_DISTANCE`)   | Detect walls ahead — triggers a turn | `my_robot.read_distance()`   |
-| **Side** (`SIDE_DISTANCE`)     | Follow the wall — PID steering       | `my_robot.read_distance_2()` |
+| Sensor                       | Purpose                              | Code                         |
+| ---------------------------- | ------------------------------------ | ---------------------------- |
+| **Front** (`FRONT_DISTANCE`) | Detect walls ahead — triggers a turn | `my_robot.read_distance()`   |
+| **Side** (`SIDE_DISTANCE`)   | Follow the wall — PID steering       | `my_robot.read_distance_2()` |
 
 ### Priority-Based Decisions
 
@@ -113,11 +113,11 @@ The robot **gradually slows down** as it approaches the wall, then stops smoothl
 
 ### Resetting PID After a Turn
 
-After the robot turns, the side sensor now sees a completely different wall at a completely different distance. The integral and previous_error from before the turn are **no longer valid**. If you don't reset them, the PID will make a huge incorrect correction.
+After the robot turns, the side sensor now sees a completely different wall at a completely different distance. The `side_integral` and `side_previous_error` from before the turn are **no longer valid**. If you don't reset them, the PID will make a huge incorrect correction.
 
 ```python
-integral = 0
-previous_error = 0
+side_integral = 0
+side_previous_error = 0
 ```
 
 Always reset these after any major manoeuvre (turn, stop, reverse).
@@ -178,8 +178,8 @@ while True:
             hold_state(TURN_TIME)
             my_robot.brake()
             hold_state(0.3)
-            integral = 0
-            previous_error = 0
+            side_integral = 0
+            side_previous_error = 0
             continue
         else:
             # Approaching — slow down proportionally
@@ -210,7 +210,7 @@ The rest of the loop is your existing Challenge 3 PID wall-following code. It on
 
     if wall_distance == -1:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
-        integral = 0
+        side_integral = 0
         hold_state(0.05)
         continue
 
@@ -224,15 +224,15 @@ The rest of the loop is your existing Challenge 3 PID wall-following code. It on
 
 Run the code in the simulator and adjust:
 
-| Observation                             | Fix                                             |
-| --------------------------------------- | ----------------------------------------------- |
-| Robot doesn't slow down before the wall | Increase FRONT_SLOW_DISTANCE (try 500)          |
-| Robot stops too far from the wall       | Decrease FRONT_STOP_DISTANCE (try 80)           |
-| Robot crashes before stopping           | Increase FRONT_STOP_DISTANCE or FRONT_Kp        |
-| Robot doesn't turn enough               | Increase TURN_TIME                              |
-| Robot turns too far                     | Decrease TURN_TIME                              |
-| Robot jerks violently after turning     | Make sure you reset integral and previous_error |
-| Robot creeps very slowly near the wall  | Increase FRONT_Kp (try 0.8) for faster approach |
+| Observation                             | Fix                                                       |
+| --------------------------------------- | --------------------------------------------------------- |
+| Robot doesn't slow down before the wall | Increase FRONT_SLOW_DISTANCE (try 500)                    |
+| Robot stops too far from the wall       | Decrease FRONT_STOP_DISTANCE (try 80)                     |
+| Robot crashes before stopping           | Increase FRONT_STOP_DISTANCE or FRONT_Kp                  |
+| Robot doesn't turn enough               | Increase TURN_TIME                                        |
+| Robot turns too far                     | Decrease TURN_TIME                                        |
+| Robot jerks violently after turning     | Make sure you reset side_integral and side_previous_error |
+| Robot creeps very slowly near the wall  | Increase FRONT_Kp (try 0.8) for faster approach           |
 
 ---
 
@@ -243,8 +243,8 @@ Run the code in the simulator and adjust:
 from aidriver import AIDriver, hold_state
 import aidriver
 
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+aidriver.DEBUG_AIDRIVER = False
+my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
 
 BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
@@ -256,15 +256,15 @@ FRONT_Kp = 0.5
 TURN_SPEED = 180
 TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
-# Side PID gains (from Challenge 3)
-Kp = 0.5
-Ki = 0.01
-Kd = 0.3
+# Side PID gains (carry over your tuned values from Challenge 3)
+side_Kp = 0.40
+side_Ki = 0.003
+side_Kd = 0.15
 MAX_STEERING = 40
-INTEGRAL_MAX = 500
+side_INTEGRAL_MAX = 1200
 
-previous_error = 0
-integral = 0
+side_previous_error = 0
+side_integral = 0
 
 while True:
     front = my_robot.read_distance()
@@ -279,8 +279,8 @@ while True:
             hold_state(TURN_TIME)
             my_robot.brake()
             hold_state(0.3)
-            integral = 0
-            previous_error = 0
+            side_integral = 0
+            side_previous_error = 0
             continue
         else:
             # Approaching — slow down proportionally
@@ -298,29 +298,29 @@ while True:
 
     if wall_distance == -1:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
-        integral = 0
+        side_integral = 0
         hold_state(0.05)
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
-    integral = integral + error
-    if integral > INTEGRAL_MAX:
-        integral = INTEGRAL_MAX
-    elif integral < -INTEGRAL_MAX:
-        integral = -INTEGRAL_MAX
-    derivative = error - previous_error
+    side_integral = side_integral + error
+    if side_integral > side_INTEGRAL_MAX:
+        side_integral = side_INTEGRAL_MAX
+    elif side_integral < -side_INTEGRAL_MAX:
+        side_integral = -side_INTEGRAL_MAX
+    side_derivative = error - side_previous_error
 
-    steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+    steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
     if steering > MAX_STEERING:
         steering = MAX_STEERING
     elif steering < -MAX_STEERING:
         steering = -MAX_STEERING
 
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
     my_robot.drive(int(right_speed), int(left_speed))
 
-    previous_error = error
+    side_previous_error = error
     hold_state(0.05)
 ```
 
@@ -332,4 +332,4 @@ while True:
 - If the robot never slows down, check that `FRONT_SLOW_DISTANCE` is large enough for the front sensor to detect the wall in time.
 - If the robot never turns, check that the front sensor is returning valid values (not -1) and that `FRONT_STOP_DISTANCE` is reachable.
 - If the robot turns but then immediately turns again, `TURN_TIME` may be too short (it's still facing the wall after turning).
-- If the PID oscillates badly after a turn, make sure you are resetting both `integral = 0` and `previous_error = 0`.
+- If the PID oscillates badly after a turn, make sure you are resetting both `side_integral = 0` and `side_previous_error = 0`.

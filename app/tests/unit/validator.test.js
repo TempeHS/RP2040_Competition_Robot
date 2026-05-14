@@ -88,7 +88,7 @@ describe("Validator", () => {
 
           // Check "from X import Y" statements
           const fromMatch = line.match(
-            /^from\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+import/
+            /^from\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+import/,
           );
           if (fromMatch) {
             const module = fromMatch[1];
@@ -190,7 +190,7 @@ describe("Validator", () => {
   describe("validate()", () => {
     test("should return valid for correct code", () => {
       const result = ValidatorImpl.validate(
-        "from aidriver import AIDriver\nrobot = AIDriver()"
+        'from aidriver import AIDriver\nrobot = AIDriver("left")',
       );
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -212,7 +212,7 @@ describe("Validator", () => {
   describe("validateImports()", () => {
     test("should allow aidriver import", () => {
       const result = ValidatorImpl.validateImports(
-        "from aidriver import AIDriver"
+        "from aidriver import AIDriver",
       );
       expect(result.valid).toBe(true);
     });
@@ -276,9 +276,7 @@ describe("Validator", () => {
     });
 
     test("should handle comments", () => {
-      const result = ValidatorImpl.validateSyntax(
-        "# This is a comment\nx = 1"
-      );
+      const result = ValidatorImpl.validateSyntax("# This is a comment\nx = 1");
       expect(result.valid).toBe(true);
     });
 
@@ -305,7 +303,7 @@ describe("Validator", () => {
 
     test("should reject compile()", () => {
       const result = ValidatorImpl.validateForbidden(
-        "compile('x=1', '', 'exec')"
+        "compile('x=1', '', 'exec')",
       );
       expect(result.valid).toBe(false);
     });
@@ -332,7 +330,7 @@ describe("Validator", () => {
 
     test("should allow normal builtins", () => {
       const result = ValidatorImpl.validateForbidden(
-        "x = len([1,2,3])\nprint(x)"
+        "x = len([1,2,3])\nprint(x)",
       );
       expect(result.valid).toBe(true);
     });
@@ -341,7 +339,7 @@ describe("Validator", () => {
   describe("hasAIDriverImport()", () => {
     test("should detect 'from aidriver import'", () => {
       expect(
-        ValidatorImpl.hasAIDriverImport("from aidriver import AIDriver")
+        ValidatorImpl.hasAIDriverImport("from aidriver import AIDriver"),
       ).toBe(true);
     });
 
@@ -357,7 +355,7 @@ describe("Validator", () => {
   describe("Multiple Errors", () => {
     test("should collect multiple import errors", () => {
       const result = ValidatorImpl.validate(
-        "import os\nimport sys\nimport socket"
+        "import os\nimport sys\nimport socket",
       );
       expect(result.errors.length).toBe(3);
     });

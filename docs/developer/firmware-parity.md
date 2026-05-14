@@ -8,7 +8,7 @@ Learner scripts written for the physical RP2040 firmware must behave the same wa
 
 | Method                                       | Hardware Behaviour                                    | Simulator Equivalent                                                         |
 | -------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `AIDriver()`                                 | Initializes motor driver and telemetry queue          | Queues an `init` command so the simulator knows a session began              |
+| `AIDriver(wall_side)`                        | Initializes motor driver and telemetry queue          | Queues an `init` command so the simulator knows a session began              |
 | `drive_forward(right, left)`                 | Sets forward PWM on each motor                        | Enqueues `drive_forward` with rounded integer speeds                         |
 | `drive_backward(right, left)`                | Sets reverse PWM                                      | Enqueues `drive_backward` for the physics engine                             |
 | `rotate_left(speed)` / `rotate_right(speed)` | Counter-rotates wheels for on-spot turns              | Issues `rotate_left` / `rotate_right` commands                               |

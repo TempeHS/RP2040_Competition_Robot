@@ -17,7 +17,7 @@ def _make_robot(monkeypatch):
             messages.append(message)
 
     monkeypatch.setattr(module, "eventlog", DummyEventLog())
-    return module, module.AIDriver(), messages
+    return module, module.AIDriver("right"), messages
 
 
 def test_drive_forward_low_speed_logs_warning(monkeypatch):

@@ -15,11 +15,12 @@ needs to be flipped (negate the correction value).
 
 from aidriver import AIDriver, hold_state
 
-BASE_SPEED = 160   # Forward speed for both wheels
-CORRECTION = 60    # Speed difference to force a visible turn
+BASE_SPEED = 160  # Forward speed for both wheels
+CORRECTION = 60  # Speed difference to force a visible turn
 
 print("Initialising...")
-my_robot = AIDriver()
+my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
+print("wall_sign =", my_robot.wall_sign, "  (+1 = right wall, -1 = left wall)")
 print("Ready. Tests start in 3 seconds — place robot on the floor with space to move.")
 hold_state(3)
 
@@ -27,7 +28,11 @@ hold_state(3)
 print()
 print("Step 1: Steering LEFT  (right wheel faster)")
 print("  >> Robot nose should turn to the LEFT")
-print("  drive(right={}, left={})".format(BASE_SPEED + CORRECTION, BASE_SPEED - CORRECTION))
+print(
+    "  drive(right={}, left={})".format(
+        BASE_SPEED + CORRECTION, BASE_SPEED - CORRECTION
+    )
+)
 my_robot.drive(BASE_SPEED + CORRECTION, BASE_SPEED - CORRECTION)
 hold_state(2)
 my_robot.brake()
@@ -37,7 +42,11 @@ hold_state(2)
 print()
 print("Step 2: Steering RIGHT (left wheel faster)")
 print("  >> Robot nose should turn to the RIGHT")
-print("  drive(right={}, left={})".format(BASE_SPEED - CORRECTION, BASE_SPEED + CORRECTION))
+print(
+    "  drive(right={}, left={})".format(
+        BASE_SPEED - CORRECTION, BASE_SPEED + CORRECTION
+    )
+)
 my_robot.drive(BASE_SPEED - CORRECTION, BASE_SPEED + CORRECTION)
 hold_state(2)
 my_robot.brake()

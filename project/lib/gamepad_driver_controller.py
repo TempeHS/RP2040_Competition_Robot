@@ -92,7 +92,7 @@ class HM10AIDriverController:
 
 if __name__ == "__main__":
     hm10 = HM10Controller()
-    robot = AIDriver()
+    robot = AIDriver("right")  # wall_side required; direction unused in gamepad mode
     controller = HM10AIDriverController(hm10, robot)
 
     print("HM-10 AIDriver controller active.")

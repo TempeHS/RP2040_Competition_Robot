@@ -405,7 +405,7 @@ describe("Side Ultrasonic Sensor - Validator", () => {
   test("code using read_distance_2 should not be flagged as invalid", () => {
     const code = `
 from aidriver import AIDriver
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 side_dist = my_robot.read_distance_2()
 print(side_dist)
 `;

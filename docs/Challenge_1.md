@@ -20,7 +20,7 @@ My robot follows the wall through a straight corridor and reaches the **green ex
 
 1. Make sure you have completed the hardware setup in [Build Instructions](docs.html?doc=Assembly_Instructions).
 2. Open the **Simulator** and select **Challenge 1** from the menu.
-3. Note the corridor has a wall on the right side — your robot will follow it.
+3. Note which side the wall is on in the simulator — set `AIDriver("left")` or `AIDriver("right")` to match.
 
 ---
 
@@ -37,7 +37,7 @@ flowchart TD
     E -- Yes --> G[Calculate error]
     G --> H[Calculate steering = side_Kp × error]
     H --> I[Clamp steering to MAX_STEERING]
-    I --> J["Drive: right = BASE_SPEED - steering, left = BASE_SPEED + steering"]
+    I --> J["Drive: right = BASE_SPEED - (wall_sign × steering), left = BASE_SPEED + (wall_sign × steering)"]
     J --> C
 
     style A fill:#e1f5fe,color:#000000
@@ -109,8 +109,8 @@ Import the library and create the robot. Set up your configuration variables.
 from aidriver import AIDriver, hold_state
 import aidriver
 
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+aidriver.DEBUG_AIDRIVER = False
+my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
 ```
 
 > [!Tip]
@@ -123,10 +123,10 @@ my_robot = AIDriver()
 These are the numbers you will tune to get your robot working:
 
 ```python
-BASE_SPEED = 165          # Forward speed (must be > 120!)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-Kp = 0.5                  # Proportional gain
-MAX_STEERING = 40         # Max wheel speed difference
+BASE_SPEED = 160           # Forward speed (must be > 120!)
+TARGET_WALL_DISTANCE = 150 # Distance to maintain from wall (mm)
+side_Kp = 0.30             # Start here — raise in 0.10 steps until zig-zag starts
+MAX_STEERING = 40          # Max wheel speed difference
 ```
 
 > [!Note]
@@ -162,7 +162,7 @@ After the sensor check, calculate the error and apply P control:
     error = wall_distance - TARGET_WALL_DISTANCE
 
     # P controller: steering correction
-    steering = Kp * error
+    steering = side_Kp * error
 
     # Clamp steering so it doesn't go too extreme
     if steering > MAX_STEERING:
@@ -174,12 +174,12 @@ After the sensor check, calculate the error and apply P control:
 Then apply differential steering — one wheel speeds up, the other slows down (see "How Differential Steering Corrects the Distance" above for why this works):
 
 ```python
-    # Apply differential steering (wall on RIGHT side)
-    # Too far from wall → steering positive → left faster, right slower → curves right
-    # Too close to wall → steering negative → right faster, left slower → curves left
-    # At perfect distance → steering zero → both same speed → straight
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    # Apply differential steering — wall_sign handles left/right automatically
+    # Too far from wall → steering positive → curves toward wall
+    # Too close to wall → steering negative → curves away from wall
+    # At perfect distance → steering zero → drives straight
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
 
     my_robot.drive(int(right_speed), int(left_speed))
     hold_state(0.05)
@@ -196,8 +196,8 @@ Run your code in the simulator. Watch the robot carefully and adjust:
 
 | Symptom                            | Cause                             | Fix                                            |
 | ---------------------------------- | --------------------------------- | ---------------------------------------------- |
-| Robot barely corrects, drifts away | Kp too low                        | Increase Kp (try 0.8, 1.0)                     |
-| Robot oscillates side to side      | Kp too high                       | Decrease Kp (try 0.3, 0.2)                     |
+| Robot barely corrects, drifts away | side_Kp too low                   | Increase side_Kp (try 0.40, 0.50)              |
+| Robot oscillates side to side      | side_Kp too high                  | Decrease side_Kp (try 0.20, 0.15)              |
 | One wheel stops during correction  | `BASE_SPEED - MAX_STEERING < 120` | Increase `BASE_SPEED` or reduce `MAX_STEERING` |
 | Robot crashes into the wall        | TARGET_WALL_DISTANCE too small    | Increase TARGET_WALL_DISTANCE (try 200)        |
 
@@ -213,32 +213,39 @@ Run your code in the simulator. Watch the robot carefully and adjust:
 from aidriver import AIDriver, hold_state
 import aidriver
 
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver()
+aidriver.DEBUG_AIDRIVER = False
+my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
 
-BASE_SPEED = 165
+BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
-Kp = 0.5
+side_Kp = 0.30             # Start here — raise in 0.10 steps until zig-zag starts
 MAX_STEERING = 40
 
 while True:
-    wall_distance = my_robot.read_distance_2()
+    # Average 3 readings to filter sensor noise
+    r1 = my_robot.read_distance_2()
+    r2 = my_robot.read_distance_2()
+    r3 = my_robot.read_distance_2()
+    valid = [r for r in (r1, r2, r3) if r != -1]
 
-    if wall_distance == -1:
+    if not valid:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
         hold_state(0.05)
         continue
 
+    wall_distance = sum(valid) // len(valid)
     error = wall_distance - TARGET_WALL_DISTANCE
-    steering = Kp * error
+    steering = side_Kp * error
 
     if steering > MAX_STEERING:
         steering = MAX_STEERING
     elif steering < -MAX_STEERING:
         steering = -MAX_STEERING
 
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
+
+    print("dist:", wall_distance, "err:", error, "steer:", int(steering), "R:", int(right_speed), "L:", int(left_speed))
 
     my_robot.drive(int(right_speed), int(left_speed))
     hold_state(0.05)
@@ -251,7 +258,7 @@ while True:
 - Run your code after every change.
 - Watch the **debug output** — it shows sensor distances and motor speeds each loop.
 - If the robot doesn't move at all, check that `BASE_SPEED` is at least 120.
-- If the robot drives away from the wall, you may have the steering signs reversed — try swapping `+ steering` and `- steering`.
+- If the robot drives away from the wall, check that `AIDriver("left")`/`AIDriver("right")` matches your physical setup — the `wall_sign` controls steering direction automatically.
 - If something confusing happens, temporarily add:
 
   ```python

@@ -850,7 +850,7 @@
                 try {
                   await this.runPython(`
 from aidriver import AIDriver, hold_state
-robot = AIDriver()
+robot = AIDriver("left")
 print("IMPORT_SUCCESS")
 `);
                   this.assert(
@@ -876,7 +876,7 @@ print("IMPORT_SUCCESS")
                 await this.runPythonWithAnimation(
                   `
 from aidriver import AIDriver, hold_state
-robot = AIDriver()
+robot = AIDriver("left")
 robot.drive_forward(200, 200)
 hold_state(1.0)
 robot.brake()
@@ -905,7 +905,7 @@ robot.brake()
                 await this.runPythonWithAnimation(
                   `
 from aidriver import AIDriver, hold_state
-robot = AIDriver()
+robot = AIDriver("left")
 robot.drive_forward(200, 200)
 hold_state(0.3)
 robot.brake()
@@ -937,7 +937,7 @@ hold_state(0.3)
                 await this.runPythonWithAnimation(
                   `
 from aidriver import AIDriver, hold_state
-robot = AIDriver()
+robot = AIDriver("left")
 robot.drive_forward(150, 200)
 hold_state(1.0)
 robot.brake()
@@ -964,7 +964,7 @@ robot.brake()
               run: async () => {
                 const code = `
 from aidriver import AIDriver, hold_state
-robot = AIDriver()
+robot = AIDriver("left")
 robot.drive_forward(200, 200)
 hold_state(0.1)
 robot.brake()
@@ -1003,7 +1003,7 @@ robot.brake()
               run: async () => {
                 const code = `
 from aidriver import AIDriver, hold_state
-robot = AIDriver()
+robot = AIDriver("left")
 robot.drive_forward(200, 200)
 hold_state(0.1)
 `;
@@ -1057,7 +1057,7 @@ hold_state(0.1)
                 await this.runPythonWithAnimation(
                   `
 from aidriver import AIDriver, hold_state
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 my_robot.drive_forward(200, 200)
 hold_state(1.0)
 my_robot.brake()
@@ -1099,7 +1099,7 @@ my_robot.brake()
                 await this.runPythonWithAnimation(
                   `
 from aidriver import AIDriver, hold_state
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 my_robot.drive_forward(150, 200)
 hold_state(2.0)
 my_robot.brake()

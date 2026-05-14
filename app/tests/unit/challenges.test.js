@@ -17,7 +17,7 @@ describe("Challenges", () => {
             "Use the side sensor and P control to follow a straight wall",
           startCode: `from aidriver import AIDriver, hold_state
 import aidriver
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 # P controller wall following`,
           successCriteria: function (robot) {
             return (
@@ -35,7 +35,7 @@ my_robot = AIDriver()
           description: "Add the Derivative term to dampen oscillations",
           startCode: `from aidriver import AIDriver, hold_state
 import aidriver
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 # PD controller wall following`,
           successCriteria: function (robot) {
             return (
@@ -53,7 +53,7 @@ my_robot = AIDriver()
           description: "Add the Integral term to fix drift around an L corner",
           startCode: `from aidriver import AIDriver, hold_state
 import aidriver
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 # Full PID wall following`,
           successCriteria: function (robot) {
             return (
@@ -72,7 +72,7 @@ my_robot = AIDriver()
             "Combine front sensor with side PID to navigate dead ends",
           startCode: `from aidriver import AIDriver, hold_state
 import aidriver
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 # Sensor fusion: front + side PID`,
           successCriteria: function (robot) {
             return robot.x >= 1600 && robot.y <= 300;
@@ -85,7 +85,7 @@ my_robot = AIDriver()
           description: "Navigate the full maze using hand-on-wall algorithm",
           startCode: `from aidriver import AIDriver, hold_state
 import aidriver
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 # Hand-on-wall maze solver`,
           successCriteria: function (robot) {
             return robot.x >= 1700 && robot.y <= 300 && !robot.crashed;

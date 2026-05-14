@@ -19,7 +19,7 @@ Python can’t find a variable or name called `driver`.
 
 **Likely causes:**
 
-- You created your robot with a different name (e.g. `my_robot = AIDriver()`) but later used `driver`.
+- You created your robot with a different name (e.g. `my_robot = AIDriver("left")`) but later used `driver`.
 - You mis-typed the name (e.g. `my_robt` vs `my_robot`).
 
 **How to fix:**
@@ -29,7 +29,7 @@ Python can’t find a variable or name called `driver`.
 3. A simple pattern is:
 
    ```python
-   my_robot = AIDriver()
+   my_robot = AIDriver("left")
    my_robot.drive_forward(200, 200)
    ```
 
@@ -242,7 +242,7 @@ Python cannot find the `aidriver` library file.
    from aidriver import AIDriver
 
    aidriver.DEBUG_AIDRIVER = True
-   robot = AIDriver()
+   robot = AIDriver("left")
    ```
 
 4. Run a simple distance test loop and see what the debug messages say.

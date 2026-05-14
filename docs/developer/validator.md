@@ -15,7 +15,7 @@
 ## Usage Guidance
 
 - Missing imports: If no `aidriver` import is detected, learners receive a warning encouraging them to set up their robot object.
-- Missing AIDriver instance: Another warning nudges the learner to instantiate `AIDriver()`.
+- Missing AIDriver instance: Another warning nudges the learner to instantiate `AIDriver("left")` or `AIDriver("right")`.
 
 ## Syntax Heuristics
 
@@ -28,7 +28,7 @@
 
 ## API Conformance
 
-- `validateMethodUsage(code)` locates variables assigned to `AIDriver()` and ensures subsequent method calls belong to the approved set (`drive_forward`, `brake`, `read_distance`, etc.). Anything else yields a warning with line numbers.
+- `validateMethodUsage(code)` locates variables assigned to `AIDriver("left")` or `AIDriver("right")` and ensures subsequent method calls belong to the approved set (`drive_forward`, `brake`, `read_distance`, etc.). Anything else yields a warning with line numbers.
 - `validateFunctionCalls(code)` flags standalone function calls that are neither builtins from `ALLOWED_FUNCTIONS`, user-defined functions, nor previously assigned variables. These generate errors because execution would fail at runtime.
 
 ## Suggestions

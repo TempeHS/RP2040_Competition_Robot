@@ -50,6 +50,7 @@ print("\n── Section 1: Raw HCSR04 ultrasonic sensor ───────")
 
 try:
     from hcsr04 import HCSR04
+
     _record("hcsr04 import", True)
 except ImportError as e:
     _record("hcsr04 import", False, str(e))
@@ -104,6 +105,7 @@ print("\n── Section 2: AIDriver initialisation ─────────�
 try:
     import aidriver
     from aidriver import AIDriver, hold_state
+
     _record("aidriver import", True)
 except ImportError as e:
     _record("aidriver import", False, str(e))
@@ -113,7 +115,9 @@ robot = None
 if AIDriver is not None:
     aidriver.DEBUG_AIDRIVER = True
     try:
-        robot = AIDriver()
+        robot = AIDriver(
+            "right"
+        )  # wall_side required; direction unused in hardware test
         _record("AIDriver() constructor", True)
     except Exception as e:
         _record("AIDriver() constructor", False, str(e))

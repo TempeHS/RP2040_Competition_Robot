@@ -175,7 +175,8 @@ def _explain_error(exc):
     if isinstance(exc, NameError):
         if "my_robot" in msg:
             print(" - You are using 'my_robot' but have not created it.")
-            print("   Make sure you have 'my_robot = AIDriver()' near the top.")
+            print("   Make sure you have 'my_robot = AIDriver(\"left\")' near the top.")
+            print('   Use "right" if your wall is on the right side.')
         elif "AIDriver" in msg:
             print(" - Python cannot find 'AIDriver'.")
             print("   Check you wrote 'from aidriver import AIDriver' exactly.")
@@ -230,7 +231,7 @@ def hold_state(seconds):
 
         from aidriver import AIDriver, hold_state
 
-        my_robot = AIDriver()
+        my_robot = AIDriver("left")  # or AIDriver("right")
 
         my_robot.drive_forward(200, 200)
         hold_state(1)  # robot keeps doing the same thing for 1 second
@@ -497,6 +498,7 @@ class AIDriver:
 
     def __init__(
         self,
+        wall_side,  # Required: "left" or "right" — which wall the robot follows
         right_speed_pin=3,  # GP3 (PWM capable)
         left_speed_pin=11,  # GP11 (PWM capable)
         right_dir_pin=12,  # GP12
@@ -511,6 +513,10 @@ class AIDriver:
         """Initialize RP2040 based AIDriver differential drive robot.
 
         Args:
+            wall_side: Which wall to follow — "left" or "right" (default "right").
+                       Sets self.wall_sign = 1 for right, -1 for left.
+                       Use in PID loops: right_speed = BASE - (wall_sign * steering)
+                                         left_speed  = BASE + (wall_sign * steering)
             right_speed_pin: PWM pin for right motor speed (default GP3)
             left_speed_pin: PWM pin for left motor speed (default GP11)
             right_dir_pin: Digital pin for right motor direction (default GP12)
@@ -522,6 +528,9 @@ class AIDriver:
             trig_pin_2: Ultrasonic sensor 2 trigger pin (default GP4)
             echo_pin_2: Ultrasonic sensor 2 echo pin (default GP5)
         """
+        # wall_sign: 1 = right wall, -1 = left wall
+        # Used in the unified steering formula so direction is always correct.
+        self.wall_sign = -1 if str(wall_side).upper() == "LEFT" else 1
 
         # Library-side preflight: log pin config and attempt a quick sensor ping
         _d(

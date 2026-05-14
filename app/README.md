@@ -32,7 +32,7 @@ The simulator implements these AIDriver methods:
 ```python
 from aidriver import AIDriver, hold_state
 
-robot = AIDriver()
+robot = AIDriver("left")
 
 # Motor control
 robot.drive_forward(right_speed, left_speed)  # 0-255

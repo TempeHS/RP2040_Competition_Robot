@@ -253,7 +253,7 @@ describe("drive() - Validator consistency", () => {
   test("code using drive() should not be flagged as forbidden", () => {
     const code = `
 from aidriver import AIDriver
-my_robot = AIDriver()
+my_robot = AIDriver("left")
 my_robot.drive(200, 200)
 my_robot.drive(180 + correction, 180 - correction)
 `;

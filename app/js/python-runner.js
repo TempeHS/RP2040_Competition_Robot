@@ -192,15 +192,16 @@ def _get_commands():
 class AIDriver:
     """AIDriver robot controller for the simulator"""
     
-    def __init__(self):
-        """Initialize the robot"""
+    def __init__(self, wall_side):
+        """Initialize the robot. wall_side must be "left" or "right"."""
         global DEBUG_AIDRIVER
+        self.wall_sign = -1 if str(wall_side).upper() == "LEFT" else 1
         self._right_speed = 0
         self._left_speed = 0
         self._is_moving = False
         _queue_command("init")
         if DEBUG_AIDRIVER:
-            print("[AIDriver] Robot initialized")
+            print("[AIDriver] Robot initialized, wall_side=" + str(wall_side))
     
     def drive_forward(self, right_speed, left_speed):
         """Drive the robot forward with specified wheel speeds"""

@@ -19,7 +19,7 @@ side_Kp = 0.55
 MAX_STEERING = 40
 SAMPLES = 20  # readings to collect
 
-my_robot = AIDriver()
+my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
 hold_state(1)
 
 print()
