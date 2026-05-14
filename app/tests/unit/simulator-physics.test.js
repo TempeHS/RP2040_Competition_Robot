@@ -504,8 +504,8 @@ describe("Simulator physics math validation", () => {
     });
 
     test("differential speed → arc motion with correct radius", () => {
-      // Left=400, Right=200 → v=(400+200)/2=300, ω=(200−400)/120=−1.667
-      // R = v/ω = 300/−1.667 = −180 mm
+      // Left=400, Right=200 → v=(400+200)/2=300, ω=(400−200)/120=+1.667
+      // R = v/ω = 300/1.667 = +180 mm  (turns RIGHT, vL > vR)
       const robot = makeRobot({
         heading: 0,
         leftSpeed: velocityToPwm(400),
@@ -517,11 +517,11 @@ describe("Simulator physics math validation", () => {
         y: 1000,
       });
       const v = (400 + 200) / 2;
-      const omega = (200 - 400) / WHEEL_BASE;
+      const omega = (400 - 200) / WHEEL_BASE;
       const R = v / omega;
       expect(v).toBe(300);
-      expect(omega).toBeCloseTo(-1.6667, 3);
-      expect(R).toBeCloseTo(-180, 1);
+      expect(omega).toBeCloseTo(1.6667, 3);
+      expect(R).toBeCloseTo(180, 1);
 
       const dt = 0.01;
       const theta0 = 0;
