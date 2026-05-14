@@ -77,7 +77,28 @@ const AIDriverStub = {
            * Initialize the stub and register the robot instance.
            * @returns {null}
            */
-          $loc.__init__ = new Sk.builtin.func(function (self) {
+          $loc.__init__ = new Sk.builtin.func(function (self, wallSide) {
+            // Resolve the wall_side argument (defaults to "left" if omitted).
+            let sideStr = "left";
+            if (
+              wallSide !== undefined &&
+              !(wallSide instanceof Sk.builtin.none)
+            ) {
+              try {
+                sideStr = String(Sk.ffi.remapToJs(wallSide)).toLowerCase();
+              } catch (e) {
+                sideStr = "left";
+              }
+            }
+            if (sideStr !== "left" && sideStr !== "right") {
+              sideStr = "left";
+            }
+
+            // Expose `wall_sign` as a Python attribute so PID code can do
+            //   right = BASE - (my_robot.wall_sign * steering)
+            // Convention: left wall → -1, right wall → +1.
+            self.wall_sign = new Sk.builtin.int_(sideStr === "left" ? -1 : 1);
+
             self.rightSpeed = 0;
             self.leftSpeed = 0;
             self.isMoving = false;
@@ -85,11 +106,14 @@ const AIDriverStub = {
             AIDriverStub.robotInstance = self;
             AIDriverStub.queueCommand({
               type: "init",
-              params: {},
+              params: { side: sideStr },
             });
 
             if (AIDriverStub.DEBUG_AIDRIVER) {
-              DebugPanel.log("[AIDriver] Robot initialized", "info");
+              DebugPanel.log(
+                "[AIDriver] Robot initialized, wall_side=" + sideStr,
+                "info",
+              );
             }
 
             return Sk.builtin.none.none$;
