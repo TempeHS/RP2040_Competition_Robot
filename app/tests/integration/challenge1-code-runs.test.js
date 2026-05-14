@@ -69,7 +69,7 @@ function runWallFollow({
   targetWall = 150,
   maxSteering = 40,
   wallSign = -1, // wall on the LEFT → -1 (matches AIDriver("left"))
-  initialHeading = 15, // tilted slightly toward the wall on purpose
+  initialHeading = 0, // robot spawns aligned with the corridor
   steps = 600,
   dt = 1 / 30,
 }) {
@@ -86,6 +86,14 @@ function runWallFollow({
     trail: [],
     collisionCount: 0,
   };
+
+  // Track trajectory metrics so the test can fail if the robot loops or
+  // wildly oscillates (a previous version of the test only checked y<200,
+  // which let visibly-circling trajectories pass).
+  const startX = robot.x;
+  let minX = robot.x;
+  let maxX = robot.x;
+  let maxAbsHeading = 0;
 
   let lastDistance = -1;
   for (let i = 0; i < steps; i++) {
@@ -113,6 +121,13 @@ function runWallFollow({
       dt,
     );
 
+    // Track lateral excursion and heading swing.
+    if (robot.x < minX) minX = robot.x;
+    if (robot.x > maxX) maxX = robot.x;
+    let h = ((robot.heading % 360) + 360) % 360;
+    if (h > 180) h -= 360;
+    if (Math.abs(h) > maxAbsHeading) maxAbsHeading = Math.abs(h);
+
     // Bail out as soon as a crash happens — no point sampling further.
     if (robot.collisionCount > 0) {
       return {
@@ -120,6 +135,10 @@ function runWallFollow({
         collisions: robot.collisionCount,
         lastDistance,
         steps: i + 1,
+        minX,
+        maxX,
+        startX,
+        maxAbsHeading,
       };
     }
     // Or if we've made it to the top of the arena.
@@ -129,6 +148,10 @@ function runWallFollow({
         collisions: robot.collisionCount,
         lastDistance,
         steps: i + 1,
+        minX,
+        maxX,
+        startX,
+        maxAbsHeading,
       };
     }
   }
@@ -138,6 +161,10 @@ function runWallFollow({
     collisions: robot.collisionCount,
     lastDistance,
     steps,
+    minX,
+    maxX,
+    startX,
+    maxAbsHeading,
   };
 }
 
@@ -194,6 +221,16 @@ describe("Challenge 1 control code in the real simulator", () => {
       // The P controller drove the robot toward the target distance —
       // by the end we are within a reasonable band of TARGET.
       expect(Math.abs(result.lastDistance - targetWall)).toBeLessThan(120);
+
+      // Trajectory must look like wall-following, not circling: heading
+      // never swings beyond ±15° from straight-ahead, and lateral drift
+      // from the spawn x stays within 75mm.
+      expect(result.maxAbsHeading).toBeLessThan(15);
+      const lateralExcursion = Math.max(
+        Math.abs(result.maxX - result.startX),
+        Math.abs(result.minX - result.startX),
+      );
+      expect(lateralExcursion).toBeLessThan(75);
     });
   });
 

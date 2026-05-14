@@ -61,6 +61,15 @@ App.onAIDriverInstantiated = function (side) {
 
   Simulator.setSideSensorSide(side);
 
+  // Update the HUD label so the banner reflects the active side sensor.
+  const sideLabelEl =
+    typeof document !== "undefined"
+      ? document.getElementById("sideSensorLabel")
+      : null;
+  if (sideLabelEl) {
+    sideLabelEl.textContent = side === "right" ? "Right" : "Left";
+  }
+
   const challenge = App.currentChallengeConfig;
 
   // Some mazes (e.g. spiral, classic) are inherently chiral and cannot be
@@ -688,6 +697,13 @@ function loadMaze(mazeId) {
   if (typeof Simulator !== "undefined") {
     Simulator.setSideSensorSide("left");
   }
+  const sideLabelReset =
+    typeof document !== "undefined"
+      ? document.getElementById("sideSensorLabel")
+      : null;
+  if (sideLabelReset) {
+    sideLabelReset.textContent = "Left";
+  }
 
   // Set maze walls in simulator
   if (typeof Simulator !== "undefined") {
@@ -992,6 +1008,13 @@ function resetRobot() {
   // next AIDriver("right") call will re-apply the mirroring fresh.
   if (typeof Simulator !== "undefined") {
     Simulator.setSideSensorSide("left");
+  }
+  const sideLabelResetRun =
+    typeof document !== "undefined"
+      ? document.getElementById("sideSensorLabel")
+      : null;
+  if (sideLabelResetRun) {
+    sideLabelResetRun.textContent = "Left";
   }
   // Restore canonical (un-mirrored) success zone if a previous run mirrored it
   if (
