@@ -18,8 +18,8 @@
 #                              toward the wall (range 0.0–0.25)
 #
 # IMPORTANT: keep LOST_WALL_DRIFT small enough that the inside wheel
-# stays > 64 (the motor dead zone). With BASE_SPEED=150, 0.20 puts
-# the inside wheel at 120; higher values still move but crawl.
+# stays > 120 (the MIN_MOTOR_SPEED). With BASE_SPEED=200, 0.15 puts
+# the inside wheel at 170; higher values still move but crawl.
 #
 # Goal: complete the full maze without external help.
 # --------------------------------------------------------------------
@@ -30,18 +30,18 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-BASE_SPEED = 150
+BASE_SPEED = 200
 TARGET_WALL_DISTANCE = 200
-MAX_STEERING = 40
+MAX_STEERING = 60
 
 side_Kp = 0.25
-side_Kd = 0.20
+side_Kd = 0.30
 side_Ki = 0.005
 side_INTEGRAL_MAX = 1000
 
 FRONT_SLOW_DISTANCE = 400
-FRONT_STOP_DISTANCE = 120
-FRONT_Kp = 0.5
+FRONT_STOP_DISTANCE = 150
+FRONT_Kp = 1.0
 TURN_SPEED = 180
 TURN_TIME_90 = 0.35
 TURN_TIME_180 = 0.60

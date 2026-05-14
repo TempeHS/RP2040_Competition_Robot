@@ -1404,6 +1404,8 @@ def ticks_diff(t1, t2):
           case "brake":
             App.robot.leftSpeed = 0;
             App.robot.rightSpeed = 0;
+            App.robot.actualLeftV = 0;
+            App.robot.actualRightV = 0;
             App.robot.isMoving = false;
             break;
 

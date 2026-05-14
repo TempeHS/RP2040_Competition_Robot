@@ -25,12 +25,12 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-BASE_SPEED = 150
+BASE_SPEED = 200
 TARGET_WALL_DISTANCE = 200
-MAX_STEERING = 40
+MAX_STEERING = 60
 
 side_Kp = 0.25
-side_Kd = 0.20
+side_Kd = 0.30
 
 side_previous_error = 0
 
@@ -57,6 +57,9 @@ while True:
     left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
 
     my_robot.drive(int(right_speed), int(left_speed))
+
+    side_previous_error = error
+    hold_state(0.05)
 
     side_previous_error = error  # MUST be the last update before hold_state
     hold_state(0.05)
