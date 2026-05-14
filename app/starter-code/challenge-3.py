@@ -2,12 +2,15 @@
 # --------------------------------------------------------------------
 # Adds the Integral (I) term so the robot no longer drifts away from
 # the wall around the L-shaped corner. The full algorithm is already
-# written for you. Your job is to choose three values:
-#
-#     side_Kp, side_Kd   carry forward from Challenge 2
-#     side_Ki            the Integral gain (start very small)
+# written for you. Every numeric setting starts at 0.
 #
 # Tuning guide: docs.html?doc=PID_Real_World_Tuning_Quickstart
+#
+# Values to set:
+#     BASE_SPEED, TARGET_WALL_DISTANCE, MAX_STEERING   (carry forward)
+#     side_Kp, side_Kd                                 (carry forward)
+#     side_Ki                                          new — Integral gain
+#     side_INTEGRAL_MAX                                anti-windup clamp
 #
 # Goal: hold TARGET_WALL_DISTANCE through the corner with no drift.
 # --------------------------------------------------------------------
@@ -18,30 +21,19 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 0
+TARGET_WALL_DISTANCE = 0
+MAX_STEERING = 0
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.0  # ← TUNE ME (use your Challenge 2 result)
-# === BLOCK: SIDE_KP END ===
-
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.0  # ← TUNE ME (use your Challenge 2 result)
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.0  # ← TUNE ME (try ~0.003, raise in 0.002 steps)
-side_INTEGRAL_MAX = 1200  # Anti-windup clamp — leave alone unless tuning windup
-# === BLOCK: SIDE_KI END ===
+side_Kp = 0.0
+side_Kd = 0.0
+side_Ki = 0.0
+side_INTEGRAL_MAX = 0
 
 side_previous_error = 0
 side_integral = 0
 
 
-# === MAIN LOOP ===
 while True:
     wall_distance = my_robot.read_distance_2()
 

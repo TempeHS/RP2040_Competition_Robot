@@ -7,7 +7,7 @@
 // (which may have been written against an older starter shape, or accidentally
 // contain the answer key) is treated as stale and replaced with the fresh
 // scaffold on next load. Increment when starter-code/*.py changes meaningfully.
-const STARTER_VERSION = "v3";
+const STARTER_VERSION = "v4";
 
 const Editor = {
   instance: null,

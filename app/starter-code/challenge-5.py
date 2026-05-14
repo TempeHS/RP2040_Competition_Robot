@@ -2,13 +2,14 @@
 # --------------------------------------------------------------------
 # After braking at a wall ahead, the robot reads its side sensor to
 # decide between turning 90° (corner) or 180° (dead end). The full
-# algorithm is already written for you. Your job is to choose ONE
-# value:
-#
-#     TURN_TIME_180   how long to rotate to achieve a 180° turn
+# algorithm is already written for you. Every numeric setting starts
+# at 0.
 #
 # Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
-# (You also need TURN_TIME_90 and your PID gains from earlier.)
+#
+# Values to set:
+#     all carried-forward C4 values
+#     TURN_TIME_180   new — seconds for ~180° rotation (≈ 2 × TURN_TIME_90)
 #
 # Goal: navigate the corner AND the dead-end maze without help.
 # --------------------------------------------------------------------
@@ -19,42 +20,26 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 0
+TARGET_WALL_DISTANCE = 0
+MAX_STEERING = 0
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.0  # ← from Challenge 3
-# === BLOCK: SIDE_KP END ===
+side_Kp = 0.0
+side_Kd = 0.0
+side_Ki = 0.0
+side_INTEGRAL_MAX = 0
 
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.0  # ← from Challenge 3
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.0  # ← from Challenge 3
-side_INTEGRAL_MAX = 1200
-# === BLOCK: SIDE_KI END ===
-
-# === BLOCK: FRONT_CONFIG START ===
-FRONT_SLOW_DISTANCE = 400
-FRONT_STOP_DISTANCE = 120
-FRONT_Kp = 0.5
-TURN_SPEED = 180
-TURN_TIME_90 = 0.0  # ← from Challenge 4
-# === BLOCK: FRONT_CONFIG END ===
-
-# === BLOCK: TURN_TIME_180 START ===
-TURN_TIME_180 = 0.0  # ← TUNE ME (start at TURN_TIME_90 * 2, then refine)
-# === BLOCK: TURN_TIME_180 END ===
+FRONT_SLOW_DISTANCE = 0
+FRONT_STOP_DISTANCE = 0
+FRONT_Kp = 0.0
+TURN_SPEED = 0
+TURN_TIME_90 = 0.0
+TURN_TIME_180 = 0.0
 
 side_previous_error = 0
 side_integral = 0
 
 
-# === MAIN LOOP ===
 while True:
     front = my_robot.read_distance()
 

@@ -198,27 +198,25 @@ describe("Challenge 1 control code in the real simulator", () => {
   });
 
   describe("starter code with all values = 0 (app/starter-code/challenge-1.py)", () => {
-    test("file leaves side_Kp at 0.0 (TODO unfilled)", () => {
-      const kp = parsePyFloat(starterSrc, "side_Kp");
-      expect(kp).toBe(0);
+    test("every numeric setting is 0 — student must configure to make anything happen", () => {
+      expect(parsePyFloat(starterSrc, "side_Kp")).toBe(0);
+      expect(parsePyFloat(starterSrc, "BASE_SPEED")).toBe(0);
+      expect(parsePyFloat(starterSrc, "TARGET_WALL_DISTANCE")).toBe(0);
+      expect(parsePyFloat(starterSrc, "MAX_STEERING")).toBe(0);
     });
 
-    test("running with side_Kp = 0 the robot drifts off-heading and crashes into the wall", () => {
-      // Pull BASE_SPEED from the starter so the test reflects the real file.
-      const baseSpeed = parsePyFloat(starterSrc, "BASE_SPEED");
-
+    test("running with all settings = 0 the robot does not move and makes no progress", () => {
       const result = runWallFollow({
         Simulator,
-        side_Kp: 0, // ← all values = 0, no proportional correction
-        baseSpeed,
+        side_Kp: parsePyFloat(starterSrc, "side_Kp"),
+        baseSpeed: parsePyFloat(starterSrc, "BASE_SPEED"),
         targetWall: parsePyFloat(starterSrc, "TARGET_WALL_DISTANCE"),
         maxSteering: parsePyFloat(starterSrc, "MAX_STEERING"),
       });
 
-      // Without correction the tilted robot must hit the wall.
-      expect(result.collisions).toBeGreaterThan(0);
-      // Crash should happen while still in the corridor (not at the goal).
-      expect(result.robot.y).toBeGreaterThan(500);
+      // No motion → no collision and no northward progress from y=1700.
+      expect(result.collisions).toBe(0);
+      expect(result.robot.y).toBeGreaterThan(1690);
     });
   });
 });

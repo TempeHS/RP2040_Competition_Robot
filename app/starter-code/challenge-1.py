@@ -1,12 +1,17 @@
 # Challenge 1: Wall Follow — P Control
 # --------------------------------------------------------------------
-# The full algorithm is already written for you below. Your job is to
-# choose ONE value:
+# The full algorithm is already written for you below. Every numeric
+# setting starts at 0 — until you fill them in the robot will not
+# move. Read the tuning guide before you pick numbers:
 #
-#     side_Kp   the Proportional gain for steering
-#
-# Read the tuning guide before you pick a number:
 #     docs.html?doc=PID_Real_World_Tuning_Quickstart
+#
+# Values to set:
+#     BASE_SPEED              forward speed (must stay > 120, motor dead zone)
+#     TARGET_WALL_DISTANCE    distance to maintain from wall (mm)
+#     MAX_STEERING            max wheel-speed difference
+#                             (BASE_SPEED - MAX_STEERING must be >= 120)
+#     side_Kp                 Proportional gain for steering
 #
 # Goal: reach the green exit zone without hitting the side wall.
 # --------------------------------------------------------------------
@@ -17,18 +22,13 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False  # Set True to print sensor + motor values
 my_robot = AIDriver("left")  # "left" or "right" — match the simulator scene
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160  # Forward speed (must stay > 120, the motor dead zone)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-MAX_STEERING = 40  # Max wheel-speed difference
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 0
+TARGET_WALL_DISTANCE = 0
+MAX_STEERING = 0
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.0  # ← TUNE ME (see PID_Real_World_Tuning_Quickstart)
-# === BLOCK: SIDE_KP END ===
+side_Kp = 0.0
 
 
-# === MAIN LOOP ===
 while True:
     wall_distance = my_robot.read_distance_2()
 
