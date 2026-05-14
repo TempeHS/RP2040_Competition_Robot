@@ -44,7 +44,6 @@
  */
 
 /* global RobotConfig */
-/* global RobotConfig */
 const Simulator = (function () {
   "use strict";
 

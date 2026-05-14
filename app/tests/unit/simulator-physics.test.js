@@ -720,6 +720,153 @@ describe("Simulator physics math validation", () => {
       const distance = Math.abs(robot.y - startY);
       expect(distance).toBeCloseTo(totalExpected, 0);
     });
+
+    test("1500mm from rest at full PWM: calculate exact time, assert exact distance", () => {
+      // ── Hand calculation from real-world constants ──────────────
+      //
+      //   top speed  V = 650 mm/s
+      //   accel      a = 1750 mm/s²
+      //
+      //   Phase 1 — accelerate from 0 to V:
+      //     t_ramp = V / a             = 650 / 1750         = 13/35 s
+      //     d_ramp = ½ · a · t_ramp²   = V² / (2a)         = 422500 / 3500
+      //            = 120.714285… mm
+      //
+      //   Phase 2 — cruise at V for the remaining distance:
+      //     d_cruise = 1500 − d_ramp   = 1500 − 120.714…   = 1379.2857… mm
+      //     t_cruise = d_cruise / V    = 1379.2857… / 650   = 2.12197… s
+      //
+      //   Total time:
+      //     t_total = t_ramp + t_cruise = 0.37143… + 2.12197… = 2.49340… s
+      //
+      //   If the simulator is correct it moves EXACTLY 1500mm in that time.
+      // ────────────────────────────────────────────────────────────
+
+      const TARGET_DIST = 1500; // mm
+
+      const tRamp = TOP_SPEED / ACCEL; // 0.37142857…
+      const dRamp = (TOP_SPEED * TOP_SPEED) / (2 * ACCEL); // 120.71428…
+      const dCruise = TARGET_DIST - dRamp; // 1379.2857…
+      const tCruise = dCruise / TOP_SPEED; // 2.12197…
+      const tTotal = tRamp + tCruise; // 2.49340…
+
+      // Verify the hand-calc intermediate values
+      expect(tRamp).toBeCloseTo(13 / 35, 10);
+      expect(dRamp).toBeCloseTo(120.7143, 2);
+      expect(tTotal).toBeCloseTo(2.4934, 3);
+
+      // ── Run the simulator for exactly tTotal seconds ───────────
+      // Use 0.1 ms timestep for high accuracy (24934 steps)
+      const DT = 0.0001;
+      const steps = Math.round(tTotal / DT);
+
+      let robot = makeRobot({
+        heading: 0,
+        leftSpeed: 255,
+        rightSpeed: 255,
+        isMoving: true,
+        actualLeftV: 0,
+        actualRightV: 0,
+        x: 1000,
+        y: 1800,
+      });
+      for (let i = 0; i < steps; i++) {
+        robot = stepNoCollision(robot, DT);
+      }
+
+      const distanceTravelled = Math.abs(robot.y - 1800);
+      expect(distanceTravelled).toBeCloseTo(TARGET_DIST, 0);
+
+      // Must have reached full speed
+      expect(robot.actualLeftV).toBeCloseTo(TOP_SPEED, 1);
+      // Must still be heading straight up
+      expect(robot.heading).toBeCloseTo(0, 5);
+      // No X drift
+      expect(robot.x).toBeCloseTo(1000, 3);
+    });
+
+    test("1500mm in all 4 cardinal directions", () => {
+      const TARGET_DIST = 1500;
+      const tRamp = TOP_SPEED / ACCEL;
+      const dRamp = (TOP_SPEED * TOP_SPEED) / (2 * ACCEL);
+      const tTotal = tRamp + (TARGET_DIST - dRamp) / TOP_SPEED;
+      const DT = 0.0001;
+      const steps = Math.round(tTotal / DT);
+
+      // heading=0 → −Y,  heading=90 → +X,  heading=180 → +Y,  heading=270 → −X
+      // Start positions give 1700mm+ clearance in direction of travel (arena boundary at 75)
+      const cases = [
+        { heading: 0, sx: 1000, sy: 1800, expectDx: 0, expectDy: -TARGET_DIST },
+        { heading: 90, sx: 200, sy: 1000, expectDx: +TARGET_DIST, expectDy: 0 },
+        {
+          heading: 180,
+          sx: 1000,
+          sy: 200,
+          expectDx: 0,
+          expectDy: +TARGET_DIST,
+        },
+        {
+          heading: 270,
+          sx: 1800,
+          sy: 1000,
+          expectDx: -TARGET_DIST,
+          expectDy: 0,
+        },
+      ];
+
+      for (const { heading, sx, sy, expectDx, expectDy } of cases) {
+        let robot = makeRobot({
+          heading,
+          leftSpeed: 255,
+          rightSpeed: 255,
+          isMoving: true,
+          actualLeftV: 0,
+          actualRightV: 0,
+          x: sx,
+          y: sy,
+        });
+        for (let i = 0; i < steps; i++) {
+          robot = stepNoCollision(robot, DT);
+        }
+        const dx = robot.x - sx;
+        const dy = robot.y - sy;
+        expect(dx).toBeCloseTo(expectDx, 0);
+        expect(dy).toBeCloseTo(expectDy, 0);
+      }
+    });
+
+    test("braking distance from full speed: d = V²/(2·decel) = 120.71mm", () => {
+      // ── Robot at full speed, PWM set to 0 — how far until it stops? ──
+      //   d_brake = V² / (2 · decel) = 650² / (2 × 1750) = 120.714… mm
+      //   t_brake = V / decel = 650 / 1750 = 0.37143… s
+
+      const dBrake = (TOP_SPEED * TOP_SPEED) / (2 * DECEL);
+      const tBrake = TOP_SPEED / DECEL;
+      expect(dBrake).toBeCloseTo(120.7143, 2);
+      expect(tBrake).toBeCloseTo(0.37143, 3);
+
+      const DT = 0.0001;
+      const steps = Math.round(tBrake / DT);
+
+      let robot = makeRobot({
+        heading: 90,
+        leftSpeed: 0,
+        rightSpeed: 0,
+        isMoving: true,
+        actualLeftV: TOP_SPEED,
+        actualRightV: TOP_SPEED,
+        x: 500,
+        y: 1000,
+      });
+      for (let i = 0; i < steps; i++) {
+        robot = stepNoCollision(robot, DT);
+      }
+
+      const dist = Math.abs(robot.x - 500);
+      expect(dist).toBeCloseTo(dBrake, 0);
+      // Should be stopped (or nearly)
+      expect(Math.abs(robot.actualLeftV)).toBeLessThan(1);
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────
