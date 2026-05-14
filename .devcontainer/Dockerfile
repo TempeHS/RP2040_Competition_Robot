@@ -1,6 +1,7 @@
 FROM ubuntu:24.04
 
-# Install build dependencies for MicroPython RP2 (Raspberry Pi Pico)
+# Install build dependencies for MicroPython RP2 (Raspberry Pi Pico) and the
+# web-based simulator's Jest/ESLint test toolchain.
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -11,6 +12,15 @@ RUN apt-get update && apt-get install -y \
     libnewlib-arm-none-eabi \
     wget \
     unzip \
+    ca-certificates \
+    curl \
+    gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+         | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
+         > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Use /workspaces to match Codespaces defaults

@@ -1,167 +1,150 @@
-# PID Real-World Tuning Quickstart
+# Side Wall PID Tuning Quickstart
 
-Use this checklist to tune wall-follow PID on the real robot. All variables for the side controller use the `side_` prefix to avoid collisions.
+Use this checklist to tune the **side-wall PID** on the real robot. The variables match the [Challenge starter code](docs.html?doc=Challenge_3) (`side_` prefix everywhere) so values you find here paste straight into Challenges 1–6.
+
+> [!Tip]
+> Tune in the simulator first to learn the workflow, then re-tune on the real robot. Real motors and sensors behave differently — expect smaller `side_Kp` and `side_Ki` values on hardware than in the simulator.
+
+---
 
 ## 1. Safe Starting Setup
 
-- `BASE_SPEED = 165`
-- `TARGET_WALL_DISTANCE = 150` (mm)
-- Loop delay: `hold_state(0.05)`
-- `MAX_STEERING = 40`
-- `side_Kp = 0`
-- `side_Ki = 0`
-- `side_Kd = 0`
-- `side_INTEGRAL_MAX = 0`
-- `side_previous_error = 0`
-- `side_integral = 0`
-- Keep this rule true: `BASE_SPEED - MAX_STEERING >= 120`
+These constants come from the canonical `CONFIG_BASE` block used by every challenge:
 
-**Expected behavior:** Robot drives straight at a safe speed. Some natural drift away from the wall is normal and expected. The robot should not turn sharply or crash, but it may slowly veer off course. This is OK for initial safety.
+```python
+BASE_SPEED           = 160   # Forward speed (must be > 120)
+TARGET_WALL_DISTANCE = 150   # mm
+MAX_STEERING         = 40    # Max wheel speed difference
+# Loop delay: hold_state(0.05)
+# Rule: BASE_SPEED - MAX_STEERING >= 120 (motor dead zone)
+```
 
-## 2. Starting PID Values
+Start every gain at **zero**:
 
-Leave all gains at **zero** from Step 1. You will raise them one at a time in the steps below.
+```python
+side_Kp = 0
+side_Ki = 0
+side_Kd = 0
+side_INTEGRAL_MAX   = 0
+side_previous_error = 0
+side_integral       = 0
+```
 
-- `side_Kp = 0`
-- `side_Kd = 0`
-- `side_Ki = 0`
-- `side_INTEGRAL_MAX = 0`
-- `side_previous_error = 0`
-- `side_integral = 0`
+**Expected behaviour:** Robot drives straight and ignores the wall. Some natural drift is normal — confirm the chassis moves cleanly before adding any gain.
 
-**Expected behavior:** Robot drives straight and ignores the wall. This is your safe baseline — confirm the robot moves cleanly before adding any gain
+---
 
-**Expected behavior:** Robot drives straight and ignores the wall. This is your safe baseline — confirm the robot moves cleanly before adding any gain.
+## 2. Tune In This Order
 
-## 3. Tune In This Order
+1. `side_Kp` first
+2. `side_Kd` second
+3. `side_Ki` last
 
-1. Tune `side_Kp` first
-2. Tune `side_Kd` second
-3. Tune `side_Ki` last
+---
 
-**ExpeRamp Up Kp From Zero
+## 3. Ramp Up `side_Kp` From Zero
 
 Keep `side_Ki = 0` and `side_Kd = 0` throughout this step.
 
-| Run | `side_Kp` | What to look for |
-|-----|-----------|------------------|
-| 1 | **0.10** | Robot barely reacts — drifts slowly. This is expected. |
-| 2 | **0.20** | Gentle corrections begin. Robot starts to follow the wall loosely. |
-| 3 | **0.30** | Corrections are visible. Robot tracks the wall but may have some steady offset. |
-| 4 | **0.40** | Good tracking. Watch carefully for the start of a zig-zag. |
-| 5 | **0.50** | Corrections are strong. Zig-zag may begin here for some robots. |
-| 6 | **0.60** | If zig-zag has not started, continue in `0.05` steps. |
+| Run | `side_Kp` | What to look for                                                       |
+| --- | --------- | ---------------------------------------------------------------------- |
+| 1   | **0.10**  | Robot barely reacts — drifts slowly. Expected.                         |
+| 2   | **0.20**  | Gentle corrections begin.                                              |
+| 3   | **0.30**  | Robot tracks the wall but may have steady offset.                      |
+| 4   | **0.40**  | Good tracking. Watch for the start of zig-zag.                         |
+| 5   | **0.50**  | Corrections strong; zig-zag may begin.                                 |
+| 6   | **0.60+** | If no zig-zag yet, continue in `0.05` steps until oscillation appears. |
 
-**Stop** as soon as you see a regular side-to-side zig-zag. That is your **oscillation point**.
+**Stop** at the first regular side-to-side zig-zag — that's your **oscillation point**. Then back off **20–30%**:
 
-Then **back off by 20–30%**:
+| Oscillation at | Final `side_Kp` |
+| -------------- | --------------- |
+| 0.50           | 0.35 – 0.40     |
+| 0.60           | 0.42 – 0.48     |
 
-```
-If oscillation started at 0.50 → set side_Kp = 0.35 to 0.40
-If oscillation started at 0.60 → set side_Kp = 0.42 to 0.48
-```
+Typical final `side_Kp` on the real robot: **0.30 – 0.55**.
 
-Typical final `side_Kp`: `0.30` to `0.55` (real robots tend to be lower than the simulator).
+---
 
-**Expected behavior at each step:**
-- Low Kp (0.10–0.20): robot drifts slowly — this is normal, P is working but weak.
-- Correct Kp: smooth, steady wall following with small corrections.
-- Too high: rapid zig-zag — back off immediately
-| 3 | **0.30** | Corrections are visible. Robot tracks the wall but may have some steady offset. |
-| 4 | **0.40** | Good tracking. Watch carefully for the start of a zig-zag. |
-| 5 | **0.50** | Corrections are strong. Zig-zag may begin here for some robots. |
-| 6 | **0.60** | If zig-zag has not started, continue in 0.05 steps. |
+## 4. Add `side_Kd` to Reduce Oscillation
 
-**Stop** as soon as you see a regular side-to-side zig-zag. That is your **oscillation point**.
+1. Start `side_Kd = 0.10`
+2. Increase by `0.05` per run
+3. Stop when oscillation is mostly gone but response is still snappy
 
-Then **back off by 20–30%**:
+Typical final `side_Kd`: **0.15 – 0.45**. Default in the starter code is `0.15`.
 
-```
-If oscillation started at 0.50 → set side_Kp = 0.35 to 0.40
-If oscillation started at 0.60 → set side_Kp = 0.42 to 0.48
-```
+**Expected behaviour:** Zig-zagging shrinks. Robot follows the wall smoothly with small, quick corrections only.
 
-Typical final `side_Kp`: `0.30` to `0.55` (real robots tend to be lower than simulators).
+---
 
-**Expected behavior at each step:**
-- At low Kp (0.10–0.20): robot drifts slowly — this is normal, it means P is working but weak.
-- At correct Kp: smooth, steady wall following with small corrections.
-- Too high: rapid zig-zag — back off immediately.
-
-## 5. Add D to Reduce Oscillation
-
-1. Start `side_Kd = 0.15`
-2. Increase `side_Kd` by `0.05`
-3. Stop when oscillation is mostly gone but response is still quick
-
-Typical final `side_Kd`: `0.20` to `0.45`
-
-**Expected behavior:** Robot's zig-zagging should decrease. It should follow the wall more smoothly, with less overshoot and fewer sharp corrections. Some small, quick corrections are normal.
-
-## 6. Add I to Remove Steady Drift
+## 5. Add `side_Ki` to Remove Steady Drift
 
 1. Start `side_Ki = 0.003`
-2. Increase by `0.002`
+2. Increase by `0.002` per run
 3. Stop when long-run offset is removed
-4. If slow weaving starts, `side_Ki` is too high
+4. If a slow weave appears, `side_Ki` is too high — back off
 
-Typical final `side_Ki`: `0.004` to `0.015`
+Typical final `side_Ki`: **0.003 – 0.015**.
 
-**Expected behavior:** Robot should stop drifting away from the wall over time. If it starts to weave slowly or makes large, slow corrections, reduce `side_Ki`.
+---
 
-## 7. Set INTEGRAL_MAX Properly
+## 6. Set `side_INTEGRAL_MAX` Properly
 
-Aim for I-term max of about `8-16` steering units.
+Aim for an I-term contribution of about **8–16 steering units** at the clamp:
 
-Formula:
-
-- `I_term_max = side_Ki * side_INTEGRAL_MAX`
-
-Examples:
-
-- If `side_Ki = 0.01`, use `side_INTEGRAL_MAX = 800 to 1600`
-- If `side_Ki = 0.008`, use `side_INTEGRAL_MAX = 1000 to 2000`
-
-Good default: `side_INTEGRAL_MAX = 1200`
-
-**Expected behavior:** Robot should not suddenly veer or oscillate due to the integral term. If it does, reduce `side_INTEGRAL_MAX`.
-
-## 8. Symptom -> Fix
-
-Use this as your starting point. **All gains start at zero** — raise them using the steps above.
-
-```python
-BASE_SPEED = 165
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-
-# Start all gains at 0. Raise side_Kp first using the ramp-up table in Step 4.
-side_Kp = 0.10       # Start here — raise in 0.10 steps, then 0.05 steps near oscillation.
-side_Ki = 0          # Add only after Kp and Kd are tuned.
-side_Kd = 0          # Add after Kp is set.
-side_INTEGRAL_MAX = 0
-side_previous_error = 0
-side_integral = 0
+```
+I_term_max = side_Ki * side_INTEGRAL_MAX
 ```
 
-**Expected behavior:** Robot drives straight at first. Add `side_Kp` gradually following the ramp-up table in Step 4 until it tracks the wall smoothly
+| `side_Ki` | Suggested `side_INTEGRAL_MAX` |
+| --------- | ----------------------------- |
+| 0.003     | 1200 (default)                |
+| 0.008     | 1000 – 2000                   |
+| 0.015     | 600 – 1100                    |
 
-**Expected behavior:** Robot should consistently follow the wall in all test scenarios. Each change should have a clear, real-world effect.
+If the robot suddenly veers when re-acquiring the wall, lower `side_INTEGRAL_MAX`.
 
-## 10. Quick Copy/Paste Block
+---
+
+## 7. Symptom → Fix
+
+| Symptom                              | Likely cause       | Fix                                                   |
+| ------------------------------------ | ------------------ | ----------------------------------------------------- |
+| Drifts away from wall                | `side_Kp` too low  | +0.05 to `side_Kp`                                    |
+| Rapid zig-zag                        | `side_Kp` too high | -20 % from `side_Kp`                                  |
+| Oscillation that won't damp          | `side_Kd` too low  | +0.05 to `side_Kd`                                    |
+| Sluggish response                    | `side_Kd` too high | -0.05 from `side_Kd`                                  |
+| Slow drift over long straights       | `side_Ki` too low  | +0.002 to `side_Ki`                                   |
+| Slow rolling weave                   | `side_Ki` too high | -0.002 from `side_Ki`                                 |
+| Big jolt after wall reappears        | Integral windup    | Lower `side_INTEGRAL_MAX`; ensure reset on `side==-1` |
+| One wheel stalls during a correction | Dead-zone violated | Increase `BASE_SPEED` or reduce `MAX_STEERING`        |
+
+---
+
+## 8. Field Test Routine
+
+1. Three straight-corridor passes
+2. Three L-corner passes (Challenge 3 maze)
+3. Three zig-zag passes (Challenge 6 maze)
+4. Change **one gain at a time**; record values + behaviour after each run
+
+---
+
+## 9. Quick Copy/Paste Block (matches Challenge 3+ starter)
 
 ```python
-BASE_SPEED = 165
+BASE_SPEED           = 160
 TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
+MAX_STEERING         = 40
 
-side_Kp = 0.55
-side_Ki = 0.008
-side_Kd = 0.25
+side_Kp           = 0.40
+side_Kd           = 0.15
+side_Ki           = 0.003
 side_INTEGRAL_MAX = 1200
 
 side_previous_error = 0
-side_integral = 0
+side_integral       = 0
 ```
 
-**Expected behavior:** Use these values as a starting point. Robot should follow the wall reasonably well, ready for fine tuning.
+These are the **simulator-tuned** values. Use them as your starting point on hardware, then re-tune `side_Kp` and `side_Kd` first.

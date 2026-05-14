@@ -69,7 +69,10 @@
               </a>
               <ul class="dropdown-menu" aria-labelledby="challengeDocsDropdown">
                 <li>
-                  <a class="dropdown-item" href="docs.html?doc=Assembly_Instructions">
+                  <a
+                    class="dropdown-item"
+                    href="docs.html?doc=Assembly_Instructions"
+                  >
                     <i class="bi bi-tools me-2"></i>Build Instructions
                   </a>
                 </li>
@@ -92,12 +95,20 @@
                 <li><hr class="dropdown-divider" /></li>
                 <li>
                   <a class="dropdown-item" href="docs.html?doc=Challenge_4">
-                    <i class="bi bi-sign-turn-right me-2"></i>Challenge 4: Dead End Detection
+                    <i class="bi bi-sign-turn-right me-2"></i>Challenge 4:
+                    Corner Detection
                   </a>
                 </li>
                 <li>
                   <a class="dropdown-item" href="docs.html?doc=Challenge_5">
-                    <i class="bi bi-signpost-split me-2"></i>Challenge 5: Maze Solver
+                    <i class="bi bi-sign-u-turn me-2"></i>Challenge 5: Dead End
+                    Detection
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="docs.html?doc=Challenge_6">
+                    <i class="bi bi-signpost-split me-2"></i>Challenge 6: Maze
+                    Solver
                   </a>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
@@ -109,11 +120,35 @@
               </ul>
             </li>
 
-            <!-- PID Tuning (active) -->
-            <li class="nav-item">
-              <a class="nav-link active" href="pid-tuning.html">
+            <!-- PID Tuning Dropdown (active) -->
+            <li class="nav-item dropdown">
+              <a
+                class="nav-link dropdown-toggle active"
+                href="#"
+                id="pidTuningDropdown"
+                role="button"
+                data-bs-toggle="dropdown"
+              >
                 <i class="bi bi-sliders me-1"></i>PID Tuning
               </a>
+              <ul class="dropdown-menu" aria-labelledby="pidTuningDropdown">
+                <li>
+                  <a class="dropdown-item" href="pid-tuning.html#sideGuide">
+                    <i class="bi bi-arrow-left-right me-2"></i>Side Wall PID
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="pid-tuning.html#frontGuide">
+                    <i class="bi bi-arrow-up me-2"></i>Front Distance PID
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="pid-tuning.html#turnGuide">
+                    <i class="bi bi-arrow-clockwise me-2"></i>Turn Time (90° /
+                    180°)
+                  </a>
+                </li>
+              </ul>
             </li>
 
             <!-- Challenge Simulator Dropdown -->
@@ -147,17 +182,29 @@
               </a>
               <ul class="dropdown-menu" aria-labelledby="downloadsDropdown">
                 <li>
-                  <a class="dropdown-item" href="_Firmware/THS_Comp_RP2040.uf2" download>
+                  <a
+                    class="dropdown-item"
+                    href="_Firmware/THS_Comp_RP2040.uf2"
+                    download
+                  >
                     <i class="bi bi-cpu me-2"></i>AIDriver Custom Firmware
                   </a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="_Firmware/PiPico_Firmware/RPI_PICO-20250415-v1.25.0.uf2" download>
+                  <a
+                    class="dropdown-item"
+                    href="_Firmware/PiPico_Firmware/RPI_PICO-20250415-v1.25.0.uf2"
+                    download
+                  >
                     <i class="bi bi-motherboard me-2"></i>RP2040 Firmware
                   </a>
                 </li>
                 <li>
-                  <a class="dropdown-item" href="_Firmware/Brick_recovery/pico_nuke_pico-1.4.uf2" download>
+                  <a
+                    class="dropdown-item"
+                    href="_Firmware/Brick_recovery/pico_nuke_pico-1.4.uf2"
+                    download
+                  >
                     <i class="bi bi-trash me-2"></i>Wipe RP2040 Firmware
                   </a>
                 </li>
@@ -166,7 +213,11 @@
 
             <!-- MicroPython Lab -->
             <li class="nav-item">
-              <a class="nav-link" href="https://lab-micropython.arduino.cc/" target="_blank">
+              <a
+                class="nav-link"
+                href="https://lab-micropython.arduino.cc/"
+                target="_blank"
+              >
                 <i class="bi bi-code-square me-1"></i>MicroPython Lab
               </a>
             </li>
@@ -193,12 +244,21 @@
               <article id="sideGuide" class="markdown-body"></article>
             </div>
           </div>
-          <div class="card bg-dark border-secondary doc-card">
+          <div class="card bg-dark border-secondary doc-card mb-4">
             <div class="card-header text-info fw-bold">
               <i class="bi bi-sliders me-2"></i>Front Distance PID Tuning Guide
             </div>
             <div class="card-body p-0">
               <article id="frontGuide" class="markdown-body"></article>
+            </div>
+          </div>
+          <div class="card bg-dark border-secondary doc-card">
+            <div class="card-header text-info fw-bold">
+              <i class="bi bi-arrow-clockwise me-2"></i>Turn Time Tuning Guide
+              (90° / 180°)
+            </div>
+            <div class="card-body p-0">
+              <article id="turnGuide" class="markdown-body"></article>
             </div>
           </div>
         </div>
@@ -227,6 +287,7 @@
         "docs/PID_Front_Distance_Tuning_Quickstart.md",
         "frontGuide",
       );
+      loadMarkdown("docs/PID_Turn_Tuning_Quickstart.md", "turnGuide");
       // Populate the challenge simulator dropdown (same as docs.html)
       if (typeof Challenges !== "undefined") {
         Challenges.populateMenu("#challengeSimulatorMenu", "simulator");

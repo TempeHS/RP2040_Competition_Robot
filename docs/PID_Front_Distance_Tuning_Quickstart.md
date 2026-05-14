@@ -1,125 +1,119 @@
-# PID Front Distance Tuning Quickstart
+# Front-Sensor P-Controller Tuning Quickstart
 
-Use this checklist to tune the front distance PID on the real robot to ensure it comes to a safe stop. All variables for the front controller use the `front_` prefix to avoid collisions.
+Use this checklist to tune the **front-sensor P-controlled deceleration** that triggers a corner or dead-end turn. Variables match the canonical `FRONT_CONFIG` block in [Challenges 4–6](docs.html?doc=Challenge_4).
+
+> [!Note]
+> The front controller is **P-only** (not full PID). The robot needs a **smooth, predictable stop** at a fixed distance — not a tracking loop — so a single proportional gain on `(front − FRONT_STOP_DISTANCE)` is enough.
+
+---
 
 ## 1. Safe Starting Setup
 
-- `BASE_SPEED = 165`
-- `TARGET_DISTANCE = 200` (mm)
-- Loop delay: `hold_state(0.05)`
-- `MAX_BRAKE = 50`
-- `front_Kp = 0`
-- `front_Ki = 0`
-- `front_Kd = 0`
-- `front_INTEGRAL_MAX = 0`
-- `front_previous_error = 0`
-- `front_integral = 0`
-- Keep this rule true: `BASE_SPEED - MAX_BRAKE >= 120`
+```python
+BASE_SPEED          = 160   # from CONFIG_BASE
+FRONT_SLOW_DISTANCE = 400   # mm — start decelerating
+FRONT_STOP_DISTANCE = 120   # mm — stop and turn
+FRONT_Kp            = 0.5   # deceleration gain
+```
 
-**Expected behavior:** Robot drives forward at a safe speed. Some natural drift or rolling past the target is normal and expected. The robot should not stop abruptly or crash, but it may not stop exactly at the target. This is OK for initial safety.
+Rule: **`approach_speed` is always clamped to `[120, BASE_SPEED]`** so the wheels never enter the motor dead-zone.
 
-## 2. Starting PID Values
+**Expected behaviour:** Robot drives at `BASE_SPEED` until `front < 400 mm`, then decelerates linearly toward `FRONT_STOP_DISTANCE`, then brakes and triggers a turn.
 
-- `front_Kp = 0.6`
-- `front_Kd = 0.3`
-- `front_Ki = 0.01`
-- `front_INTEGRAL_MAX = 1000`
-- `front_previous_error = 0`
-- `front_integral = 0`
+---
 
-**Expected behavior:** Robot should slow down and stop near the target distance, but may still roll a bit past or stop inconsistently. Some overshoot is normal at this stage.
+## 2. The Approach Formula
+
+```python
+approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
+if approach_speed < 120:        approach_speed = 120
+if approach_speed > BASE_SPEED: approach_speed = BASE_SPEED
+my_robot.drive(approach_speed, approach_speed)
+```
+
+| `front` | `0.5 × (front − 120)` | After clamp       |
+| ------- | --------------------- | ----------------- |
+| 400 mm  | 140                   | **140**           |
+| 300 mm  | 90                    | **120** (clamped) |
+| 200 mm  | 40                    | **120** (clamped) |
+| 120 mm  | 0                     | **stop → turn**   |
+
+The clamp keeps the chassis crawling at the dead-zone speed all the way to the stop point.
+
+---
 
 ## 3. Tune In This Order
 
-1. Tune `front_Kp` first
-2. Tune `front_Kd` second
-3. Tune `front_Ki` last
+1. `FRONT_STOP_DISTANCE` (where you want to stop)
+2. `FRONT_SLOW_DISTANCE` (when to begin decelerating)
+3. `FRONT_Kp` (how aggressively to decelerate)
 
-**Expected behavior:** Tuning in this order lets you see the effect of each gain. Robot should stop more accurately as you tune each gain.
+---
 
-## 4. P-Only Pass
+## 4. Set `FRONT_STOP_DISTANCE`
 
-1. Set `front_Ki = 0`, `front_Kd = 0`
-2. Increase `front_Kp` by `0.05` each run
-3. Stop when oscillation starts
-4. Back off `front_Kp` by `20-30%`
+Place the robot ~300 mm from a wall, run the code, and measure where it brakes.
 
-Typical final `front_Kp`: `0.5` to `0.9`
+| Stops too far from wall | → Decrease `FRONT_STOP_DISTANCE` (try `100`)           |
+| ----------------------- | ------------------------------------------------------ |
+| Touches the wall        | → Increase `FRONT_STOP_DISTANCE` (try `150`)           |
+| Inconsistent stop       | → Sensor noise — average 3 readings before the compare |
 
-**Expected behavior:** Robot should stop closer to the target, but as `front_Kp` increases, you should see a clear, regular overshoot and correction (oscillation) around the target. This is a sign that P is too high. Back off when this happens.
+Typical real-robot value: **100 – 160 mm**. Default in the starter: `120 mm`.
 
-## 5. Add D to Reduce Oscillation
+---
 
-1. Start `front_Kd = 0.2`
-2. Increase `front_Kd` by `0.05`
-3. Stop when oscillation is mostly gone but response is still quick
+## 5. Set `FRONT_SLOW_DISTANCE`
 
-Typical final `front_Kd`: `0.25` to `0.5`
+This is **how early** the robot starts slowing down. It must be far enough to give the deceleration ramp time to act before the wall.
 
-**Expected behavior:** Robot's stopping should become smoother, with less overshoot or bouncing near the stop point. Some small, quick corrections are normal.
+| Robot crashes before stopping        | → Increase `FRONT_SLOW_DISTANCE` (try `500`)                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| Robot crawls for a long time         | → Decrease `FRONT_SLOW_DISTANCE` (try `300`)                                       |
+| Brakes once then accelerates briefly | → Sensor flicker — increase `FRONT_SLOW_DISTANCE` so the early brake stays latched |
 
-## 6. Add I to Remove Steady Drift
+Typical real-robot value: **350 – 500 mm**. Default in the starter: `400 mm`.
 
-1. Start `front_Ki = 0.005`
-2. Increase by `0.002`
-3. Stop when long-run offset is removed
-4. If slow weaving starts, `front_Ki` is too high
+> [!Important]
+> `FRONT_SLOW_DISTANCE` is also the **threshold for the side-sensor check** in the dead-end decision (Challenge 5+). If you raise it, also re-check that corners are still classified as 90° not 180°.
 
-Typical final `front_Ki`: `0.005` to `0.02`
+---
 
-**Expected behavior:** Robot should stop at the correct distance every time. If it starts to weave or creep, reduce `front_Ki`.
+## 6. Set `FRONT_Kp`
 
-## 7. Set INTEGRAL_MAX Properly
+`FRONT_Kp` controls how steeply speed drops with distance.
 
-Aim for I-term max of about `8-16` brake units.
+1. Start `FRONT_Kp = 0.5`
+2. Increase by `0.1` per run
 
-Formula:
+| Symptom                                     | Cause               | Fix                                    |
+| ------------------------------------------- | ------------------- | -------------------------------------- |
+| Robot crawls almost all the way (boring)    | `FRONT_Kp` low      | +0.1 (try 0.7, 0.9)                    |
+| Robot brakes hard then re-accelerates       | `FRONT_Kp` high     | -0.1                                   |
+| Robot reaches stop point too fast and skids | `FRONT_Kp` high     | -0.1 or increase `FRONT_STOP_DISTANCE` |
+| Robot never reaches the dead-zone clamp     | `FRONT_Kp` very low | +0.2 or shorten `FRONT_SLOW_DISTANCE`  |
 
-- `I_term_max = front_Ki * front_INTEGRAL_MAX`
+Typical real-robot value: **0.4 – 0.9**. Default in the starter: `0.5`.
 
-Examples:
+---
 
-- If `front_Ki = 0.01`, use `front_INTEGRAL_MAX = 800 to 1600`
-- If `front_Ki = 0.008`, use `front_INTEGRAL_MAX = 1000 to 2000`
+## 7. Field Test Routine
 
-Good default: `front_INTEGRAL_MAX = 1000`
+1. Three head-on stops (wall directly ahead).
+2. Three approaches at a shallow angle.
+3. Three approaches after a recent corner turn (still recovering wall).
+4. Change **one variable at a time**; log distance at brake, distance at stop, and overshoot.
 
-**Expected behavior:** Robot should not suddenly brake too hard or oscillate due to the integral term. If it does, reduce `front_INTEGRAL_MAX`.
+---
 
-## 8. Symptom -> Fix
-
-- Stops too far: increase `front_Kp` slightly, then `front_Ki` slightly
-- Stops too quickly: reduce `front_Kp` or increase `front_Kd`
-- Slow oscillation near stop: reduce `front_Ki` or reduce `front_INTEGRAL_MAX`
-- Overshoot before stopping: reduce `front_Ki` and reduce `front_INTEGRAL_MAX`
-- Inconsistent stopping: increase `BASE_SPEED` or reduce `MAX_BRAKE`
-
-**Expected behavior:** Use this table to diagnose and fix common problems. Robot should stop smoothly and consistently as you apply these fixes.
-
-## 9. Field Test Routine
-
-1. Run 3 straight stopping passes
-2. Run 3 stopping passes from a curve
-3. Run 3 recovery runs from a high speed
-4. Change only one gain at a time
-5. Record values and behavior after each run
-
-**Expected behavior:** Robot should stop reliably in all test scenarios. Each change should have a clear, real-world effect.
-
-## 10. Quick Copy/Paste Block
+## 8. Quick Copy/Paste Block (matches Challenge 4+ starter)
 
 ```python
-BASE_SPEED = 165
-TARGET_DISTANCE = 200
-MAX_BRAKE = 50
-
-front_Kp = 0.6
-front_Ki = 0.01
-front_Kd = 0.3
-front_INTEGRAL_MAX = 1000
-
-front_previous_error = 0
-front_integral = 0
+FRONT_SLOW_DISTANCE = 400   # mm — start decelerating
+FRONT_STOP_DISTANCE = 120   # mm — stop and turn
+FRONT_Kp            = 0.5   # deceleration gain
+TURN_SPEED          = 180
+TURN_TIME_90        = 0.5   # tuned in the Turn Tuning guide
 ```
 
-**Expected behavior:** Use these values as a starting point. Robot should stop near the target distance, ready for fine tuning.
+When this is solid, move on to the [Turn Tuning Quickstart](pid-tuning.html#turnGuide) to dial in `TURN_TIME_90` and `TURN_TIME_180`.

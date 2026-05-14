@@ -434,6 +434,39 @@ const Simulator = (function () {
   }
 
   /**
+   * Mirror a pose across the vertical centreline of the arena.
+   * Used so that switching from `AIDriver("left")` to `AIDriver("right")`
+   * mirrors the spawn position without requiring duplicated maze layouts.
+   *
+   * @param {{x:number,y:number,heading?:number}} pose Pose to mirror.
+   * @returns {{x:number,y:number,heading:number}} Mirrored pose.
+   */
+  function mirrorPose(pose) {
+    const heading = pose && typeof pose.heading === "number" ? pose.heading : 0;
+    return {
+      x: ARENA_WIDTH - pose.x,
+      y: pose.y,
+      heading: (((360 - heading) % 360) + 360) % 360,
+    };
+  }
+
+  /**
+   * Mirror an axis-aligned rectangle across the vertical centreline of the arena.
+   * Used to mirror challenge success zones for right-wall play.
+   *
+   * @param {{x:number,y:number,width:number,height:number}} rect Rectangle to mirror.
+   * @returns {{x:number,y:number,width:number,height:number}} Mirrored rectangle.
+   */
+  function mirrorRect(rect) {
+    return {
+      x: ARENA_WIDTH - rect.x - rect.width,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    };
+  }
+
+  /**
    * Compute the parametric distance from a ray origin to an axis-aligned box.
    * Returns null when the ray misses or faces away from the volume.
    *
@@ -492,31 +525,64 @@ const Simulator = (function () {
       return robot;
     }
 
-    // Update kinematics
-    let newState = updateKinematics(robot, dt);
+    // --- D4: substep so fast motion cannot tunnel through walls.
+    // Estimate per-frame travel distance and split into <=5 mm sub-steps.
+    const avgSpeedUnits =
+      (Math.abs(robot.leftSpeed) + Math.abs(robot.rightSpeed)) / 2;
+    const linearVelocityMmPerSec =
+      (avgSpeedUnits / MAX_MOTOR_SPEED) *
+      MM_PER_SPEED_UNIT *
+      1000 *
+      simulationSpeed;
+    const frameTravelMm = linearVelocityMmPerSec * dt;
+    const SUBSTEP_MAX_MM = 5;
+    const substeps = Math.max(1, Math.ceil(frameTravelMm / SUBSTEP_MAX_MM));
+    const subDt = dt / substeps;
 
-    // Apply boundary constraints
-    newState = applyBoundaryConstraints(newState);
+    let current = robot;
+    const allObstacles = obstacles.concat(mazeWalls);
 
-    // Check collisions
-    if (checkCollision(newState, obstacles.concat(mazeWalls))) {
-      // Stop on collision
-      newState.leftSpeed = 0;
-      newState.rightSpeed = 0;
-      newState.isMoving = false;
+    for (let i = 0; i < substeps; i++) {
+      let candidate = updateKinematics(current, subDt);
+      candidate = applyBoundaryConstraints(candidate);
 
-      if (typeof DebugPanel !== "undefined") {
-        DebugPanel.warning("Robot collision detected!");
+      if (checkCollision(candidate, allObstacles)) {
+        // Reject the move: keep the previous good pose, zero motion,
+        // bump the collision counter and flash the chassis briefly.
+        const newCount = (current.collisionCount || 0) + 1;
+        if (typeof DebugPanel !== "undefined") {
+          DebugPanel.error(
+            `Wall hit at (${Math.round(current.x)}, ${Math.round(current.y)}) — collision #${newCount}`,
+          );
+        }
+        const blockedTrail = [
+          ...(robot.trail || []),
+          { x: current.x, y: current.y },
+        ];
+        return {
+          ...current,
+          leftSpeed: 0,
+          rightSpeed: 0,
+          isMoving: false,
+          collisionCount: newCount,
+          collisionFlashUntil: Date.now() + 200,
+          trail:
+            blockedTrail.length > 1000
+              ? blockedTrail.slice(-1000)
+              : blockedTrail,
+        };
       }
+      current = candidate;
     }
 
-    // Update trail
-    newState.trail = [...(robot.trail || []), { x: newState.x, y: newState.y }];
-    if (newState.trail.length > 1000) {
-      newState.trail = newState.trail.slice(-1000);
-    }
-
-    return newState;
+    // No collision in any substep — accept the move.
+    const newTrail = [...(robot.trail || []), { x: current.x, y: current.y }];
+    return {
+      ...current,
+      collisionCount: robot.collisionCount || 0,
+      collisionFlashUntil: robot.collisionFlashUntil || 0,
+      trail: newTrail.length > 1000 ? newTrail.slice(-1000) : newTrail,
+    };
   }
 
   /**
@@ -597,5 +663,7 @@ const Simulator = (function () {
     applyBoundaryConstraints,
     setSideSensorSide,
     getSideSensorSide,
+    mirrorPose,
+    mirrorRect,
   };
 })();

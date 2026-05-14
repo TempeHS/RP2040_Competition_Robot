@@ -32,138 +32,200 @@ const Mazes = (function () {
 
   /**
    * Pre-defined maze layouts with walls expressed as millimeter rectangles.
+   *
+   * Mazes are designed mirror-symmetric across the vertical centreline
+   * (x = 1000). The recorded `startPosition` and `endZone` describe the
+   * LEFT-wall ("AIDriver(\"left\")") spawn; when the user instantiates
+   * `AIDriver("right")` the simulator auto-mirrors both via
+   * `Simulator.mirrorPose` / `Simulator.mirrorRect` (see App.onAIDriverInstantiated).
+   *
+   * The few mazes that are inherently chiral (spiral, classic) carry
+   * `symmetric: false` so the simulator leaves the spawn alone for those.
+   *
    * @type {Record<string, MazeDefinition>}
    */
   const mazeDefinitions = {
-    // Straight corridor - single wall on the right for P / PD practice
+    // Straight corridor — symmetric pair of outer corridors. Two long
+    // vertical walls split the arena into three vertical strips. Drive
+    // north along whichever outer strip your spawn picked.
     straight_corridor: {
       id: "straight_corridor",
       name: "Straight Corridor",
       difficulty: "Easy",
+      symmetric: true,
       description:
-        "A straight corridor with a wall on the right — perfect for tuning P and PD controllers",
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 100, y: 100, width: 300, height: 200 },
+        'Drive straight up the outer corridor — perfect for tuning P and PD controllers. Switch AIDriver("left") <> AIDriver("right") to flip sides.',
+      startPosition: { x: 250, y: 1700, heading: 0 },
+      endZone: { x: 50, y: 100, width: 400, height: 200 },
       walls: [
-        // Right wall running the full arena height, 400mm from the left edge
+        // Inner wall of the LEFT corridor
         { x: 500, y: 0, width: WALL_THICKNESS, height: 2000 },
+        // Inner wall of the RIGHT corridor (mirror)
+        { x: 1470, y: 0, width: WALL_THICKNESS, height: 2000 },
       ],
     },
 
-    // Dead end corridor — requires front sensor detection and turning
+    // Corner — symmetric L-corridors meeting under a top horizontal strip.
+    // Drive up the outer corridor, hit the top wall, turn inward and
+    // continue to the top-centre goal.
+    corner: {
+      id: "corner",
+      name: "Corner",
+      difficulty: "Easy",
+      symmetric: true,
+      description:
+        "Drive up the outer corridor, detect the front wall, then turn 90° toward the centre to reach the top.",
+      startPosition: { x: 250, y: 1700, heading: 0 },
+      endZone: { x: 900, y: 50, width: 200, height: 200 },
+      walls: [
+        // Vertical separators between outer corridors and the central column
+        { x: 500, y: 300, width: WALL_THICKNESS, height: 1700 },
+        { x: 1470, y: 300, width: WALL_THICKNESS, height: 1700 },
+        // Central blocker — leaves a top horizontal strip (y=0..300) and
+        // a bottom block under it. Symmetric about x=1000.
+        { x: 500, y: 300, width: 1000, height: WALL_THICKNESS },
+      ],
+    },
+
+    // Dead end — TWO sealed pockets, one on each side of the arena.
+    // The robot spawns in the matching pocket and must drive up to the
+    // dead-end cap (front sensor reads ~0). Reach the zone just below
+    // the cap to complete.
     dead_end: {
       id: "dead_end",
-      name: "Dead End",
+      name: "Dead End (Both Sides)",
       difficulty: "Medium",
+      symmetric: true,
       description:
-        "A U-shaped corridor with a dead end — combine front detection with side wall following",
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 1600, y: 100, width: 300, height: 200 },
+        'U-shaped arena with a dead end on each side. Pick AIDriver("left") or AIDriver("right") and the spawn moves to the matching pocket — drive to the dead end and stop before colliding.',
       walls: [
-        // Right wall of first corridor
-        { x: 500, y: 400, width: WALL_THICKNESS, height: 1600 },
-        // Top wall creating the dead end
-        { x: 0, y: 400, width: 530, height: WALL_THICKNESS },
-        // Left wall of return corridor
-        { x: 800, y: 400, width: WALL_THICKNESS, height: 1600 },
-        // Bottom gap wall — forces robot back south after turning
-        { x: 800, y: 1400, width: 1200, height: WALL_THICKNESS },
-        // Right wall of return corridor (south leg)
-        { x: 1100, y: 0, width: WALL_THICKNESS, height: 1430 },
+        // Vertical walls sealing each outer corridor from the central area
+        { x: 400, y: 0, width: WALL_THICKNESS, height: 2000 },
+        { x: 1570, y: 0, width: WALL_THICKNESS, height: 2000 },
+        // Horizontal caps creating the dead-end pockets (~200 mm from top)
+        { x: 0, y: 300, width: 430, height: WALL_THICKNESS },
+        { x: 1570, y: 300, width: 430, height: WALL_THICKNESS },
       ],
+      // Spawn near the bottom of the left pocket; mirror puts right spawn at x=1800
+      startPosition: { x: 200, y: 1700, heading: 0 },
+      // Goal: the dead-end pocket just under the cap on the chosen side
+      endZone: { x: 30, y: 350, width: 370, height: 250 },
     },
 
-    // Simple maze - basic L-shaped corridor
+    // Simple — single 90° turn into a wide top room. Symmetric pair
+    // means either spawn ends in the same central goal.
     simple: {
       id: "simple",
       name: "Simple Corridor",
       difficulty: "Easy",
-      description: "A simple L-shaped corridor to practice basic navigation",
+      symmetric: true,
+      description:
+        "A pair of mirrored L-shaped corridors meeting at the top — practice basic wall-follow plus one 90° turn.",
       startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 100, y: 100, width: 200, height: 200 },
+      endZone: { x: 900, y: 100, width: 200, height: 200 },
       walls: [
-        // Just two walls creating an L-shaped path
-        { x: 0, y: 1000, width: 1400, height: WALL_THICKNESS },
+        // Lower horizontal walls block direct vertical travel except in
+        // outer corridors. Two pieces, each mirrored across x=1000.
+        { x: 0, y: 1000, width: 700, height: WALL_THICKNESS },
+        { x: 1300, y: 1000, width: 700, height: WALL_THICKNESS },
+        // Vertical walls forming the outer corridors (y=400..1000)
         { x: 700, y: 400, width: WALL_THICKNESS, height: 600 },
+        { x: 1270, y: 400, width: WALL_THICKNESS, height: 600 },
       ],
     },
 
-    // Zigzag maze - walls extend from opposite sides
+    // Zigzag — symmetric chevron pattern. Three horizontal walls each
+    // built from mirrored pieces with a central gap to weave through.
     zigzag: {
       id: "zigzag",
       name: "Zigzag Path",
       difficulty: "Medium",
-      description: "Navigate through a zigzag corridor",
+      symmetric: true,
+      description:
+        "Weave through three rows of walls, each with a central gap. Symmetric across the centreline so left- and right-wall runs feel the same.",
       startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 1700, y: 100, width: 200, height: 200 },
+      endZone: { x: 900, y: 50, width: 200, height: 150 },
       walls: [
-        // Bottom wall extends from left
-        { x: 0, y: 1200, width: 1500, height: WALL_THICKNESS },
-        // Top wall extends from right
-        { x: 500, y: 600, width: 1500, height: WALL_THICKNESS },
+        // Bottom row: gap in the centre (x=800..1200)
+        { x: 0, y: 1300, width: 800, height: WALL_THICKNESS },
+        { x: 1200, y: 1300, width: 800, height: WALL_THICKNESS },
+        // Middle row: gap on each end (wall in the centre, blocks centreline)
+        { x: 600, y: 800, width: 800, height: WALL_THICKNESS },
+        // Top row: gap in the centre again
+        { x: 0, y: 300, width: 800, height: WALL_THICKNESS },
+        { x: 1200, y: 300, width: 800, height: WALL_THICKNESS },
       ],
     },
 
-    // Spiral maze - evenly spaced spiral pattern
+    // Spiral — inherently chiral, cannot be mirrored. Marked symmetric:false
+    // so the simulator does NOT mirror the spawn when the user picks
+    // AIDriver("right") — they'll get a warning in the debug log.
     spiral: {
       id: "spiral",
       name: "Spiral",
       difficulty: "Hard",
-      description: "Navigate a spiral pattern to the center",
+      symmetric: false,
+      description:
+        'A spiral inward to the centre. This maze is inherently chiral — only AIDriver("left") is supported.',
       startPosition: { x: 300, y: 1700, heading: 0 },
       endZone: { x: 800, y: 800, width: 200, height: 200 },
       walls: [
         // Outer spiral - 400mm spacing between walls
-        { x: 0, y: 1400, width: 1600, height: WALL_THICKNESS }, // Outer top
-        { x: 1600, y: 400, width: WALL_THICKNESS, height: 1030 }, // Outer right
-        { x: 400, y: 400, width: 1230, height: WALL_THICKNESS }, // Outer bottom
-        { x: 400, y: 400, width: WALL_THICKNESS, height: 600 }, // Outer left (partial)
+        { x: 0, y: 1400, width: 1600, height: WALL_THICKNESS },
+        { x: 1600, y: 400, width: WALL_THICKNESS, height: 1030 },
+        { x: 400, y: 400, width: 1230, height: WALL_THICKNESS },
+        { x: 400, y: 400, width: WALL_THICKNESS, height: 600 },
         // Inner spiral - 400mm inward
-        { x: 400, y: 1000, width: 800, height: WALL_THICKNESS }, // Inner top
-        { x: 1200, y: 800, width: WALL_THICKNESS, height: 230 }, // Inner right
+        { x: 400, y: 1000, width: 800, height: WALL_THICKNESS },
+        { x: 1200, y: 800, width: WALL_THICKNESS, height: 230 },
       ],
     },
 
-    // Classic maze - verified solvable with dead ends
-    // Solution: UP to top, hit wall, DOWN, RIGHT through gap, UP, RIGHT to end
+    // Classic — also chiral; left-wall only.
     classic: {
       id: "classic",
       name: "Classic Maze",
       difficulty: "Hard",
-      description: "A traditional maze with dead ends",
+      symmetric: false,
+      description:
+        'A traditional maze with dead ends. Inherently chiral — only AIDriver("left") is supported.',
       startPosition: { x: 250, y: 1750, heading: 0 },
       endZone: { x: 1700, y: 100, width: 200, height: 200 },
       walls: [
         // Horizontal walls
-        { x: 500, y: 400, width: 500, height: WALL_THICKNESS }, // blocks middle-left at top
-        { x: 1500, y: 400, width: 500, height: WALL_THICKNESS }, // blocks right at top
-        { x: 500, y: 1100, width: 1000, height: WALL_THICKNESS }, // middle barrier
-        { x: 500, y: 1500, width: 500, height: WALL_THICKNESS }, // blocks path up from start-right
+        { x: 500, y: 400, width: 500, height: WALL_THICKNESS },
+        { x: 1500, y: 400, width: 500, height: WALL_THICKNESS },
+        { x: 500, y: 1100, width: 1000, height: WALL_THICKNESS },
+        { x: 500, y: 1500, width: 500, height: WALL_THICKNESS },
         // Vertical walls
-        { x: 500, y: 700, width: WALL_THICKNESS, height: 400 }, // short wall with gap above
-        { x: 500, y: 1500, width: WALL_THICKNESS, height: 500 }, // blocks going right from start
-        { x: 1000, y: 0, width: WALL_THICKNESS, height: 400 }, // forces detour at top
-        { x: 1500, y: 400, width: WALL_THICKNESS, height: 700 }, // blocks direct right path
+        { x: 500, y: 700, width: WALL_THICKNESS, height: 400 },
+        { x: 500, y: 1500, width: WALL_THICKNESS, height: 500 },
+        { x: 1000, y: 0, width: WALL_THICKNESS, height: 400 },
+        { x: 1500, y: 400, width: WALL_THICKNESS, height: 700 },
       ],
     },
 
-    // Open arena with obstacles - including wall-attached obstacles
+    // Obstacle course — scattered obstacles arranged symmetrically.
     obstacles: {
       id: "obstacles",
       name: "Obstacle Course",
       difficulty: "Medium",
-      description: "Navigate around scattered obstacles",
+      symmetric: true,
+      description:
+        "Navigate around scattered obstacles. Layout is mirrored across the centreline so either AIDriver side works.",
       startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 1700, y: 100, width: 200, height: 200 },
+      endZone: { x: 900, y: 50, width: 200, height: 150 },
       walls: [
-        // Wall-attached obstacles
-        { x: 0, y: 1200, width: 300, height: 200 }, // Left wall
-        { x: 1700, y: 800, width: 300, height: 200 }, // Right wall
-        { x: 600, y: 0, width: 200, height: 300 }, // Top wall
-        { x: 1200, y: 1700, width: 200, height: 300 }, // Bottom wall
-        // Center obstacles
-        { x: 700, y: 900, width: 200, height: 200 },
-        { x: 1100, y: 500, width: 200, height: 200 },
+        // Wall-attached obstacles (each pair mirrored across x=1000)
+        { x: 0, y: 1200, width: 300, height: 200 },
+        { x: 1700, y: 1200, width: 300, height: 200 },
+        { x: 600, y: 0, width: 200, height: 300 },
+        { x: 1200, y: 0, width: 200, height: 300 },
+        { x: 0, y: 600, width: 200, height: 200 },
+        { x: 1800, y: 600, width: 200, height: 200 },
+        // Centre obstacles (mirrored pair)
+        { x: 600, y: 900, width: 200, height: 200 },
+        { x: 1200, y: 900, width: 200, height: 200 },
       ],
     },
   };

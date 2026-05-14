@@ -46,4 +46,18 @@ make -C "$RP2_PORT_DIR" submodules
 info "Marking devcontainer scripts as executable"
 chmod +x "$PROJECT_ROOT/.devcontainer"/*.sh
 
+# Install JavaScript test dependencies for the simulator (Jest, ESLint, ...)
+if command -v npm >/dev/null 2>&1; then
+    if [ -f "$PROJECT_ROOT/app/package.json" ]; then
+        info "Installing simulator npm dependencies (app/)"
+        if (cd "$PROJECT_ROOT/app" && npm install --no-audit --no-fund); then
+            info "npm install complete"
+        else
+            warn "npm install failed in app/; continuing"
+        fi
+    fi
+else
+    warn "npm not available; skipping JS test dependency install"
+fi
+
 info "Setup complete"

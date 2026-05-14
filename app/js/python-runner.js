@@ -193,15 +193,20 @@ class AIDriver:
     """AIDriver robot controller for the simulator"""
     
     def __init__(self, wall_side):
-        """Initialize the robot. wall_side must be "left" or "right"."""
+        """Initialize the robot. wall_side must be "left" or "right" (case-insensitive)."""
         global DEBUG_AIDRIVER
-        self.wall_sign = -1 if str(wall_side).upper() == "LEFT" else 1
+        side = str(wall_side).lower()
+        if side not in ("left", "right"):
+            side = "left"
+        self.wall_sign = -1 if side == "left" else 1
         self._right_speed = 0
         self._left_speed = 0
         self._is_moving = False
-        _queue_command("init")
+        # Pass the side string to the JS bridge so the simulator can
+        # mount the side sensor and mirror the spawn pose.
+        _queue_command("init", {"side": side})
         if DEBUG_AIDRIVER:
-            print("[AIDriver] Robot initialized, wall_side=" + str(wall_side))
+            print("[AIDriver] Robot initialized, wall_side=" + side)
     
     def drive_forward(self, right_speed, left_speed):
         """Drive the robot forward with specified wheel speeds"""
@@ -1210,7 +1215,15 @@ def ticks_diff(t1, t2):
         break;
 
       case "init":
-        // Robot initialized
+        // AIDriver(side) was instantiated by user code. Forward the side
+        // string to the App hook so the simulator mounts the side sensor
+        // and mirrors the spawn pose if needed.
+        if (
+          typeof App !== "undefined" &&
+          typeof App.onAIDriverInstantiated === "function"
+        ) {
+          App.onAIDriverInstantiated(cmd.params && cmd.params.side);
+        }
         break;
 
       case "hold_state":
@@ -1394,9 +1407,18 @@ def ticks_diff(t1, t2):
             break;
 
           case "init":
-            // Robot initialized
+            // AIDriver(side) instantiated. Forward to App so the simulator
+            // mounts the side sensor and mirrors the spawn pose if needed.
+            if (
+              typeof App !== "undefined" &&
+              typeof App.onAIDriverInstantiated === "function"
+            ) {
+              App.onAIDriverInstantiated(cmd.params && cmd.params.side);
+            }
             if (typeof DebugPanel !== "undefined") {
-              DebugPanel.info("[AIDriver] Robot initialized");
+              DebugPanel.info(
+                `[AIDriver] Robot initialized (side=${(cmd.params && cmd.params.side) || "left"})`,
+              );
             }
             break;
 

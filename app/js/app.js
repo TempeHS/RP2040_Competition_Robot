@@ -29,6 +29,8 @@ const App = {
     rightSpeed: 0,
     isMoving: false,
     trail: [], // Array of {x, y} positions
+    collisionCount: 0,
+    collisionFlashUntil: 0,
   },
 
   // Simulation
@@ -37,6 +39,77 @@ const App = {
 
   // DOM Elements (cached)
   elements: {},
+};
+
+/**
+ * Bridge invoked from the Skulpt-side AIDriver constructor command queue.
+ * Mounts the side sensor, mirrors the spawn pose if the user picked the
+ * non-default wall side, and re-renders. This makes the AIDriver(side)
+ * argument the single source of truth for which wall the robot follows.
+ *
+ * @param {"left"|"right"|undefined} side Wall side requested by user code.
+ * @returns {void}
+ */
+App.onAIDriverInstantiated = function (side) {
+  if (typeof Simulator === "undefined") return;
+  if (side !== "left" && side !== "right") return;
+
+  const previous = Simulator.getSideSensorSide();
+  if (previous === side) {
+    return; // already on the requested side, nothing to do
+  }
+
+  Simulator.setSideSensorSide(side);
+
+  const challenge = App.currentChallengeConfig;
+
+  // Some mazes (e.g. spiral, classic) are inherently chiral and cannot be
+  // mirrored without breaking the puzzle. Honour an explicit opt-out so the
+  // robot stays in its left-hand spawn for those.
+  const canMirror = !challenge || challenge.symmetric !== false;
+
+  // Mirror the spawn pose so the wall the user chose is on the requested
+  // side of the robot. Only mirror when switching away from the default.
+  if (canMirror && App.robot && challenge && challenge.startPosition) {
+    const mirrored = Simulator.mirrorPose({
+      x: challenge.startPosition.x,
+      y: challenge.startPosition.y,
+      heading: challenge.startPosition.heading || 0,
+    });
+    App.robot.x = mirrored.x;
+    App.robot.y = mirrored.y;
+    App.robot.heading =
+      (mirrored.heading + (App.startHeadingOffset || 0)) % 360;
+    App.robot.trail = [];
+  }
+
+  // Mirror the success-zone too so e.g. a left-arm dead-end becomes the
+  // right-arm dead-end when the user picks AIDriver("right").
+  if (
+    canMirror &&
+    challenge &&
+    challenge.successCriteria &&
+    challenge.successCriteria.zone
+  ) {
+    challenge.successCriteria.zone = Simulator.mirrorRect(
+      challenge.successCriteria.zone,
+    );
+  }
+
+  if (typeof DebugPanel !== "undefined") {
+    if (canMirror) {
+      DebugPanel.info(
+        `AIDriver mounted on ${side} wall \u2014 spawn + goal mirrored`,
+      );
+    } else {
+      DebugPanel.warning(
+        `AIDriver("${side}") requested but maze is not symmetric \u2014 spawn unchanged`,
+      );
+    }
+  }
+  if (typeof render === "function") {
+    render();
+  }
 };
 
 /**
@@ -117,13 +190,11 @@ function cacheElements() {
     btnClearDebug: document.getElementById("btnClearDebug"),
     btnConfirmReset: document.getElementById("btnConfirmReset"),
     btnRotateCar: document.getElementById("btnRotateCar"),
-    btnToggleSideSensor: document.getElementById("btnToggleSideSensor"),
     rotationDisplay: document.getElementById("rotationDisplay"),
 
     // Displays
     ultrasonicDisplay: document.getElementById("ultrasonicDisplay"),
     sideSensorDisplay: document.getElementById("sideSensorDisplay"),
-    sideSensorLabel: document.getElementById("sideSensorLabel"),
     speedValue: document.getElementById("speedValue"),
     debugConsole: document.getElementById("debugConsole"),
     statusMessage: document.getElementById("statusMessage"),
@@ -228,18 +299,9 @@ function setupEventListeners() {
     DebugPanel.info(`Car start direction set to ${App.startHeadingOffset}°`);
   });
 
-  // Side sensor toggle button
-  if (App.elements.btnToggleSideSensor) {
-    App.elements.btnToggleSideSensor.addEventListener("click", () => {
-      const current = Simulator.getSideSensorSide();
-      const next = current === "left" ? "right" : "left";
-      Simulator.setSideSensorSide(next);
-      App.elements.sideSensorLabel.textContent =
-        next.charAt(0).toUpperCase() + next.slice(1);
-      DebugPanel.info(`Side sensor moved to ${next} side`);
-      render();
-    });
-  }
+  // (Side sensor mounting is driven by the AIDriver("left"|"right")
+  // argument in user code via App.onAIDriverInstantiated below — there is
+  // no manual UI toggle.)
 
   // Copy code button
   App.elements.btnCopyCode.addEventListener("click", () => {
@@ -472,6 +534,19 @@ function loadChallenge(challengeId) {
   // Store current challenge config
   App.currentChallengeConfig = challenge;
 
+  // Snapshot the canonical (left-frame) success zone so resetRobot can
+  // restore it after a previous run mirrored it for AIDriver("right").
+  if (
+    challenge &&
+    challenge.successCriteria &&
+    challenge.successCriteria.zone
+  ) {
+    challenge._canonicalZone = { ...challenge.successCriteria.zone };
+  }
+  if (challenge && challenge.startPosition) {
+    challenge._canonicalStart = { ...challenge.startPosition };
+  }
+
   // Initialize session tracking
   App.session = {
     startPosition: challenge
@@ -545,32 +620,33 @@ function loadChallenge(challengeId) {
  * @returns {Promise<void>} Resolves once code is applied to the editor.
  */
 async function loadStarterCode(challengeId) {
-  // Debug challenge loads from project/main.py via GitHub raw
-  if (challengeId === "debug") {
-    try {
-      const response = await fetch(
-        "https://raw.githubusercontent.com/TempeHS/AIDriver_MicroPython_Challanges/refs/heads/main/project/main.py",
-      );
-      if (response.ok) {
-        const code = await response.text();
-        Editor.setCode(code);
-        logDebug("[App] Loaded starter code from project/main.py");
-        return;
-      }
-    } catch (err) {
-      console.warn("[App] Could not fetch project/main.py:", err);
-    }
-    // Fallback if fetch fails
-    Editor.setCode(
-      "# Could not load project/main.py\n# Check your internet connection\n",
+  const starterCodePath = getStarterCodePath(challengeId);
+  if (!starterCodePath) {
+    Editor.setCode("# No starter code available\n");
+    logDebug(
+      `[App] No starter code file configured for Challenge ${challengeId}`,
     );
     return;
   }
 
-  const starterCodes = getStarterCodes();
-  const code = starterCodes[challengeId] || "# No starter code available\n";
-  Editor.setCode(code);
-  logDebug(`[App] Loaded starter code for Challenge ${challengeId}`);
+  try {
+    const response = await fetch(starterCodePath, { cache: "no-cache" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const code = await response.text();
+    Editor.setCode(code);
+    logDebug(`[App] Loaded starter code from ${starterCodePath}`);
+  } catch (err) {
+    console.warn(
+      `[App] Could not fetch starter code at ${starterCodePath}:`,
+      err,
+    );
+    Editor.setCode(
+      `# Could not load starter code\n# Expected file: ${starterCodePath}\n`,
+    );
+  }
 }
 
 /**
@@ -604,6 +680,14 @@ function loadMaze(mazeId) {
 
   const maze = Mazes.get(mazeId);
   App.currentMaze = maze;
+
+  // Reset the side sensor to the canonical "left" orientation so that the
+  // next AIDriver("right") instantiation will correctly mirror the maze's
+  // recorded left-side spawn + endZone. Without this, switching mazes
+  // while running in right-wall mode would leave geometry in the wrong frame.
+  if (typeof Simulator !== "undefined") {
+    Simulator.setSideSensorSide("left");
+  }
 
   // Set maze walls in simulator
   if (typeof Simulator !== "undefined") {
@@ -904,6 +988,20 @@ function resetRobot() {
   };
 
   // Reset robot state to current challenge's start position
+  // Also snap the side sensor back to the canonical "left" frame so that the
+  // next AIDriver("right") call will re-apply the mirroring fresh.
+  if (typeof Simulator !== "undefined") {
+    Simulator.setSideSensorSide("left");
+  }
+  // Restore canonical (un-mirrored) success zone if a previous run mirrored it
+  if (
+    challenge &&
+    challenge._canonicalZone &&
+    challenge.successCriteria &&
+    challenge.successCriteria.zone
+  ) {
+    challenge.successCriteria.zone = { ...challenge._canonicalZone };
+  }
   if (challenge && challenge.startPosition) {
     const baseHeading = challenge.startPosition.heading || 0;
     App.robot = {
@@ -914,11 +1012,15 @@ function resetRobot() {
       rightSpeed: 0,
       isMoving: false,
       trail: [],
+      collisionCount: 0,
+      collisionFlashUntil: 0,
     };
   } else if (typeof Simulator !== "undefined") {
     const initialState = Simulator.getInitialRobotState();
     initialState.heading =
       (initialState.heading + App.startHeadingOffset) % 360;
+    initialState.collisionCount = 0;
+    initialState.collisionFlashUntil = 0;
     App.robot = initialState;
   } else {
     App.robot = {
@@ -929,6 +1031,8 @@ function resetRobot() {
       rightSpeed: 0,
       isMoving: false,
       trail: [],
+      collisionCount: 0,
+      collisionFlashUntil: 0,
     };
   }
 
@@ -1843,8 +1947,14 @@ function drawRobot(ctx, scale) {
   ctx.translate(x, y);
   ctx.rotate(heading - Math.PI / 2); // Rotate -90 degrees so car faces up
 
-  // Main car body (red)
-  ctx.fillStyle = "#cc0000";
+  // Main car body (red, flashes brighter on collision for ~200 ms)
+  const isFlashing =
+    App.robot.collisionFlashUntil && App.robot.collisionFlashUntil > Date.now();
+  ctx.fillStyle = isFlashing ? "#ff3333" : "#cc0000";
+  if (isFlashing) {
+    ctx.shadowColor = "#ff0000";
+    ctx.shadowBlur = 20 * scale;
+  }
   ctx.beginPath();
   // Rounded rectangle for car body
   const bodyX = -carLength / 2;
@@ -1876,6 +1986,10 @@ function drawRobot(ctx, scale) {
   ctx.quadraticCurveTo(bodyX, bodyY, bodyX + radius, bodyY);
   ctx.closePath();
   ctx.fill();
+
+  // Clear the collision-flash glow before drawing the rest of the car details
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
 
   // Front windshield (dark, at the front/right of car heading up)
   ctx.fillStyle = "#3a1a1a";
@@ -2020,360 +2134,34 @@ function hideLoading() {
 }
 
 /**
- * Provide starter program templates keyed by challenge identifier.
- * Debug challenge source is fetched dynamically in loadStarterCode.
- * @returns {Record<number, string>} Mapping of challenge id to starter code.
+ * Resolve a challenge id to the starter-code file path used by the ACE editor.
+ * @param {number|string} challengeId Identifier for the active challenge.
+ * @returns {string|null} Relative path to starter code file, or null when no mapping exists.
  */
-function getStarterCodes() {
-  return {
-    // debug: loaded dynamically from project/main.py
-    1: `# Challenge 1: Wall Follow — P Control
-# Follow the side wall using Proportional steering
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = False  # Set True for full motor debug (slows loop)
-my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
-
-# ═══════════════════════════════════════════════════════
-# CONFIGURATION — Adjust these values
-# ═══════════════════════════════════════════════════════
-BASE_SPEED = 160           # Forward speed (must be > 120!)
-TARGET_WALL_DISTANCE = 150 # Distance to maintain from wall (mm)
-side_Kp = 0.30             # Start here — raise in 0.10 steps until zig-zag starts
-MAX_STEERING = 40          # Max wheel speed difference
-
-# Rule: BASE_SPEED - MAX_STEERING must be >= 120 (dead zone)
-
-# ═══════════════════════════════════════════════════════
-# MAIN LOOP
-# ═══════════════════════════════════════════════════════
-while True:
-    # Average 3 readings to filter sensor noise
-    r1 = my_robot.read_distance_2()
-    r2 = my_robot.read_distance_2()
-    r3 = my_robot.read_distance_2()
-    valid = [r for r in (r1, r2, r3) if r != -1]
-
-    if not valid:
-        # No valid readings — drive straight and try again
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        hold_state(0.05)
-        continue
-
-    wall_distance = sum(valid) // len(valid)
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-    steering = side_Kp * error
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    # Debug print — comment out once working
-    print("dist:", wall_distance, "err:", error, "steer:", int(steering), "R:", int(right_speed), "L:", int(left_speed))
-
-    my_robot.drive(int(right_speed), int(left_speed))
-    hold_state(0.05)
-`,
-
-    2: `# Challenge 2: Wall Follow — PD Control
-# Add the Derivative term to dampen oscillations
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
-
-# ═══════════════════════════════════════════════════════
-# CONFIGURATION
-# ═══════════════════════════════════════════════════════
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-side_Kp = 0.40             # Use the Kp you found in Challenge 1
-side_Kd = 0.15             # Start low — raise in 0.05 steps
-MAX_STEERING = 40
-
-# ═══════════════════════════════════════════════════════
-# MAIN LOOP
-# ═══════════════════════════════════════════════════════
-side_previous_error = 0
-
-while True:
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    # Derivative: how fast is the error changing?
-    side_derivative = error - side_previous_error
-
-    # PD output
-    steering = (side_Kp * error) + (side_Kd * side_derivative)
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    hold_state(0.05)
-`,
-
-    3: `# Challenge 3: Wall Follow — Full PID
-# Add the Integral term to fix drift around the L corner
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
-
-# ═══════════════════════════════════════════════════════
-# CONFIGURATION
-# ═══════════════════════════════════════════════════════
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-side_Kp = 0.40             # Use the Kp you found in Challenge 1
-side_Kd = 0.25             # Use the Kd you found in Challenge 2
-side_Ki = 0.003            # Start very small — raise in 0.002 steps
-MAX_STEERING = 40
-side_INTEGRAL_MAX = 1200   # Anti-windup clamp
-
-# ═══════════════════════════════════════════════════════
-# MAIN LOOP
-# ═══════════════════════════════════════════════════════
-side_previous_error = 0
-side_integral = 0
-
-while True:
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0  # Reset when wall lost
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    # Integral: accumulated error
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-
-    # Derivative
-    side_derivative = error - side_previous_error
-
-    # Full PID
-    steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    hold_state(0.05)
-`,
-
-    4: `# Challenge 4: Dead End Detection
-# Combine front sensor with side PID wall following
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
-
-# ═══════════════════════════════════════════════════════
-# CONFIGURATION
-# ═══════════════════════════════════════════════════════
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-
-# Front sensor P-controlled approach
-FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
-FRONT_STOP_DISTANCE = 120  # Stop and turn (mm)
-FRONT_Kp = 0.5             # Front deceleration gain
-TURN_SPEED = 180
-TURN_TIME = 0              # TODO: tune for ~90 degree turn
-
-# Side PID gains (carry over your tuned values from Challenge 3)
-side_Kp = 0.40
-side_Kd = 0.25
-side_Ki = 0.003
-MAX_STEERING = 40
-side_INTEGRAL_MAX = 1200
-
-# ═══════════════════════════════════════════════════════
-# MAIN LOOP
-# ═══════════════════════════════════════════════════════
-side_previous_error = 0
-side_integral = 0
-
-while True:
-    front = my_robot.read_distance()
-
-    # Priority 1: Wall ahead — P-controlled deceleration then turn
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            # Close enough — stop and turn
-            my_robot.brake()
-            hold_state(0.3)
-            my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME)
-            my_robot.brake()
-            hold_state(0.3)
-            side_integral = 0
-            side_previous_error = 0
-            continue
-        else:
-            # Approaching — slow down proportionally
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-            hold_state(0.05)
-            continue
-
-    # Priority 2: Side wall following with PID
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-    side_derivative = error - side_previous_error
-
-    steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    hold_state(0.05)
-`,
-    5: `# Challenge 5: Maze Solver — Hand on Wall
-# Full PID wall following + front P deceleration + hand-on-wall algorithm
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = True
-my_robot = AIDriver("left")  # ← Change to "right" if wall is on your right
-
-# ═══════════════════════════════════════════════════════
-# CONFIGURATION
-# ═══════════════════════════════════════════════════════
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-
-# Front sensor P-controlled approach
-FRONT_SLOW_DISTANCE = 400
-FRONT_STOP_DISTANCE = 120
-FRONT_Kp = 0.5
-TURN_SPEED = 180
-TURN_TIME = 0              # TODO: tune for ~90 degree turn
-
-# Side PID gains
-side_Kp = 0.40════════════════════════════════════════════════════
-# MAIN LOOP — Hand on Wall Algorithm
-# ═══════════════════════════════════════════════════════
-side_previous_error = 0
-side_integral = 0
-
-while True:
-    front = my_robot.read_distance()
-    side = my_robot.read_distance_2()
-
-    # Priority 1: Wall ahead — P-controlled deceleration then turn
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
-            my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME)
-            my_robot.brake()
-            hold_state(0.3)
-            side_integral = 0
-            side_previous_error = 0
-        else:
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-
-    # Priority 2: Lost the wall — drift toward it to reacquire
-    elif side == -1:
-        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * 0.4)
-        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * 0.4)
-        my_robot.drive(r, l)
-
-    # Priority 3: Wall visible — PID follow
-    else:
-        error = side - TARGET_WALL_DISTANCE
-        side_integral = side_integral + error
-        if side_integral > side_INTEGRAL_MAX:
-            side_integral = side_INTEGRAL_MAX
-        elif side_integral < -side_INTEGRAL_MAX:
-            side_integral = -side_INTEGRAL_MAX
-        side_derivative = error - side_previous_error
-
-        steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-        if steering > MAX_STEERING:
-            steering = MAX_STEERING
-        elif steering < -MAX_STEERING:
-            steering = -MAX_STEERING
-
-        right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-        left_speed  = BASE_SPEED + (my_robot.wall_sign * steering)
-
-        my_robot.drive(int(right_speed), int(left_speed))
-        side_previous_error = error
-
-    hold_state(0.05)
-`,
+function getStarterCodePath(challengeId) {
+  const starterCodeFiles = {
+    debug: "../project/main.py",
+    1: "starter-code/challenge-1.py",
+    2: "starter-code/challenge-2.py",
+    3: "starter-code/challenge-3.py",
+    4: "starter-code/challenge-4.py",
+    5: "starter-code/challenge-5.py",
+    6: "starter-code/challenge-6.py",
   };
+
+  if (Object.prototype.hasOwnProperty.call(starterCodeFiles, challengeId)) {
+    return starterCodeFiles[challengeId];
+  }
+
+  const numericId = parseInt(challengeId, 10);
+  if (
+    Number.isInteger(numericId) &&
+    Object.prototype.hasOwnProperty.call(starterCodeFiles, numericId)
+  ) {
+    return starterCodeFiles[numericId];
+  }
+
+  return null;
 }
 
 // Initialize when DOM is ready

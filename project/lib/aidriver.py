@@ -443,7 +443,7 @@ class L298N:
         else:
             self._pwm_val = min(speed, 65535)
 
-            _d("L298N set_speed: raw=", speed, "pwm=", self._pwm_val)
+        _d("L298N set_speed: raw=", speed, "pwm=", self._pwm_val)
 
     def get_speed(self):
         """
@@ -645,21 +645,16 @@ class AIDriver:
             raise
 
     def service(self):
-        """Run background housekeeping tasks for the robot.
+        """Background housekeeping hook (currently a no-op).
 
-        Currently this just advances the onboard LED heartbeat in a
-        non-blocking way when ``self._heartbeat_enabled`` is True. It is
-        safe to call frequently from a main loop and is optional for
-        simple student programs.
+        The onboard LED heartbeat is driven entirely by hardware PWM
+        (see ``_start_pwm_heartbeat`` called from ``__init__``), so no
+        per-loop work is required to keep it blinking. This method is
+        kept as a stable extension point so callers such as the gamepad
+        controller can invoke it every loop without needing to know
+        whether housekeeping is currently required.
         """
-
-        if not getattr(self, "_heartbeat_enabled", False):
-            return
-
-        try:
-            heartbeat()
-        except Exception as exc:
-            _explain_error(exc)
+        return
 
     def drive_forward(self, right_wheel_speed, left_wheel_speed):
         """

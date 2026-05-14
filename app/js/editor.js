@@ -3,6 +3,12 @@
  * ACE Editor configuration and management
  */
 
+// Bumped whenever starter scaffolds change so previously cached student code
+// (which may have been written against an older starter shape, or accidentally
+// contain the answer key) is treated as stale and replaced with the fresh
+// scaffold on next load. Increment when starter-code/*.py changes meaningfully.
+const STARTER_VERSION = "v2";
+
 const Editor = {
   instance: null,
   markers: [],
@@ -328,7 +334,7 @@ const Editor = {
     if (typeof App === "undefined") return;
 
     const code = this.getCode();
-    const key = `aidriver_challenge_${App.currentChallenge}_code`;
+    const key = `aidriver_challenge_${App.currentChallenge}_code_${STARTER_VERSION}`;
     localStorage.setItem(key, code);
     console.log(`[Editor] Code saved for challenge ${App.currentChallenge}`);
   },
@@ -339,7 +345,7 @@ const Editor = {
    * @returns {string|null} Persisted code or null when absent.
    */
   loadSavedCode(challengeId) {
-    const key = `aidriver_challenge_${challengeId}_code`;
+    const key = `aidriver_challenge_${challengeId}_code_${STARTER_VERSION}`;
     return localStorage.getItem(key);
   },
 
@@ -349,7 +355,7 @@ const Editor = {
    * @returns {void}
    */
   clearSavedCode(challengeId) {
-    const key = `aidriver_challenge_${challengeId}_code`;
+    const key = `aidriver_challenge_${challengeId}_code_${STARTER_VERSION}`;
     localStorage.removeItem(key);
   },
 
@@ -359,7 +365,7 @@ const Editor = {
    * @returns {boolean} True when code is present in storage.
    */
   hasSavedCode(challengeId) {
-    const key = `aidriver_challenge_${challengeId}_code`;
+    const key = `aidriver_challenge_${challengeId}_code_${STARTER_VERSION}`;
     return localStorage.getItem(key) !== null;
   },
 

@@ -128,23 +128,51 @@ const Challenges = (function () {
       maze: "simple",
     },
 
-    // Challenge 4: Front + Side Sensors — Dead End Detection
+    // Challenge 4: Corner Detection — single 90° turn
     4: {
       id: 4,
-      title: "Dead End Detection",
-      subtitle: "Sensor Fusion",
+      title: "Corner Detection",
+      subtitle: "Front Sensor + Turn",
       icon: "bi-sign-turn-right",
       menuGroup: "advanced",
       difficulty: DIFFICULTY.MEDIUM,
       description:
-        "Combine the front sensor with side PID to detect and navigate past a dead end.",
-      goal: "Follow the wall, detect the dead end, turn, and reach the exit.",
+        "Use the front sensor to detect a corner, turn 90° in the correct direction, and continue wall following.",
+      goal: "Follow the wall, detect the corner, turn 90°, and reach the exit.",
       hints: [
-        "Use read_distance() for the front sensor — detects the dead end",
-        "If front < FRONT_THRESHOLD → stop, turn, then continue wall following",
-        "Reset integral and previous_error after turning",
-        "Use read_distance_2() for side PID as before",
-        "Think: wall ahead → turn; wall beside → PID follow",
+        "Use read_distance() for the front sensor — detects the wall ahead",
+        "If front <= FRONT_STOP_DISTANCE → stop and turn 90° away from your wall",
+        "Use wall_sign to pick the correct turn direction automatically",
+        "Reset side_integral and side_previous_error after turning",
+        "Tune TURN_TIME_90 so the robot turns approximately 90 degrees",
+      ],
+      startPosition: { x: 300, y: 1700, heading: 0 },
+      successCriteria: {
+        type: "reach_zone",
+        zone: { x: 1600, y: 300, width: 200, height: 300 },
+      },
+      path: null,
+      obstacles: [],
+      maze: "corner",
+    },
+
+    // Challenge 5: Dead End Detection — 90° corner OR 180° dead end
+    5: {
+      id: 5,
+      title: "Dead End Detection",
+      subtitle: "Sensor Fusion",
+      icon: "bi-sign-u-turn",
+      menuGroup: "advanced",
+      difficulty: DIFFICULTY.MEDIUM,
+      description:
+        "Extend corner logic to handle dead ends: check the side sensor to decide between a 90° corner turn or a 180° reversal.",
+      goal: "Follow the wall, detect the dead end, turn 180°, and reach the exit.",
+      hints: [
+        "Stop at the front wall — then check the side sensor",
+        "Side sensor open (== -1 or very far) → corner → turn 90°",
+        "Side sensor blocked → dead end → turn 180° (two TURN_TIME_90 durations)",
+        "Use wall_sign to pick the correct rotation direction",
+        "Reset side_integral and side_previous_error after every turn",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
       successCriteria: {
@@ -156,9 +184,9 @@ const Challenges = (function () {
       maze: "dead_end",
     },
 
-    // Challenge 5: Full Maze Solving — Hand on Wall
-    5: {
-      id: 5,
+    // Challenge 6: Full Maze Solving — Hand on Wall
+    6: {
+      id: 6,
       title: "Maze Solver",
       subtitle: "Hand-on-Wall",
       icon: "bi-signpost-split",
