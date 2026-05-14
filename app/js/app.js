@@ -599,6 +599,26 @@ function loadChallenge(challengeId) {
     }
   }
 
+  // Load maze walls if the challenge references a maze. We set walls and
+  // App.currentMaze directly here (rather than calling loadMaze) so the
+  // challenge's own startPosition / spawnXRange remains the source of
+  // truth for the spawn pose.
+  if (typeof Simulator !== "undefined") {
+    if (challenge && challenge.maze && typeof Mazes !== "undefined") {
+      const maze = Mazes.get(challenge.maze);
+      if (maze) {
+        App.currentMaze = maze;
+        Simulator.setMazeWalls(maze.walls || []);
+      } else {
+        App.currentMaze = null;
+        Simulator.setMazeWalls([]);
+      }
+    } else {
+      App.currentMaze = null;
+      Simulator.setMazeWalls([]);
+    }
+  }
+
   // Clear success/failure overlay from previous challenge
   App.elements.canvasContainer.classList.remove("success", "failure");
 

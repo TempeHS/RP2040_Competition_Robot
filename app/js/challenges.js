@@ -93,7 +93,6 @@ const Challenges = (function () {
       ],
       startPosition: { x: 150, y: 1700, heading: 10 },
       spawnXRange: { min: 110, max: 410 },
-      spawnHeadingRange: { min: -15, max: 15 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 100, y: 100, width: 300, height: 200 },
