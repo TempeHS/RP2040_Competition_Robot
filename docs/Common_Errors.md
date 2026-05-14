@@ -249,6 +249,96 @@ Python cannot find the `aidriver` library file.
 
 ---
 
+---
+
+## 9. Robot steers the wrong way during PID wall following
+
+**What it looks like:**
+
+- The robot drifts toward the wall when it should correct away, or vice versa.
+- The robot spins or veers immediately when PID starts.
+
+**How to diagnose:**
+
+Upload and run the steering direction test from your Pico:
+
+```
+project/tests/test_pid_steer_direction.py
+```
+
+Place the robot on the floor with space to move. The test drives the robot in two short bursts and tells you which way the nose **should** turn. Watch the robot:
+
+| Step | What the test does | Robot nose should |
+|------|--------------------|-------------------|
+| 1 | Right wheel faster | turn **LEFT** |
+| 2 | Left wheel faster  | turn **RIGHT** |
+
+**How to fix:**
+
+If either step goes the **opposite** way, swap the correction sign in your PID loop:
+
+```python
+# WRONG (if robot steers backwards):
+my_robot.drive(BASE_SPEED + correction, BASE_SPEED - correction)
+
+# FIX:
+my_robot.drive(BASE_SPEED - correction, BASE_SPEED + correction)
+```
+
+---
+
+## 10. Robot is erratic or jerky during PID wall following
+
+**What it looks like:**
+
+- The robot zigzags wildly even with low Kp values.
+- The motors seem to pulse or stutter constantly.
+- The robot moves erratically even when almost at the target distance.
+
+**Likely cause:**
+
+The raw HC-SR04 ultrasonic sensor can jump ±20–50 mm between readings even when the robot is completely still. This noise feeds straight into the PID correction, causing the motors to jerk every loop.
+
+**How to diagnose:**
+
+Upload and run the sensor noise diagnostic from your Pico:
+
+```
+project/tests/test_pid_sensor_noise.py
+```
+
+Keep the robot **still** beside a wall while it runs. It prints 20 readings and tells you:
+
+- The **spread** (max − min) of the raw readings
+- What correction swing that produces at your Kp
+
+| Spread | Diagnosis | Fix |
+|--------|-----------|-----|
+| > 30 mm | High noise — the main cause of erratic movement | Average 3 readings per loop (see below) |
+| 15–30 mm | Moderate noise | Average 2 readings, reduce Kp to ≤ 0.4 |
+| < 15 mm | Sensor is clean | Reduce Kp by 30% |
+
+**How to fix (averaging sensor readings):**
+
+Replace the single sensor read in your loop with this:
+
+```python
+# Instead of:
+wall_distance = my_robot.read_distance_2()
+
+# Use this averaged version:
+r1 = my_robot.read_distance_2()
+r2 = my_robot.read_distance_2()
+r3 = my_robot.read_distance_2()
+valid = [r for r in (r1, r2, r3) if r != -1]
+if not valid:
+    my_robot.drive(BASE_SPEED, BASE_SPEED)
+    continue
+wall_distance = sum(valid) // len(valid)
+```
+
+---
+
 If you see an error that is not listed here, try to:
 
 1. Read the **first line** of the error message.
