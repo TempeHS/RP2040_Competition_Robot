@@ -59,7 +59,7 @@ const Challenges = (function () {
         "read_distance_2() reads the side ultrasonic sensor",
         "error = wall_distance - TARGET_WALL_DISTANCE",
         "steering = Kp * error adjusts wheel speed difference",
-        "Keep BASE_SPEED - MAX_STEERING >= 120 (dead zone)",
+        "Keep BASE_SPEED - MAX_STEERING > 64 (dead zone)",
         "drive() handles signed speeds and the dead zone automatically",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
