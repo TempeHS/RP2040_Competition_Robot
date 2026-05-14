@@ -152,6 +152,7 @@ const Challenges = (function () {
       startPosition: { x: 200, y: 1700, heading: 0 },
       successCriteria: {
         type: "reach_zone",
+        zone: { x: 1600, y: 0, width: 400, height: 400 },
       },
       path: null,
       obstacles: [],

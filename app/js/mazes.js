@@ -78,10 +78,6 @@ const Mazes = (function () {
       description:
         "Drive up the outer corridor, detect the front wall, then turn 90° toward the centre to reach the top.",
       startPosition: { x: 200, y: 1700, heading: 0 },
-      // End zone fills the full top-right corner so the only way to
-      // cross the top corridor past the block is to enter the zone —
-      // the car cannot sneak past above or below it.
-      endZone: { x: 1600, y: 0, width: 400, height: 400 },
       walls: [
         // Single central block. Starts 400 mm in from the left and top
         // edges and extends to the right and bottom edges of the arena,

@@ -76,6 +76,7 @@ describe("Mazes (real source)", () => {
 
     test("endZone is fully inside the arena", () => {
       const z = allMazes[id].endZone;
+      if (!z) return; // optional — some mazes rely on challenge.successCriteria.zone
       expect(z.x).toBeGreaterThanOrEqual(0);
       expect(z.y).toBeGreaterThanOrEqual(0);
       expect(z.x + z.width).toBeLessThanOrEqual(ARENA);
