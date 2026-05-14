@@ -28,10 +28,10 @@ aidriver.DEBUG_AIDRIVER = False  # Set True to print sensor + motor values
 my_robot = AIDriver("left")  # "left" or "right" — match the simulator scene
 
 BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 240
-MAX_STEERING = 15
+TARGET_WALL_DISTANCE = 150
+MAX_STEERING = 40
 
-side_Kp = 0.1
+side_Kp = 0.40
 
 
 while True:

@@ -63,6 +63,7 @@ const Challenges = (function () {
         "drive() handles signed speeds and the dead zone automatically",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
+      spawnXRange: { min: 110, max: 410 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 100, y: 100, width: 300, height: 200 },
@@ -91,6 +92,8 @@ const Challenges = (function () {
         "Remember to save previous_error each loop",
       ],
       startPosition: { x: 150, y: 1700, heading: 10 },
+      spawnXRange: { min: 110, max: 410 },
+      spawnHeadingRange: { min: -15, max: 15 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 100, y: 100, width: 300, height: 200 },
@@ -119,6 +122,7 @@ const Challenges = (function () {
         "Reset integral to 0 when sensor returns -1",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
+      spawnXRange: { min: 110, max: 410 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 100, y: 100, width: 200, height: 200 },
@@ -147,6 +151,7 @@ const Challenges = (function () {
         "Tune TURN_TIME_90 so the robot turns approximately 90 degrees",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
+      spawnXRange: { min: 110, max: 410 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 1600, y: 300, width: 200, height: 300 },
@@ -175,6 +180,7 @@ const Challenges = (function () {
         "Reset side_integral and side_previous_error after every turn",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
+      spawnXRange: { min: 110, max: 410 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 1600, y: 100, width: 300, height: 200 },
@@ -204,6 +210,7 @@ const Challenges = (function () {
         "Use the maze selector to try different difficulty levels",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
+      spawnXRange: { min: 110, max: 410 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 1700, y: 100, width: 200, height: 200 },
@@ -214,6 +221,30 @@ const Challenges = (function () {
       maze: "zigzag",
     },
   };
+
+  /**
+   * Roll a random spawn position for a challenge.  If the challenge has
+   * `spawnXRange` (and optionally `spawnHeadingRange`), the returned
+   * position uses a uniform-random x (and heading) within those bounds.
+   * Otherwise the static `startPosition` is returned unchanged.
+   *
+   * @param {object} challenge  A challenge definition from `get()`.
+   * @returns {{x:number, y:number, heading:number}} Spawn pose in mm / degrees.
+   */
+  function randomizeSpawn(challenge) {
+    const base = challenge.startPosition || { x: 300, y: 1700, heading: 0 };
+    const pos = { x: base.x, y: base.y, heading: base.heading || 0 };
+
+    if (challenge.spawnXRange) {
+      const { min, max } = challenge.spawnXRange;
+      pos.x = Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    if (challenge.spawnHeadingRange) {
+      const { min, max } = challenge.spawnHeadingRange;
+      pos.heading = Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    return pos;
+  }
 
   /**
    * Retrieve a challenge definition by identifier, falling back to challenge 0 when missing.
@@ -535,6 +566,7 @@ const Challenges = (function () {
     getAll,
     count,
     checkSuccess,
+    randomizeSpawn,
     generateMenuHTML,
     populateMenu,
     DIFFICULTY,

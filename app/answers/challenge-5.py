@@ -26,10 +26,10 @@ aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
 BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 180
-MAX_STEERING = 25
+TARGET_WALL_DISTANCE = 150
+MAX_STEERING = 40
 
-side_Kp = 0.20
+side_Kp = 0.40
 side_Kd = 0.15
 side_Ki = 0.003
 side_INTEGRAL_MAX = 1200

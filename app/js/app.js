@@ -80,10 +80,12 @@ App.onAIDriverInstantiated = function (side) {
   // Mirror the spawn pose so the wall the user chose is on the requested
   // side of the robot. Only mirror when switching away from the default.
   if (canMirror && App.robot && challenge && challenge.startPosition) {
+    const spawn =
+      (App.session && App.session.startPosition) || challenge.startPosition;
     const mirrored = Simulator.mirrorPose({
-      x: challenge.startPosition.x,
-      y: challenge.startPosition.y,
-      heading: challenge.startPosition.heading || 0,
+      x: spawn.x,
+      y: spawn.y,
+      heading: spawn.heading || 0,
     });
     App.robot.x = mirrored.x;
     App.robot.y = mirrored.y;
@@ -556,27 +558,30 @@ function loadChallenge(challengeId) {
     challenge._canonicalStart = { ...challenge.startPosition };
   }
 
+  // Roll a random spawn position (uses spawnXRange / spawnHeadingRange if defined)
+  const spawnPos =
+    challenge && typeof Challenges !== "undefined"
+      ? Challenges.randomizeSpawn(challenge)
+      : challenge && challenge.startPosition
+        ? { ...challenge.startPosition }
+        : { x: 1000, y: 1800, heading: 0 };
+
   // Initialize session tracking
   App.session = {
-    startPosition: challenge
-      ? { ...challenge.startPosition }
-      : { x: 1000, y: 1800 },
+    startPosition: { ...spawnPos },
     hasError: false,
     totalRotation: 0,
-    lastHeading:
-      challenge && challenge.startPosition
-        ? challenge.startPosition.heading || 0
-        : 0,
+    lastHeading: spawnPos.heading || 0,
     minY: 2000,
     crossoverCount: 0,
     startTime: null,
   };
 
-  // Set robot start position from challenge
+  // Set robot start position from randomised spawn
   if (challenge && challenge.startPosition) {
-    App.robot.x = challenge.startPosition.x;
-    App.robot.y = challenge.startPosition.y;
-    App.robot.heading = challenge.startPosition.heading || 0;
+    App.robot.x = spawnPos.x;
+    App.robot.y = spawnPos.y;
+    App.robot.heading = spawnPos.heading || 0;
     App.robot.trail = [];
     App.robot.leftSpeed = 0;
     App.robot.rightSpeed = 0;
@@ -986,18 +991,20 @@ function resetRobot() {
   App.elements.btnStep.disabled = false;
   App.elements.btnStep.textContent = "Step";
 
-  // Reset session tracking
+  // Reset session tracking — roll a NEW random spawn each run
   const challenge = App.currentChallengeConfig;
+  const spawnPos =
+    challenge && typeof Challenges !== "undefined"
+      ? Challenges.randomizeSpawn(challenge)
+      : challenge && challenge.startPosition
+        ? { ...challenge.startPosition }
+        : { x: 1000, y: 1800, heading: 0 };
+
   App.session = {
-    startPosition: challenge
-      ? { ...challenge.startPosition }
-      : { x: 1000, y: 1800 },
+    startPosition: { ...spawnPos },
     hasError: false,
     totalRotation: 0,
-    lastHeading:
-      challenge && challenge.startPosition
-        ? challenge.startPosition.heading || 0
-        : 0,
+    lastHeading: spawnPos.heading || 0,
     minY: 2000,
     crossoverCount: 0,
     startTime: null,
@@ -1026,10 +1033,10 @@ function resetRobot() {
     challenge.successCriteria.zone = { ...challenge._canonicalZone };
   }
   if (challenge && challenge.startPosition) {
-    const baseHeading = challenge.startPosition.heading || 0;
+    const baseHeading = spawnPos.heading || 0;
     App.robot = {
-      x: challenge.startPosition.x,
-      y: challenge.startPosition.y,
+      x: spawnPos.x,
+      y: spawnPos.y,
       heading: (baseHeading + App.startHeadingOffset) % 360,
       leftSpeed: 0,
       rightSpeed: 0,
