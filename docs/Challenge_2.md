@@ -6,7 +6,7 @@ You will learn:
 
 - Why P control alone causes oscillations.
 - What the **Derivative** term does and why it helps.
-- How to track `previous_error` to calculate the rate of change.
+- How to track `side_previous_error` to calculate the rate of change.
 
 ---
 
@@ -35,11 +35,11 @@ flowchart TD
     E -- No --> F[Drive straight]
     F --> C
     E -- Yes --> G[Calculate error]
-    G --> H["Calculate derivative = error - previous_error"]
-    H --> I["steering = (Kp × error) + (Kd × derivative)"]
-    I --> J[Clamp steering]
-    J --> K["Drive with differential steering"]
-    K --> L["Save previous_error = error"]
+    G --> H["Calculate side_derivative = error - side_previous_error"]
+    H --> I["steering = (side_Kp × error) + (side_Kd × side_derivative)"]
+    I --> J[Clamp steering to MAX_STEERING]
+    J --> K["Drive: right = BASE_SPEED - steering, left = BASE_SPEED + steering"]
+    K --> L["Save side_previous_error = error"]
     L --> C
 
     style A fill:#e1f5fe,color:#000000
@@ -66,32 +66,37 @@ Think of it like a car on an icy road — you turn the wheel hard, slide past wh
 The **Derivative** measures how fast the error is **changing**:
 
 ```
-derivative = error - previous_error
+side_derivative = error - side_previous_error
 ```
 
-- If the error is **getting smaller quickly** (robot approaching the wall fast) → derivative is **negative** → it opposes the P correction and slows you down.
-- If the error is **getting bigger** (robot drifting away) → derivative is **positive** → it adds to the P correction and speeds up the response.
+- If the error is **getting smaller quickly** (robot approaching the wall fast) → side_derivative is **negative** → it opposes the P correction and slows you down.
+- If the error is **getting bigger** (robot drifting away) → side_derivative is **positive** → it adds to the P correction and speeds up the response.
 
 The derivative acts like a **brake on the steering** — it resists rapid changes and prevents overshoot.
 
-### What is Kd?
+### What is side_Kd?
 
-**Kd** (Derivative gain) controls how strongly the derivative term affects steering:
+**side_Kd** (Derivative gain) controls how strongly the derivative term affects steering:
 
 ```
-steering = (Kp × error) + (Kd × derivative)
+steering = (side_Kp * error) + (side_Kd * side_derivative)
 ```
 
-- **Bigger Kd** → more dampening → slower, smoother response.
-- **Smaller Kd** → less dampening → faster response, but may still oscillate.
-- **Kd = 0** → no derivative at all (same as Challenge 1).
+---
 
-### Real-World Analogy
+## Example Starting Values
 
-Imagine you're carrying a full cup of water across a room:
+```python
+BASE_SPEED = 165
+TARGET_WALL_DISTANCE = 150
+MAX_STEERING = 40
+side_Kp = 0.55
+side_Kd = 0.25
+side_previous_error = 0
+```
 
-- **P control** = walking faster when you're far from the table (but you slosh the water).
-- **PD control** = walking faster when far, but **slowing down as you approach** (no sloshing).
+> [!Note]
+> `side_previous_error` starts at 0 because on the first loop iteration, there is no previous reading.
 
 ---
 
@@ -110,7 +115,7 @@ Copy your working Challenge 1 code. You will add two things:
 Add `Kd` to your configuration and `previous_error` before the loop:
 
 ```python
-BASE_SPEED = 160
+BASE_SPEED = 165
 TARGET_WALL_DISTANCE = 150
 Kp = 0.5
 Kd = 0.3                  # Derivative gain — dampens oscillations
@@ -191,10 +196,10 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
 
-BASE_SPEED = 160
+BASE_SPEED = 165
 TARGET_WALL_DISTANCE = 150
 Kp = 0.5
-Kd = 0.3
+Kd = 0.3                  # Derivative gain — dampens oscillations
 MAX_STEERING = 40
 
 previous_error = 0

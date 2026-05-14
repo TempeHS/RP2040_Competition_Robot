@@ -31,15 +31,15 @@ flowchart TD
     A[Start Program] --> B[Setup Robot & Variables]
     B --> C{Control Loop}
     C --> D[Read front sensor]
-    D --> E{"Wall ahead?<br>(front < SLOW_DISTANCE)"}
-    E -- Yes --> F{"Very close?<br>(front <= STOP_DISTANCE)"}
+    D --> E{"Wall ahead?<br>(FRONT_DISTANCE < FRONT_SLOW_DISTANCE)"}
+    E -- Yes --> F{"Very close?<br>(FRONT_DISTANCE <= FRONT_STOP_DISTANCE)"}
     F -- Yes --> G[Brake + Turn + Reset PID]
     G --> C
-    F -- No --> H["Slow down: speed = Kp × (front - STOP)"]
+    F -- No --> H["Slow down: speed = front_Kp × (FRONT_DISTANCE - FRONT_STOP_DISTANCE)"]
     H --> C
     E -- No --> I[Read side sensor]
     I --> J{Sensor OK?}
-    J -- No --> K[Drive straight + reset integral]
+    J -- No --> K[Drive straight + reset side_integral]
     K --> C
     J -- Yes --> L[PID wall follow]
     L --> C
@@ -64,27 +64,29 @@ flowchart TD
 
 | Sensor                         | Purpose                              | Code                         |
 | ------------------------------ | ------------------------------------ | ---------------------------- |
-| **Front** (`read_distance()`)  | Detect walls ahead — triggers a turn | `my_robot.read_distance()`   |
-| **Side** (`read_distance_2()`) | Follow the wall — PID steering       | `my_robot.read_distance_2()` |
+| **Front** (`FRONT_DISTANCE`)   | Detect walls ahead — triggers a turn | `my_robot.read_distance()`   |
+| **Side** (`SIDE_DISTANCE`)     | Follow the wall — PID steering       | `my_robot.read_distance_2()` |
 
 ### Priority-Based Decisions
 
 When you have two sensors, you need **rules about which one takes priority**:
 
-1. **Priority 1a: Very close to wall ahead** (`front <= FRONT_STOP_DISTANCE`) → Stop and turn. This is the most urgent.
-2. **Priority 1b: Approaching wall ahead** (`front < FRONT_SLOW_DISTANCE`) → Slow down proportionally. The closer the wall, the slower the robot drives.
+1. **Priority 1a: Very close to wall ahead** (`FRONT_DISTANCE <= FRONT_STOP_DISTANCE`) → Stop and turn. This is the most urgent.
+2. **Priority 1b: Approaching wall ahead** (`FRONT_DISTANCE < FRONT_SLOW_DISTANCE`) → Slow down proportionally. The closer the wall, the slower the robot drives.
 3. **Priority 2: No wall ahead** → Use PID to follow the side wall as normal.
 
 This is coded as a nested `if` structure:
 
 ```python
-if wall_detected_ahead:
-    if very_close:
-        # stop and turn
-    else:
-        # slow down (P control on front sensor)
+FRONT_DISTANCE = my_robot.read_distance()
+SIDE_DISTANCE = my_robot.read_distance_2()
+
+if FRONT_DISTANCE <= FRONT_STOP_DISTANCE:
+    # Stop and turn
+elif FRONT_DISTANCE < FRONT_SLOW_DISTANCE:
+    # Slow down: speed = front_Kp * (FRONT_DISTANCE - FRONT_STOP_DISTANCE)
 else:
-    # PID wall follow (side sensor)
+    # Use side PID wall following
 ```
 
 ### P Control on the Front Sensor — Smooth Deceleration
@@ -270,6 +272,7 @@ while True:
     # Priority 1: Wall ahead — P-controlled deceleration then turn
     if front != -1 and front < FRONT_SLOW_DISTANCE:
         if front <= FRONT_STOP_DISTANCE:
+            # Close enough — stop and turn
             my_robot.brake()
             hold_state(0.3)
             my_robot.rotate_left(TURN_SPEED)
@@ -280,6 +283,7 @@ while True:
             previous_error = 0
             continue
         else:
+            # Approaching — slow down proportionally
             approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
             if approach_speed < 120:
                 approach_speed = 120

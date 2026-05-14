@@ -1,26 +1,26 @@
-# Challenge 5: Maze Solver — Hand on Wall
+# Challenge 5: Full Maze Navigation
 
-In this challenge you will put everything together to navigate a **full maze**. Your robot will use the **hand-on-wall algorithm** combined with PID wall following and front sensor detection to find its way from the start to the exit.
+In this final challenge, your robot must use **all your skills** to navigate a maze with multiple turns, dead ends, and open spaces. You will combine **side PID wall following**, **front wall detection**, and **decision logic** to reach the exit.
 
 You will learn:
 
-- What the **hand-on-wall algorithm** is and why it works.
-- How to handle **three different situations** (wall ahead, wall lost, wall visible).
-- How to choose between **right-hand rule** and **left-hand rule**.
+- How to combine all previous algorithms into a robust maze solver.
+- How to handle open spaces (no wall detected).
+- How to tune all PID and threshold variables for best performance.
 
 ---
 
 ## Success Criteria
 
-My robot navigates the maze from start to the **green exit zone** without hitting walls. Time limit: **60 seconds**.
+My robot navigates the maze, avoids dead ends, makes correct turns, and reaches the **green exit zone**.
 
 ---
 
 ## Before You Begin
 
-1. Complete [Challenge 4](docs.html?doc=Challenge_4) — you need sensor fusion and PID working.
+1. Complete [Challenge 4](docs.html?doc=Challenge_4) — you need working PID and dead-end logic.
 2. Open the **Simulator** and select **Challenge 5**.
-3. Try running your Challenge 4 code — it may get partway through, but will likely get stuck at open junctions or turns in the wrong direction.
+3. Run your Challenge 4 code here — the robot will need to handle more complex situations!
 
 ---
 
@@ -30,24 +30,26 @@ My robot navigates the maze from start to the **green exit zone** without hittin
 flowchart TD
     A[Start Program] --> B[Setup Robot & Variables]
     B --> C{Control Loop}
-    C --> D[Read front + side sensors]
-    D --> E{"Priority 1:<br>Wall ahead?"}
-    E -- Yes --> F[Brake + turn away]
-    F --> G[Reset PID state]
+    C --> D[Read front & side sensors]
+    D --> E{"Wall ahead?<br>(FRONT_DISTANCE < FRONT_SLOW_DISTANCE)"}
+    E -- Yes --> F{"Very close?<br>(FRONT_DISTANCE <= FRONT_STOP_DISTANCE)"}
+    F -- Yes --> G[Brake + Turn + Reset PID]
     G --> C
-    E -- No --> H{"Priority 2:<br>Lost the wall?<br>(side == -1)"}
-    H -- Yes --> I["Gentle turn toward wall"]
-    I --> C
-    H -- No --> J["Priority 3:<br>PID wall follow"]
+    F -- No --> H["Slow down: speed = front_Kp × (FRONT_DISTANCE - FRONT_STOP_DISTANCE)"]
+    H --> C
+    E -- No --> I{"Side wall detected?<br>(SIDE_DISTANCE != -1)"}
+    I -- Yes --> J[PID wall follow]
     J --> C
+    I -- No --> K[Drive straight + reset side_integral]
+    K --> C
 
     style A fill:#e1f5fe,color:#000000
     style B fill:#000000,color:#ffffff
     style C fill:#fff3e0,color:#000000
     style E fill:#ffcdd2,color:#000000
     style F fill:#ffcdd2,color:#000000
-    style H fill:#fff9c4,color:#000000
-    style I fill:#fff9c4,color:#000000
+    style G fill:#ffcdd2,color:#000000
+    style H fill:#ffe0b2,color:#000000
     style J fill:#e8f5e8,color:#000000
 ```
 
@@ -55,48 +57,66 @@ flowchart TD
 
 ## Key Concepts
 
-### What is the Hand-on-Wall Algorithm?
+### Combining All Logic
 
-Imagine you are in a dark maze and you put your **right hand on the wall**. If you never take your hand off the wall — always touching it, always turning to keep contact — you will eventually find the exit.
+You now need to combine **side PID wall following** and **front wall detection** with logic for open spaces:
 
-This works because:
+- **Wall ahead (FRONT_DISTANCE < FRONT_SLOW_DISTANCE):** Slow down or stop and turn.
+- **No wall ahead, side wall detected (SIDE_DISTANCE != -1):** Use PID to follow the wall.
+- **No wall ahead, no side wall (SIDE_DISTANCE == -1):** Drive straight and reset side_integral.
 
-- A maze is a connected set of walls.
-- If you always follow the same wall, you are guaranteed to trace the entire boundary.
-- The exit is part of that boundary.
-
-### Right-Hand Rule vs Left-Hand Rule
-
-You can follow either the **right wall** or the **left wall**, but you must be **consistent**:
-
-| Rule                | Which sensor side | When wall lost, turn... | When wall ahead, turn... |
-| ------------------- | ----------------- | ----------------------- | ------------------------ |
-| **Right-hand rule** | Right side        | Right (toward the wall) | Left (away from wall)    |
-| **Left-hand rule**  | Left side         | Left (toward the wall)  | Right (away from wall)   |
-
-> [!Important]
-> Pick one rule and stick with it for the entire maze. Switching mid-run will confuse the algorithm.
-
-### Three Priority Levels
-
-Your robot needs to handle three situations, checked in order of urgency:
-
-**Priority 1 — Wall ahead (front sensor):** Stop and turn. This is the most urgent — if you don't react, you crash. Turn **away** from the wall you're following (if following the right wall, turn left).
-
-**Priority 2 — Lost the wall (side sensor returns -1):** The wall has ended — there's a gap or a junction. Turn **gently toward** the wall to reconnect with it. Don't spin on the spot — just slow down the wall-side wheel so the robot curves toward where the wall should be.
-
-**Priority 3 — Wall visible (side sensor returns a distance):** Use PID to follow the wall smoothly. This is the same code from Challenge 3.
-
-### Why "Gentle Turn" for Lost Wall?
-
-When the side sensor returns -1, the wall has disappeared — probably because the robot reached a junction or turn. A hard spin would overshoot. Instead, the robot curves gently by slowing one wheel:
+### Example Variable Names
 
 ```python
-# Following right wall, wall lost — curve right
-my_robot.drive(BASE_SPEED, int(BASE_SPEED * 0.6))
+BASE_SPEED = 165
+TARGET_WALL_DISTANCE = 150
+MAX_STEERING = 40
+side_Kp = 0.55
+side_Ki = 0.0
+side_Kd = 0.0
+front_Kp = 0.7
+FRONT_SLOW_DISTANCE = 220
+FRONT_STOP_DISTANCE = 120
 ```
 
-This makes the robot arc to the right, searching for the wall. Once the sensor picks up the wall again, PID takes over.
+- Use **all-caps** for constants and thresholds.
+- Use **side_** and **front_** prefixes for PID gains and variables.
+- Use **SIDE_DISTANCE** and **FRONT_DISTANCE** for sensor readings.
+
+---
+
+## Example Code Structure
+
+```python
+BASE_SPEED = 165
+TARGET_WALL_DISTANCE = 150
+MAX_STEERING = 40
+side_Kp = 0.55
+side_Ki = 0.0
+side_Kd = 0.0
+front_Kp = 0.7
+FRONT_SLOW_DISTANCE = 220
+FRONT_STOP_DISTANCE = 120
+
+while True:
+    FRONT_DISTANCE = my_robot.read_distance()
+    SIDE_DISTANCE = my_robot.read_distance_2()
+
+    if FRONT_DISTANCE <= FRONT_STOP_DISTANCE:
+        # Stop and turn
+        ...
+    elif FRONT_DISTANCE < FRONT_SLOW_DISTANCE:
+        # Slow down
+        speed = front_Kp * (FRONT_DISTANCE - FRONT_STOP_DISTANCE)
+        ...
+    elif SIDE_DISTANCE != -1:
+        # PID wall follow
+        error = SIDE_DISTANCE - TARGET_WALL_DISTANCE
+        ...
+    else:
+        # No wall detected, drive straight
+        ...
+```
 
 ---
 
@@ -239,29 +259,22 @@ Use the **maze selector** in the simulator to try different mazes:
 ## Complete Code
 
 ```python
-# Challenge 5: Maze Solver — Hand on Wall
+# Challenge 5: Full Maze Navigation
 from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
 
-BASE_SPEED = 160
+BASE_SPEED = 165
 TARGET_WALL_DISTANCE = 150
-
-# Front sensor P-controlled approach
-FRONT_SLOW_DISTANCE = 400
-FRONT_STOP_DISTANCE = 120
-FRONT_Kp = 0.5
-TURN_SPEED = 180
-TURN_TIME = 0              # TODO: tune for ~90 degree turn
-
-# Side PID gains
-Kp = 0.5
-Ki = 0.01
-Kd = 0.3
 MAX_STEERING = 40
-INTEGRAL_MAX = 500
+side_Kp = 0.55
+side_Ki = 0.0
+side_Kd = 0.0
+front_Kp = 0.7
+FRONT_SLOW_DISTANCE = 220
+FRONT_STOP_DISTANCE = 120
 
 WALL_SIDE = "right"
 
@@ -269,38 +282,31 @@ previous_error = 0
 integral = 0
 
 while True:
-    front = my_robot.read_distance()
-    side = my_robot.read_distance_2()
+    FRONT_DISTANCE = my_robot.read_distance()
+    SIDE_DISTANCE = my_robot.read_distance_2()
 
     # Priority 1: Wall ahead — P-controlled deceleration then turn
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
-            my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME)
-            my_robot.brake()
-            hold_state(0.3)
-            integral = 0
-            previous_error = 0
-        else:
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-
-    # Priority 2: Lost the wall — gentle turn toward it
-    elif side == -1:
-        if WALL_SIDE == "right":
-            my_robot.drive(BASE_SPEED, int(BASE_SPEED * 0.6))
-        else:
-            my_robot.drive(int(BASE_SPEED * 0.6), BASE_SPEED)
-
-    # Priority 3: Wall visible — PID follow
-    else:
-        error = side - TARGET_WALL_DISTANCE
+    if FRONT_DISTANCE <= FRONT_STOP_DISTANCE:
+        # Stop and turn
+        my_robot.brake()
+        hold_state(0.3)
+        my_robot.rotate_left(TURN_SPEED)
+        hold_state(TURN_TIME)
+        my_robot.brake()
+        hold_state(0.3)
+        integral = 0
+        previous_error = 0
+    elif FRONT_DISTANCE < FRONT_SLOW_DISTANCE:
+        # Slow down
+        speed = front_Kp * (FRONT_DISTANCE - FRONT_STOP_DISTANCE)
+        if speed < 120:
+            speed = 120
+        if speed > BASE_SPEED:
+            speed = BASE_SPEED
+        my_robot.drive(speed, speed)
+    elif SIDE_DISTANCE != -1:
+        # PID wall follow
+        error = SIDE_DISTANCE - TARGET_WALL_DISTANCE
         integral = integral + error
         if integral > INTEGRAL_MAX:
             integral = INTEGRAL_MAX

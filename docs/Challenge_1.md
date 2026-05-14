@@ -6,7 +6,7 @@ You will learn:
 
 - How the side sensor measures distance to a wall.
 - What "error" means in a control system.
-- How to turn error into a steering correction using a single number called **Kp**.
+- How to turn error into a steering correction using a single number called **side_Kp**.
 
 ---
 
@@ -35,9 +35,9 @@ flowchart TD
     E -- No --> F[Drive straight]
     F --> C
     E -- Yes --> G[Calculate error]
-    G --> H[Calculate steering = Kp × error]
+    G --> H[Calculate steering = side_Kp × error]
     H --> I[Clamp steering to MAX_STEERING]
-    I --> J["Drive: right = BASE - steering, left = BASE + steering"]
+    I --> J["Drive: right = BASE_SPEED - steering, left = BASE_SPEED + steering"]
     J --> C
 
     style A fill:#e1f5fe,color:#000000
@@ -69,98 +69,35 @@ Both return a distance in **millimetres**. If the wall is too close, too far, or
 Error is the difference between **where the robot is** and **where you want it to be**:
 
 ```
-error = wall_distance - TARGET_WALL_DISTANCE
+SIDE_DISTANCE = my_robot.read_distance_2()
+error = SIDE_DISTANCE - TARGET_WALL_DISTANCE
 ```
 
 - If the robot is **too far** from the wall → error is **positive** → steer closer.
 - If the robot is **too close** to the wall → error is **negative** → steer away.
 - If the robot is at the **perfect distance** → error is **zero** → drive straight.
 
-### What is Kp?
+### What is side_Kp?
 
-**Kp** (Proportional gain) is a number you multiply by the error to get a steering correction:
-
-```
-steering = Kp × error
-```
-
-- **Bigger Kp** → stronger correction → faster response, but may overshoot.
-- **Smaller Kp** → gentler correction → smoother, but may not correct fast enough.
-
-### How Differential Steering Corrects the Distance
-
-The robot steers by making one wheel go **faster** than the other. The formula is:
+**side_Kp** (Proportional gain) controls how strongly the error affects steering:
 
 ```
-right_speed = BASE_SPEED - steering
-left_speed  = BASE_SPEED + steering
+steering = side_Kp * error
 ```
 
-The wall is on the **right** side. Here is what happens in each situation:
+- If **side_Kp** is too low, the robot reacts slowly and drifts away from the wall.
+- If **side_Kp** is too high, the robot overreacts and zig-zags.
 
-#### Too far from the wall (need to steer RIGHT, closer to wall)
+---
 
-The sensor reads 200mm but your target is 150mm, so `error = 200 - 150 = +50`. With `Kp = 0.5`, `steering = +25`.
-
-```
-right_speed = 160 - 25 = 135   ← right wheel SLOWER
-left_speed  = 160 + 25 = 185   ← left wheel FASTER
-```
-
-The **left wheel pushes harder** than the right, so the robot curves **right toward the wall**.
-
-#### Too close to the wall (need to steer LEFT, away from wall)
-
-The sensor reads 100mm but your target is 150mm, so `error = 100 - 150 = -50`. With `Kp = 0.5`, `steering = -25`.
-
-```
-right_speed = 160 - (-25) = 185   ← right wheel FASTER
-left_speed  = 160 + (-25) = 135   ← left wheel SLOWER
-```
-
-The **right wheel pushes harder** than the left, so the robot curves **left away from the wall**.
-
-#### At the perfect distance (drive straight)
-
-The sensor reads 150mm and your target is 150mm, so `error = 0`. `steering = 0`.
-
-```
-right_speed = 160 - 0 = 160   ← same speed
-left_speed  = 160 + 0 = 160   ← same speed
-```
-
-Both wheels run at the **same speed**, so the robot drives **straight ahead**.
-
-> [!Tip]
-> Think of it like rowing a boat: if you paddle harder on the left, the boat turns right. If you paddle harder on the right, the boat turns left. Equal paddling goes straight.
-
-### What is `drive()`?
-
-The `drive()` method accepts **signed speeds** for the right and left wheels:
+## Example Starting Values
 
 ```python
-my_robot.drive(right_speed, left_speed)
+BASE_SPEED = 165
+TARGET_WALL_DISTANCE = 150
+MAX_STEERING = 40
+side_Kp = 0.55
 ```
-
-- Positive values = forward, negative values = backward.
-- Values are automatically clamped to -255 to +255.
-- The motor **dead zone** (speeds 1–119 don't spin the wheels) is handled automatically.
-
-> [!Important]
-> The robot's motors need at least speed **120** to actually turn. The `drive()` method handles this for you — if a speed is too low to move the wheel, it either stops it (0) or jumps to 120.
-
-### The Dead Zone Rule
-
-When setting your `BASE_SPEED` and `MAX_STEERING`, follow this rule:
-
-```
-BASE_SPEED - MAX_STEERING >= 120
-```
-
-If you break this rule, one wheel may stop unexpectedly during a correction. For example:
-
-- `BASE_SPEED = 160`, `MAX_STEERING = 40` → minimum wheel speed = 120 ✅
-- `BASE_SPEED = 150`, `MAX_STEERING = 40` → minimum wheel speed = 110 ❌
 
 ---
 
@@ -186,7 +123,7 @@ my_robot = AIDriver()
 These are the numbers you will tune to get your robot working:
 
 ```python
-BASE_SPEED = 160          # Forward speed (must be > 120!)
+BASE_SPEED = 165          # Forward speed (must be > 120!)
 TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
 Kp = 0.5                  # Proportional gain
 MAX_STEERING = 40         # Max wheel speed difference
@@ -279,7 +216,7 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = True
 my_robot = AIDriver()
 
-BASE_SPEED = 160
+BASE_SPEED = 165
 TARGET_WALL_DISTANCE = 150
 Kp = 0.5
 MAX_STEERING = 40
