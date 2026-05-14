@@ -62,7 +62,7 @@ const Challenges = (function () {
         "Keep BASE_SPEED - MAX_STEERING >= 120 (dead zone)",
         "drive() handles signed speeds and the dead zone automatically",
       ],
-      startPosition: { x: 210, y: 1700, heading: 0 },
+      startPosition: { x: 300, y: 1700, heading: 0 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 100, y: 100, width: 300, height: 200 },
