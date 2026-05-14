@@ -60,6 +60,3 @@ while True:
 
     side_previous_error = error
     hold_state(0.05)
-
-    side_previous_error = error  # MUST be the last update before hold_state
-    hold_state(0.05)

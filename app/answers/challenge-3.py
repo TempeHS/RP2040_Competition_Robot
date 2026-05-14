@@ -31,9 +31,9 @@ TARGET_WALL_DISTANCE = 200
 MAX_STEERING = 60
 
 side_Kp = 0.25
-side_Kd = 0.30
-side_Ki = 0.005
-side_INTEGRAL_MAX = 1000
+side_Kd = 0.40
+side_Ki = 0.001
+side_INTEGRAL_MAX = 50
 
 side_previous_error = 0
 side_integral = 0
