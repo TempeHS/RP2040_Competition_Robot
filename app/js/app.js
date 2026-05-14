@@ -2229,6 +2229,20 @@ function startAnimationLoop() {
         App.robot = Simulator.step(App.robot, dt);
       }
 
+      // === TRACE: per-frame trajectory dump for debugging ===
+      // Set window.__TRACE_TRAJECTORY = true in DevTools to enable.
+      // Output is one CSV line per frame: t_ms,x,y,heading,L,R
+      if (typeof window !== "undefined" && window.__TRACE_TRAJECTORY) {
+        if (window.__TRACE_T0 == null) {
+          window.__TRACE_T0 = currentTime;
+          console.log("TRACE,t_ms,x,y,heading,L,R");
+        }
+        const t = (currentTime - window.__TRACE_T0).toFixed(1);
+        console.log(
+          `TRACE,${t},${App.robot.x.toFixed(2)},${App.robot.y.toFixed(2)},${App.robot.heading.toFixed(3)},${App.robot.leftSpeed},${App.robot.rightSpeed}`,
+        );
+      }
+
       // Track session data for success checking
       updateSessionTracking();
 
