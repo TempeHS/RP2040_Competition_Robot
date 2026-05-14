@@ -74,15 +74,19 @@ const Mazes = (function () {
       id: "corner",
       name: "Corner",
       difficulty: "Easy",
-      symmetric: true,
+      symmetric: false,
       description:
         "Drive up the outer corridor, detect the front wall, then turn 90° toward the centre to reach the top.",
       startPosition: { x: 200, y: 1700, heading: 0 },
-      endZone: { x: 1600, y: 100, width: 300, height: 200 },
+      // End zone fills the full top-right corner so the only way to
+      // cross the top corridor past the block is to enter the zone —
+      // the car cannot sneak past above or below it.
+      endZone: { x: 1600, y: 0, width: 400, height: 400 },
       walls: [
-        // Single central block, 1200 × 1600 mm, starting 400 mm in from
-        // the left/top and right edges and running down to the bottom.
-        { x: 400, y: 400, width: 1200, height: 1600 },
+        // Single central block. Starts 400 mm in from the left and top
+        // edges and extends to the right and bottom edges of the arena,
+        // leaving an L-shaped corridor: up the left, then across the top.
+        { x: 400, y: 400, width: 1600, height: 1600 },
       ],
     },
 
