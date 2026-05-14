@@ -18,7 +18,7 @@
  * │                                                                 │
  * │  Differential-drive kinematics                                   │
  * │    v = (vL + vR) / 2                                            │
- * │    ω = (vR − vL) / wheelBase           (rad/s)                  │
+ * │    ω = (vL − vR) / wheelBase           (rad/s)                  │
  * │                                                                 │
  * │  Heading convention (screen space)                               │
  * │    heading 0° = up (−Y on screen)                               │
@@ -38,11 +38,13 @@
  * │      y −= R · (sin(θ₁) − sin(θ₀))                              │
  * │                                                                 │
  * │  Turn convention                                                 │
- * │    vR > vL  →  ω > 0  →  heading increases  →  turns RIGHT     │
- * │    vL > vR  →  ω < 0  →  heading decreases  →  turns LEFT      │
+ * │    vL > vR  →  ω > 0  →  heading increases  →  turns RIGHT     │
+ * │    vR > vL  →  ω < 0  →  heading decreases  →  turns LEFT      │
  * └─────────────────────────────────────────────────────────────────┘
  */
 
+/* global RobotConfig */
+/* global RobotConfig */
 const Simulator = (function () {
   "use strict";
 
@@ -150,9 +152,10 @@ const Simulator = (function () {
 
     // 3. Differential-drive equations
     //    v = (vL + vR) / 2
-    //    ω = (vR − vL) / wheelBase
+    //    ω = (vL − vR) / wheelBase
+    //    Sign: vL > vR → ω > 0 → heading increases → RIGHT turn (screen-space clockwise)
     const v = (actualLeftV + actualRightV) / 2;
-    const omega = (actualRightV - actualLeftV) / WHEEL_BASE_MM;
+    const omega = (actualLeftV - actualRightV) / WHEEL_BASE_MM;
 
     const theta = (robot.heading * Math.PI) / 180;
 

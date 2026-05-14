@@ -125,7 +125,7 @@ function simulateManually(
     aRV = expectedRamp(aRV, rightTarget, dt);
 
     const v = (aLV + aRV) / 2;
-    const omega = (aRV - aLV) / WHEEL_BASE;
+    const omega = (aLV - aRV) / WHEEL_BASE;
     const theta = (heading * Math.PI) / 180;
 
     if (Math.abs(omega) < 1e-6) {
@@ -438,22 +438,8 @@ describe("Simulator physics math validation", () => {
   describe("turning and rotation", () => {
     test("rotate right in place: left=+v, right=−v → heading increases", () => {
       // rotate_right: left forward, right backward
-      // vL = +V, vR = −V  →  ω = (vR − vL) / L = −2V/L
-      // Wait — with our convention: ω = (vR − vL) / L
-      // If vR = −V, vL = +V: ω = (−V − V)/L = −2V/L < 0 → heading DECREASES
-      // That's actually a LEFT turn. Let me reconsider.
-      //
-      // For RIGHT rotation in the firmware:
-      //   rotate_right(speed) → left forward, right backward
-      //   leftSpeed = +speed, rightSpeed = −speed
-      //
-      // So ω = (vR − vL)/L = (−V − V)/L = −2V/L
-      // heading_change = ω × dt (in radians)
-      // Negative ω → heading decreases → turns LEFT in screen coords
-      //
-      // Actually let's test what the firmware actually does:
-      // rotate_right in the stub does: leftSpeed = +speed, rightSpeed = −speed
-      // Let's just verify the math is consistent.
+      // vL = +V, vR = −V
+      // ω = (vL − vR) / L = (V − (−V)) / L = 2V/L > 0 → heading increases → RIGHT ✓
       const V = 200; // mm/s
       const robot = makeRobot({
         heading: 0,
@@ -465,16 +451,17 @@ describe("Simulator physics math validation", () => {
         x: 1000,
         y: 1000,
       });
-      // ω = (vR − vL) / L = (−200 − 200) / 120 = −400/120 = −3.333 rad/s
-      // After dt=0.01: heading_change = −3.333 × 0.01 = −0.03333 rad = −1.91°
-      const omega = (-V - V) / WHEEL_BASE;
-      expect(omega).toBeCloseTo(-3.3333, 3);
+      // ω = (vL − vR) / L = (200 − (−200)) / 120 = 400/120 = +3.333 rad/s
+      const omega = (V - -V) / WHEEL_BASE;
+      expect(omega).toBeCloseTo(3.3333, 3);
       const after = stepNoCollision(robot, 0.01);
-      const expectedHeading = (0 + (omega * 0.01 * 180) / Math.PI + 360) % 360;
+      const expectedHeading = (0 + (omega * 0.01 * 180) / Math.PI) % 360;
       expect(after.heading).toBeCloseTo(expectedHeading, 2);
     });
 
     test("rotate left in place: left=−v, right=+v → heading decreases", () => {
+      // vL = −V, vR = +V
+      // ω = (vL − vR) / L = (−V − V) / L = −2V/L < 0 → heading decreases → LEFT ✓
       const V = 200;
       const robot = makeRobot({
         heading: 90,
@@ -486,10 +473,9 @@ describe("Simulator physics math validation", () => {
         x: 1000,
         y: 1000,
       });
-      // ω = (V − (−V)) / L = 2V/L = 400/120 = +3.333 rad/s
-      // heading increases
-      const omega = (V - -V) / WHEEL_BASE;
-      expect(omega).toBeCloseTo(3.3333, 3);
+      // ω = (−V − V) / L = −400/120 = −3.333 rad/s
+      const omega = (-V - V) / WHEEL_BASE;
+      expect(omega).toBeCloseTo(-3.3333, 3);
       const after = stepNoCollision(robot, 0.01);
       const expectedHeading = 90 + (omega * 0.01 * 180) / Math.PI;
       expect(after.heading).toBeCloseTo(expectedHeading, 2);
