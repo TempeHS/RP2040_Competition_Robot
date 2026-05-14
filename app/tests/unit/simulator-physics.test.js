@@ -603,6 +603,51 @@ describe("§9 Collision", () => {
     expect(r.y + 75).toBeLessThanOrEqual(1500);
     expect(r.collisionCount).toBeGreaterThan(0);
   });
+
+  // ── Regression: substepping prevents tunneling through thin walls ──
+  // Without substepping a single frame can move the robot further than
+  // the wall's thickness; if all four body corners land beyond the wall
+  // the discrete corner-in-rect check misses the collision.
+  test("Robot does not tunnel through a 1 mm-thick wall at full speed", () => {
+    S.clearObstacles();
+    S.setMazeWalls([{ x: 0, y: 500, width: 2000, height: 1 }]);
+    var r = makeRobot({
+      x: 1000,
+      y: 900,
+      heading: 0,
+      leftSpeed: 255,
+      rightSpeed: 255,
+      isMoving: true,
+    });
+    for (var i = 0; i < 200; i++) {
+      r = S.step(r, 0.05);
+    }
+    expect(r.y - 75).toBeGreaterThanOrEqual(500);
+    expect(r.collisionCount).toBeGreaterThan(0);
+  });
+
+  test("Robot does not tunnel through a thin wall when approaching at an angle", () => {
+    // Vertical 5 mm thick wall — the robot drives diagonally toward it.
+    S.clearObstacles();
+    S.setMazeWalls([{ x: 800, y: 0, width: 5, height: 2000 }]);
+    // Heading 45° = forward vector (sin45, -cos45) i.e. up-and-right.
+    var r = makeRobot({
+      x: 400,
+      y: 1500,
+      heading: 45,
+      leftSpeed: 255,
+      rightSpeed: 255,
+      isMoving: true,
+    });
+    for (var i = 0; i < 400; i++) {
+      r = S.step(r, 0.05);
+    }
+    // The right-most corner is at x = cx + hw·cos(h) - (-hl)·sin(h) at
+    // heading=45 ≈ cx + 60·0.707 + 75·0.707 ≈ cx + 95.5. We require the
+    // body to stay on the left (near) side of the wall: cx + 95.5 ≤ 800.
+    expect(r.x + 95.5).toBeLessThanOrEqual(800 + 1);
+    expect(r.collisionCount).toBeGreaterThan(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════

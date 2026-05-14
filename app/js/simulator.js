@@ -170,7 +170,15 @@ const Simulator = (function () {
 
   // ═══════════════════════════════════════════════════════════════════
   //  step  =  kinematics  →  boundary clamp  →  collision check
+  //
+  //  Substeps the frame so the robot never moves further than
+  //  SAFE_SUBSTEP_MM per integration tick. This avoids "tunneling" —
+  //  the robot jumping clean through a thin wall in a single frame
+  //  because all four body corners happen to land outside the wall
+  //  rectangle even though the swept body passed through it.
   // ═══════════════════════════════════════════════════════════════════
+  var SAFE_SUBSTEP_MM = 10;
+
   function step(robot, dt) {
     // Truly idle — nothing to compute
     if (
@@ -183,20 +191,40 @@ const Simulator = (function () {
       return robot;
     }
 
-    var r = updateKinematics(robot, dt);
-    r = applyBoundaryConstraints(r);
-    var afterCollision = checkCollision(r);
-    // If the kinematic step pushed the body into a wall, revert the
-    // translation/heading to the pre-step pose (but keep the updated
-    // motor velocities and collision counter). This prevents the robot
-    // from passing through walls while still letting it back out when
-    // the user code commands a reversal.
-    if (afterCollision.collisionCount !== (robot.collisionCount || 0)) {
-      afterCollision.x = robot.x;
-      afterCollision.y = robot.y;
-      afterCollision.heading = robot.heading;
+    // Decide how many physics substeps to take based on the fastest
+    // wheel velocity in play (target PWM or current ramped velocity).
+    var topV = Math.max(
+      Math.abs(pwmToVelocity(robot.leftSpeed)),
+      Math.abs(pwmToVelocity(robot.rightSpeed)),
+      Math.abs(robot.actualLeftV || 0),
+      Math.abs(robot.actualRightV || 0),
+    );
+    var simDt = dt * simulationSpeed;
+    var nSubsteps = Math.max(1, Math.ceil((topV * simDt) / SAFE_SUBSTEP_MM));
+    var subDt = dt / nSubsteps;
+
+    var r = robot;
+    for (var i = 0; i < nSubsteps; i++) {
+      var prevX = r.x;
+      var prevY = r.y;
+      var prevH = r.heading;
+      var prevCC = r.collisionCount || 0;
+
+      var next = updateKinematics(r, subDt);
+      next = applyBoundaryConstraints(next);
+      next = checkCollision(next);
+      if ((next.collisionCount || 0) !== prevCC) {
+        // Revert translation/heading; keep velocity ramps + collision
+        // counter so the user code still sees motors as commanded.
+        next.x = prevX;
+        next.y = prevY;
+        next.heading = prevH;
+        r = next;
+        break; // no point continuing this frame once blocked
+      }
+      r = next;
     }
-    return afterCollision;
+    return r;
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -363,8 +391,57 @@ const Simulator = (function () {
     ];
   }
 
-  function pointInRect(px, py, rx, ry, rw, rh) {
-    return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
+  /**
+   * Separating-Axis-Theorem overlap test between the (rotated) robot
+   * OBB defined by its four corners and an axis-aligned wall rectangle.
+   * Returns true when the two shapes overlap.
+   *
+   * Tests four axes: world X, world Y, and the two body edge directions.
+   * This is robust against thin walls — unlike a corner-in-rect check it
+   * detects the case where the body straddles a wall whose width is
+   * smaller than the distance between body corners (no corner inside
+   * the wall, no wall corner inside the body, but the swept regions
+   * overlap).
+   */
+  function obbAabbOverlap(corners, w) {
+    var wallCorners = [
+      { x: w.x, y: w.y },
+      { x: w.x + w.width, y: w.y },
+      { x: w.x + w.width, y: w.y + w.height },
+      { x: w.x, y: w.y + w.height },
+    ];
+    var ax1 = {
+      x: corners[1].x - corners[0].x,
+      y: corners[1].y - corners[0].y,
+    };
+    var ax2 = {
+      x: corners[3].x - corners[0].x,
+      y: corners[3].y - corners[0].y,
+    };
+    var n1 = Math.sqrt(ax1.x * ax1.x + ax1.y * ax1.y) || 1;
+    var n2 = Math.sqrt(ax2.x * ax2.x + ax2.y * ax2.y) || 1;
+    ax1.x /= n1;
+    ax1.y /= n1;
+    ax2.x /= n2;
+    ax2.y /= n2;
+    var axes = [{ x: 1, y: 0 }, { x: 0, y: 1 }, ax1, ax2];
+    for (var k = 0; k < axes.length; k++) {
+      var a = axes[k];
+      var bmin = Infinity;
+      var bmax = -Infinity;
+      var wmin = Infinity;
+      var wmax = -Infinity;
+      for (var i = 0; i < 4; i++) {
+        var bp = corners[i].x * a.x + corners[i].y * a.y;
+        if (bp < bmin) bmin = bp;
+        if (bp > bmax) bmax = bp;
+        var wp = wallCorners[i].x * a.x + wallCorners[i].y * a.y;
+        if (wp < wmin) wmin = wp;
+        if (wp > wmax) wmax = wp;
+      }
+      if (bmax < wmin || wmax < bmin) return false; // separating axis
+    }
+    return true;
   }
 
   function checkCollision(robot) {
@@ -372,14 +449,9 @@ const Simulator = (function () {
     var allWalls = mazeWalls.concat(obstacles);
     var hit = false;
 
-    for (var i = 0; i < corners.length && !hit; i++) {
-      for (var j = 0; j < allWalls.length && !hit; j++) {
-        var w = allWalls[j];
-        if (
-          pointInRect(corners[i].x, corners[i].y, w.x, w.y, w.width, w.height)
-        ) {
-          hit = true;
-        }
+    for (var j = 0; j < allWalls.length && !hit; j++) {
+      if (obbAabbOverlap(corners, allWalls[j])) {
+        hit = true;
       }
     }
 

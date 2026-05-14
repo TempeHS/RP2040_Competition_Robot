@@ -65,14 +65,11 @@ const Mazes = (function () {
       ],
     },
 
-    // Corner — symmetric L-corridors meeting under a top horizontal strip.
-    // Drive up the outer corridor, hit the top wall, turn inward and
-    // continue to the top-centre goal.
-    //
-    // Geometry:
-    //   • Outer corridor width  = 400 mm (left/right strips of the arena)
-    //   • Top corridor height   = 400 mm (joins the two outer corridors)
-    //   • Central block fills the remaining area so the only path is the L.
+    // Corner — single large central block. A 400 mm wide corridor wraps
+    // the block on the left, top and right. The block touches the bottom
+    // edge of the arena so the only path is: drive up the left corridor,
+    // turn right at the top, follow the top corridor to the exit on the
+    // right.
     corner: {
       id: "corner",
       name: "Corner",
@@ -81,15 +78,11 @@ const Mazes = (function () {
       description:
         "Drive up the outer corridor, detect the front wall, then turn 90° toward the centre to reach the top.",
       startPosition: { x: 200, y: 1700, heading: 0 },
-      endZone: { x: 900, y: 100, width: 200, height: 200 },
+      endZone: { x: 1600, y: 100, width: 300, height: 200 },
       walls: [
-        // Vertical separators between outer corridors and the central block.
-        // Start 400 mm below the top so the top horizontal corridor is open.
-        { x: 400, y: 400, width: WALL_THICKNESS, height: 1600 },
-        { x: 1570, y: 400, width: WALL_THICKNESS, height: 1600 },
-        // Central block — fills everything between the two vertical walls
-        // and below the top corridor. Symmetric about x=1000.
-        { x: 430, y: 430, width: 1140, height: 1570 },
+        // Single central block, 1200 × 1600 mm, starting 400 mm in from
+        // the left/top and right edges and running down to the bottom.
+        { x: 400, y: 400, width: 1200, height: 1600 },
       ],
     },
 
