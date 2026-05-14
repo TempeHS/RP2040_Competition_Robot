@@ -2039,51 +2039,39 @@ my_robot = AIDriver()
 # ═══════════════════════════════════════════════════════
 # CONFIGURATION — Adjust these values
 # ═══════════════════════════════════════════════════════
-BASE_SPEED = 160          // Forward speed (must be > 120!)
-TARGET_WALL_DISTANCE = 150  // Distance to maintain from wall (mm)
-side_Kp = 0.5             // Proportional gain
-side_Ki = 0.01            // Integral gain — keep SMALL!
-side_Kd = 0.3             // Derivative gain
-MAX_STEERING = 40         // Max wheel speed difference
-side_INTEGRAL_MAX = 500   // Anti-windup clamp
+BASE_SPEED = 160           # Forward speed (must be > 120!)
+TARGET_WALL_DISTANCE = 150 # Distance to maintain from wall (mm)
+side_Kp = 0.10             # Start LOW — raise in 0.10 steps (see PID Tuning guide)
+MAX_STEERING = 40          # Max wheel speed difference
 
 # Rule: BASE_SPEED - MAX_STEERING must be >= 120 (dead zone)
 
 # ═══════════════════════════════════════════════════════
 # MAIN LOOP
 # ═══════════════════════════════════════════════════════
-side_previous_error = 0
-side_integral = 0
+while True:
+    wall_distance = my_robot.read_distance_2()
 
-while (true) {
-  let SIDE_DISTANCE = my_robot.read_distance_2();
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
+        hold_state(0.05)
+        continue
 
-  if (SIDE_DISTANCE === -1) {
-    my_robot.drive(BASE_SPEED, BASE_SPEED);
-    side_integral = 0; // Reset when wall lost
-    hold_state(0.05);
-    continue;
-  }
+    error = wall_distance - TARGET_WALL_DISTANCE
+    steering = side_Kp * error
 
-  let error = SIDE_DISTANCE - TARGET_WALL_DISTANCE;
-  side_integral += error;
-  if (side_integral > side_INTEGRAL_MAX) side_integral = side_INTEGRAL_MAX;
-  if (side_integral < -side_INTEGRAL_MAX) side_integral = -side_INTEGRAL_MAX;
+    if steering > MAX_STEERING:
+        steering = MAX_STEERING
+    elif steering < -MAX_STEERING:
+        steering = -MAX_STEERING
 
-  let side_derivative = error - side_previous_error;
-  let steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative);
+    right_speed = BASE_SPEED - steering
+    left_speed = BASE_SPEED + steering
 
-  if (steering > MAX_STEERING) steering = MAX_STEERING;
-  if (steering < -MAX_STEERING) steering = -MAX_STEERING;
-
-  let right_speed = BASE_SPEED - steering;
-  let left_speed = BASE_SPEED + steering;
-
-  my_robot.drive(parseInt(right_speed), parseInt(left_speed));
-  side_previous_error = error;
-  hold_state(0.05);
-}
+    my_robot.drive(int(right_speed), int(left_speed))
+    hold_state(0.05)
 `,
+
     2: `# Challenge 2: Wall Follow — PD Control
 # Add the Derivative term to dampen oscillations
 
@@ -2098,14 +2086,14 @@ my_robot = AIDriver()
 # ═══════════════════════════════════════════════════════
 BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
-Kp = 0.5
-Kd = 0.3                  # Derivative gain — dampens oscillations
+side_Kp = 0.40             # Use the Kp you found in Challenge 1
+side_Kd = 0.15             # Start low — raise in 0.05 steps
 MAX_STEERING = 40
 
 # ═══════════════════════════════════════════════════════
 # MAIN LOOP
 # ═══════════════════════════════════════════════════════
-previous_error = 0
+side_previous_error = 0
 
 while True:
     wall_distance = my_robot.read_distance_2()
@@ -2118,10 +2106,10 @@ while True:
     error = wall_distance - TARGET_WALL_DISTANCE
 
     # Derivative: how fast is the error changing?
-    derivative = error - previous_error
+    side_derivative = error - side_previous_error
 
     # PD output
-    steering = (Kp * error) + (Kd * derivative)
+    steering = (side_Kp * error) + (side_Kd * side_derivative)
 
     if steering > MAX_STEERING:
         steering = MAX_STEERING
@@ -2133,9 +2121,10 @@ while True:
 
     my_robot.drive(int(right_speed), int(left_speed))
 
-    previous_error = error
+    side_previous_error = error
     hold_state(0.05)
 `,
+
     3: `# Challenge 3: Wall Follow — Full PID
 # Add the Integral term to fix drift around the L corner
 
@@ -2150,41 +2139,41 @@ my_robot = AIDriver()
 # ═══════════════════════════════════════════════════════
 BASE_SPEED = 160
 TARGET_WALL_DISTANCE = 150
-Kp = 0.5
-Ki = 0.01                 # Integral gain — keep SMALL!
-Kd = 0.3
+side_Kp = 0.40             # Use the Kp you found in Challenge 1
+side_Kd = 0.25             # Use the Kd you found in Challenge 2
+side_Ki = 0.003            # Start very small — raise in 0.002 steps
 MAX_STEERING = 40
-INTEGRAL_MAX = 500         # Anti-windup clamp
+side_INTEGRAL_MAX = 1200   # Anti-windup clamp
 
 # ═══════════════════════════════════════════════════════
 # MAIN LOOP
 # ═══════════════════════════════════════════════════════
-previous_error = 0
-integral = 0
+side_previous_error = 0
+side_integral = 0
 
 while True:
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
-        integral = 0       # Reset when wall lost
+        side_integral = 0  # Reset when wall lost
         hold_state(0.05)
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
 
     # Integral: accumulated error
-    integral = integral + error
-    if integral > INTEGRAL_MAX:
-        integral = INTEGRAL_MAX
-    elif integral < -INTEGRAL_MAX:
-        integral = -INTEGRAL_MAX
+    side_integral = side_integral + error
+    if side_integral > side_INTEGRAL_MAX:
+        side_integral = side_INTEGRAL_MAX
+    elif side_integral < -side_INTEGRAL_MAX:
+        side_integral = -side_INTEGRAL_MAX
 
     # Derivative
-    derivative = error - previous_error
+    side_derivative = error - side_previous_error
 
     # Full PID
-    steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+    steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
 
     if steering > MAX_STEERING:
         steering = MAX_STEERING
@@ -2196,9 +2185,10 @@ while True:
 
     my_robot.drive(int(right_speed), int(left_speed))
 
-    previous_error = error
+    side_previous_error = error
     hold_state(0.05)
 `,
+
     4: `# Challenge 4: Dead End Detection
 # Combine front sensor with side PID wall following
 
@@ -2221,18 +2211,18 @@ FRONT_Kp = 0.5             # Front deceleration gain
 TURN_SPEED = 180
 TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
-# Side PID gains (from Challenge 3)
-Kp = 0.5
-Ki = 0.01
-Kd = 0.3
+# Side PID gains (carry over your tuned values from Challenge 3)
+side_Kp = 0.40
+side_Kd = 0.25
+side_Ki = 0.003
 MAX_STEERING = 40
-INTEGRAL_MAX = 500
+side_INTEGRAL_MAX = 1200
 
 # ═══════════════════════════════════════════════════════
 # MAIN LOOP
 # ═══════════════════════════════════════════════════════
-previous_error = 0
-integral = 0
+side_previous_error = 0
+side_integral = 0
 
 while True:
     front = my_robot.read_distance()
@@ -2247,8 +2237,8 @@ while True:
             hold_state(TURN_TIME)
             my_robot.brake()
             hold_state(0.3)
-            integral = 0
-            previous_error = 0
+            side_integral = 0
+            side_previous_error = 0
             continue
         else:
             # Approaching — slow down proportionally
@@ -2266,19 +2256,19 @@ while True:
 
     if wall_distance == -1:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
-        integral = 0
+        side_integral = 0
         hold_state(0.05)
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
-    integral = integral + error
-    if integral > INTEGRAL_MAX:
-        integral = INTEGRAL_MAX
-    elif integral < -INTEGRAL_MAX:
-        integral = -INTEGRAL_MAX
-    derivative = error - previous_error
+    side_integral = side_integral + error
+    if side_integral > side_INTEGRAL_MAX:
+        side_integral = side_INTEGRAL_MAX
+    elif side_integral < -side_INTEGRAL_MAX:
+        side_integral = -side_INTEGRAL_MAX
+    side_derivative = error - side_previous_error
 
-    steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+    steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
     if steering > MAX_STEERING:
         steering = MAX_STEERING
     elif steering < -MAX_STEERING:
@@ -2288,7 +2278,7 @@ while True:
     left_speed = BASE_SPEED + steering
     my_robot.drive(int(right_speed), int(left_speed))
 
-    previous_error = error
+    side_previous_error = error
     hold_state(0.05)
 `,
     5: `# Challenge 5: Maze Solver — Hand on Wall
@@ -2314,19 +2304,19 @@ TURN_SPEED = 180
 TURN_TIME = 0              # TODO: tune for ~90 degree turn
 
 # Side PID gains
-Kp = 0.5
-Ki = 0.01
-Kd = 0.3
+side_Kp = 0.40
+side_Kd = 0.25
+side_Ki = 0.003
 MAX_STEERING = 40
-INTEGRAL_MAX = 500
+side_INTEGRAL_MAX = 1200
 
 WALL_SIDE = "right"        # Follow the right wall
 
 # ═══════════════════════════════════════════════════════
 # MAIN LOOP — Hand on Wall Algorithm
 # ═══════════════════════════════════════════════════════
-previous_error = 0
-integral = 0
+side_previous_error = 0
+side_integral = 0
 
 while True:
     front = my_robot.read_distance()
@@ -2341,8 +2331,8 @@ while True:
             hold_state(TURN_TIME)
             my_robot.brake()
             hold_state(0.3)
-            integral = 0
-            previous_error = 0
+            side_integral = 0
+            side_previous_error = 0
         else:
             approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
             if approach_speed < 120:
@@ -2361,14 +2351,14 @@ while True:
     # Priority 3: Wall visible — PID follow
     else:
         error = side - TARGET_WALL_DISTANCE
-        integral = integral + error
-        if integral > INTEGRAL_MAX:
-            integral = INTEGRAL_MAX
-        elif integral < -INTEGRAL_MAX:
-            integral = -INTEGRAL_MAX
-        derivative = error - previous_error
+        side_integral = side_integral + error
+        if side_integral > side_INTEGRAL_MAX:
+            side_integral = side_INTEGRAL_MAX
+        elif side_integral < -side_INTEGRAL_MAX:
+            side_integral = -side_INTEGRAL_MAX
+        side_derivative = error - side_previous_error
 
-        steering = (Kp * error) + (Ki * integral) + (Kd * derivative)
+        steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
         if steering > MAX_STEERING:
             steering = MAX_STEERING
         elif steering < -MAX_STEERING:
@@ -2382,7 +2372,7 @@ while True:
             left_speed = BASE_SPEED - steering
 
         my_robot.drive(int(right_speed), int(left_speed))
-        previous_error = error
+        side_previous_error = error
 
     hold_state(0.05)
 `,
