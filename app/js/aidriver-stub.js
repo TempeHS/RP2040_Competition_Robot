@@ -97,7 +97,13 @@ const AIDriverStub = {
             // Expose `wall_sign` as a Python attribute so PID code can do
             //   right = BASE - (my_robot.wall_sign * steering)
             // Convention: left wall → -1, right wall → +1.
-            self.wall_sign = new Sk.builtin.int_(sideStr === "left" ? -1 : 1);
+            // NOTE: a plain JS assignment (`self.wall_sign = …`) only sets a
+            // property on the wrapper; Skulpt looks attributes up via
+            // tp$setattr / the instance dict, so we must go through that path.
+            self.tp$setattr(
+              new Sk.builtin.str("wall_sign"),
+              new Sk.builtin.int_(sideStr === "left" ? -1 : 1),
+            );
 
             self.rightSpeed = 0;
             self.leftSpeed = 0;
