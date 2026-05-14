@@ -46,13 +46,16 @@ const Simulator = (function () {
   const LIVE_RANGE = MAX_MOTOR_SPEED - DEAD_ZONE_PWM; // 191
 
   /**
-   * Convert a PWM command (0-255) to a target wheel velocity in mm/s.
-   * Models the real motor dead-zone: values ≤ DEAD_ZONE_PWM yield 0.
-   * Linear between dead-zone and max.
+   * Convert a PWM command to a target wheel velocity in mm/s.
+   * Handles negative PWM for reverse (rotate_left / rotate_right).
+   * Models the real motor dead-zone: |pwm| ≤ DEAD_ZONE_PWM → 0.
+   * Linear between dead-zone and max in both directions.
    */
   function pwmToVelocity(pwm) {
-    if (pwm <= DEAD_ZONE_PWM) return 0;
-    return ((pwm - DEAD_ZONE_PWM) / LIVE_RANGE) * TOP_SPEED_MM_S;
+    const absPwm = Math.abs(pwm);
+    if (absPwm <= DEAD_ZONE_PWM) return 0;
+    const v = ((absPwm - DEAD_ZONE_PWM) / LIVE_RANGE) * TOP_SPEED_MM_S;
+    return pwm >= 0 ? v : -v;
   }
 
   /**

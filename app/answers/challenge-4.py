@@ -29,20 +29,20 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
+BASE_SPEED = 150
+TARGET_WALL_DISTANCE = 200
 MAX_STEERING = 40
 
-side_Kp = 0.40
-side_Kd = 0.15
-side_Ki = 0.003
-side_INTEGRAL_MAX = 1200
+side_Kp = 0.25
+side_Kd = 0.20
+side_Ki = 0.005
+side_INTEGRAL_MAX = 1000
 
 FRONT_SLOW_DISTANCE = 400
 FRONT_STOP_DISTANCE = 120
 FRONT_Kp = 0.5
 TURN_SPEED = 180
-TURN_TIME_90 = 0.5
+TURN_TIME_90 = 0.35
 
 side_previous_error = 0
 side_integral = 0

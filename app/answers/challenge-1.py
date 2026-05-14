@@ -12,10 +12,10 @@
 #     docs.html?doc=PID_Real_World_Tuning_Quickstart
 #
 # Values to set:
-#     BASE_SPEED              forward speed (must stay > 120, motor dead zone)
+#     BASE_SPEED              forward speed (must stay > 64, motor dead zone)
 #     TARGET_WALL_DISTANCE    distance to maintain from wall (mm)
 #     MAX_STEERING            max wheel-speed difference
-#                             (BASE_SPEED - MAX_STEERING must be >= 120)
+#                             (BASE_SPEED - MAX_STEERING must be > 64)
 #     side_Kp                 Proportional gain for steering
 #
 # Goal: reach the green exit zone without hitting the side wall.
@@ -27,11 +27,11 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False  # Set True to print sensor + motor values
 my_robot = AIDriver("left")  # "left" or "right" — match the simulator scene
 
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
+BASE_SPEED = 150
+TARGET_WALL_DISTANCE = 200
 MAX_STEERING = 40
 
-side_Kp = 0.40
+side_Kp = 0.25
 
 
 while True:
