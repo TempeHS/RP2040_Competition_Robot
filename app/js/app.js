@@ -2039,42 +2039,50 @@ my_robot = AIDriver()
 # ═══════════════════════════════════════════════════════
 # CONFIGURATION — Adjust these values
 # ═══════════════════════════════════════════════════════
-BASE_SPEED = 160          # Forward speed (must be > 120!)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-Kp = 0.5                  # Proportional gain
-MAX_STEERING = 40         # Max wheel speed difference
+BASE_SPEED = 160          // Forward speed (must be > 120!)
+TARGET_WALL_DISTANCE = 150  // Distance to maintain from wall (mm)
+side_Kp = 0.5             // Proportional gain
+side_Ki = 0.01            // Integral gain — keep SMALL!
+side_Kd = 0.3             // Derivative gain
+MAX_STEERING = 40         // Max wheel speed difference
+side_INTEGRAL_MAX = 500   // Anti-windup clamp
 
 # Rule: BASE_SPEED - MAX_STEERING must be >= 120 (dead zone)
 
 # ═══════════════════════════════════════════════════════
 # MAIN LOOP
 # ═══════════════════════════════════════════════════════
-while True:
-    wall_distance = my_robot.read_distance_2()
+side_previous_error = 0
+side_integral = 0
 
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        hold_state(0.05)
-        continue
+while (true) {
+  let SIDE_DISTANCE = my_robot.read_distance_2();
 
-    # Calculate error (positive = too far from wall)
-    error = wall_distance - TARGET_WALL_DISTANCE
+  if (SIDE_DISTANCE === -1) {
+    my_robot.drive(BASE_SPEED, BASE_SPEED);
+    side_integral = 0; // Reset when wall lost
+    hold_state(0.05);
+    continue;
+  }
 
-    # P controller: steering correction
-    steering = Kp * error
+  let error = SIDE_DISTANCE - TARGET_WALL_DISTANCE;
+  side_integral += error;
+  if (side_integral > side_INTEGRAL_MAX) side_integral = side_INTEGRAL_MAX;
+  if (side_integral < -side_INTEGRAL_MAX) side_integral = -side_INTEGRAL_MAX;
 
-    # Clamp steering
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
+  let side_derivative = error - side_previous_error;
+  let steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative);
 
-    # Apply differential steering (wall on RIGHT side)
-    right_speed = BASE_SPEED - steering
-    left_speed = BASE_SPEED + steering
+  if (steering > MAX_STEERING) steering = MAX_STEERING;
+  if (steering < -MAX_STEERING) steering = -MAX_STEERING;
 
-    my_robot.drive(int(right_speed), int(left_speed))
-    hold_state(0.05)
+  let right_speed = BASE_SPEED - steering;
+  let left_speed = BASE_SPEED + steering;
+
+  my_robot.drive(parseInt(right_speed), parseInt(left_speed));
+  side_previous_error = error;
+  hold_state(0.05);
+}
 `,
     2: `# Challenge 2: Wall Follow — PD Control
 # Add the Derivative term to dampen oscillations

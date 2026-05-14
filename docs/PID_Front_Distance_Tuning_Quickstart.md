@@ -8,9 +8,15 @@ Use this checklist to tune the front distance PID on the real robot to ensure it
 - `TARGET_DISTANCE = 200` (mm)
 - Loop delay: `hold_state(0.05)`
 - `MAX_BRAKE = 50`
+- `front_Kp = 0`
+- `front_Ki = 0`
+- `front_Kd = 0`
+- `front_INTEGRAL_MAX = 0`
+- `front_previous_error = 0`
+- `front_integral = 0`
 - Keep this rule true: `BASE_SPEED - MAX_BRAKE >= 120`
 
-**Expected behavior:** Robot drives forward at a safe speed and can stop before hitting an obstacle. It should not skid or stop too late.
+**Expected behavior:** Robot drives forward at a safe speed. Some natural drift or rolling past the target is normal and expected. The robot should not stop abruptly or crash, but it may not stop exactly at the target. This is OK for initial safety.
 
 ## 2. Starting PID Values
 
@@ -21,7 +27,7 @@ Use this checklist to tune the front distance PID on the real robot to ensure it
 - `front_previous_error = 0`
 - `front_integral = 0`
 
-**Expected behavior:** Robot should slow down and stop near the target distance, but may not be perfectly accurate yet.
+**Expected behavior:** Robot should slow down and stop near the target distance, but may still roll a bit past or stop inconsistently. Some overshoot is normal at this stage.
 
 ## 3. Tune In This Order
 
@@ -29,7 +35,7 @@ Use this checklist to tune the front distance PID on the real robot to ensure it
 2. Tune `front_Kd` second
 3. Tune `front_Ki` last
 
-**Expected behavior:** Tuning in this order helps you see the effect of each gain clearly. Robot should stop more accurately as you tune each gain.
+**Expected behavior:** Tuning in this order lets you see the effect of each gain. Robot should stop more accurately as you tune each gain.
 
 ## 4. P-Only Pass
 
@@ -40,7 +46,7 @@ Use this checklist to tune the front distance PID on the real robot to ensure it
 
 Typical final `front_Kp`: `0.5` to `0.9`
 
-**Expected behavior:** Robot should stop closer to the target, but may start to overshoot or oscillate if `front_Kp` is too high.
+**Expected behavior:** Robot should stop closer to the target, but as `front_Kp` increases, you should see a clear, regular overshoot and correction (oscillation) around the target. This is a sign that P is too high. Back off when this happens.
 
 ## 5. Add D to Reduce Oscillation
 
@@ -50,7 +56,7 @@ Typical final `front_Kp`: `0.5` to `0.9`
 
 Typical final `front_Kd`: `0.25` to `0.5`
 
-**Expected behavior:** Robot's stopping should become smoother, with less overshoot or bouncing near the stop point.
+**Expected behavior:** Robot's stopping should become smoother, with less overshoot or bouncing near the stop point. Some small, quick corrections are normal.
 
 ## 6. Add I to Remove Steady Drift
 
@@ -98,7 +104,7 @@ Good default: `front_INTEGRAL_MAX = 1000`
 4. Change only one gain at a time
 5. Record values and behavior after each run
 
-**Expected behavior:** Robot should stop reliably in all test scenarios. Each change should have a clear effect.
+**Expected behavior:** Robot should stop reliably in all test scenarios. Each change should have a clear, real-world effect.
 
 ## 10. Quick Copy/Paste Block
 

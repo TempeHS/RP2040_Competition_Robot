@@ -8,9 +8,15 @@ Use this checklist to tune wall-follow PID on the real robot. All variables for 
 - `TARGET_WALL_DISTANCE = 150` (mm)
 - Loop delay: `hold_state(0.05)`
 - `MAX_STEERING = 40`
+- `side_Kp = 0`
+- `side_Ki = 0`
+- `side_Kd = 0`
+- `side_INTEGRAL_MAX = 0`
+- `side_previous_error = 0`
+- `side_integral = 0`
 - Keep this rule true: `BASE_SPEED - MAX_STEERING >= 120`
 
-**Expected behavior:** Robot drives straight at a safe speed and does not veer sharply. It should not hit the wall even if PID is not tuned yet.
+**Expected behavior:** Robot drives straight at a safe speed. Some natural drift away from the wall is normal and expected. The robot should not turn sharply or crash, but it may slowly veer off course. This is OK for initial safety.
 
 ## 2. Starting PID Values
 
@@ -21,7 +27,7 @@ Use this checklist to tune wall-follow PID on the real robot. All variables for 
 - `side_previous_error = 0`
 - `side_integral = 0`
 
-**Expected behavior:** Robot should follow the wall with moderate accuracy. Some drifting or gentle zig-zag may occur, but it should not crash.
+**Expected behavior:** Robot should begin to follow the wall, but may still drift or gently zig-zag. It should not crash, but perfect tracking is not expected yet.
 
 ## 3. Tune In This Order
 
@@ -29,7 +35,7 @@ Use this checklist to tune wall-follow PID on the real robot. All variables for 
 2. Tune `side_Kd` second
 3. Tune `side_Ki` last
 
-**Expected behavior:** Tuning in this order helps you see the effect of each gain clearly. Robot should improve its wall following step by step.
+**Expected behavior:** Tuning in this order lets you see the effect of each gain. Robot should improve its wall following step by step.
 
 ## 4. P-Only Pass
 
@@ -40,7 +46,7 @@ Use this checklist to tune wall-follow PID on the real robot. All variables for 
 
 Typical final `side_Kp`: `0.45` to `0.80`
 
-**Expected behavior:** Robot starts to follow the wall, but may begin to zig-zag as `side_Kp` increases. Stop increasing when you see fast side-to-side movement.
+**Expected behavior:** Robot should start to correct its drift and follow the wall, but as `side_Kp` increases, you should see a clear, regular side-to-side oscillation (zig-zag). This is a sign that P is too high. Back off when this happens.
 
 ## 5. Add D to Reduce Oscillation
 
@@ -50,7 +56,7 @@ Typical final `side_Kp`: `0.45` to `0.80`
 
 Typical final `side_Kd`: `0.20` to `0.45`
 
-**Expected behavior:** Robot's zig-zagging should decrease. It should follow the wall more smoothly without overcorrecting.
+**Expected behavior:** Robot's zig-zagging should decrease. It should follow the wall more smoothly, with less overshoot and fewer sharp corrections. Some small, quick corrections are normal.
 
 ## 6. Add I to Remove Steady Drift
 
@@ -61,7 +67,7 @@ Typical final `side_Kd`: `0.20` to `0.45`
 
 Typical final `side_Ki`: `0.004` to `0.015`
 
-**Expected behavior:** Robot should stop drifting away from the wall over time. If it starts to weave slowly, reduce `side_Ki`.
+**Expected behavior:** Robot should stop drifting away from the wall over time. If it starts to weave slowly or makes large, slow corrections, reduce `side_Ki`.
 
 ## 7. Set INTEGRAL_MAX Properly
 
@@ -98,7 +104,7 @@ Good default: `side_INTEGRAL_MAX = 1200`
 4. Change only one gain at a time
 5. Record values and behavior after each run
 
-**Expected behavior:** Robot should consistently follow the wall in all test scenarios. Each change should have a clear effect.
+**Expected behavior:** Robot should consistently follow the wall in all test scenarios. Each change should have a clear, real-world effect.
 
 ## 10. Quick Copy/Paste Block
 
