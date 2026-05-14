@@ -102,6 +102,7 @@ describe("Mazes (real source)", () => {
       expect(ids).toEqual(
         expect.arrayContaining([
           "straight_corridor",
+          "corner",
           "dead_end",
           "simple",
           "zigzag",

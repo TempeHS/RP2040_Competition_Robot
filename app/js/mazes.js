@@ -65,24 +65,24 @@ const Mazes = (function () {
       ],
     },
 
-    // Corner — single large central block. A 400 mm wide corridor wraps
-    // the block on the left, top and right. The block touches the bottom
-    // edge of the arena so the only path is: drive up the left corridor,
-    // turn right at the top, follow the top corridor to the exit on the
-    // right.
+    // Corner — single large central block, mirror-symmetric about
+    // x = 1000 so the same maze works for both left- and right-hand
+    // wall followers. A 400 mm wide corridor wraps the block on the
+    // left, top and right. The block touches the bottom edge so the
+    // only path is: drive up the outer corridor, turn 90° at the top,
+    // continue to the opposite top corner.
     corner: {
       id: "corner",
       name: "Corner",
       difficulty: "Easy",
-      symmetric: false,
+      symmetric: true,
       description:
         "Drive up the outer corridor, detect the front wall, then turn 90° toward the centre to reach the top.",
       startPosition: { x: 200, y: 1700, heading: 0 },
       walls: [
-        // Single central block. Starts 400 mm in from the left and top
-        // edges and extends to the right and bottom edges of the arena,
-        // leaving an L-shaped corridor: up the left, then across the top.
-        { x: 400, y: 400, width: 1600, height: 1600 },
+        // Central block: x = 400..1600, y = 400..2000.
+        // Symmetric: mirror about x=1000 maps the block to itself.
+        { x: 400, y: 400, width: 1200, height: 1600 },
       ],
     },
 
