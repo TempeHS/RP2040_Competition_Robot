@@ -1,28 +1,35 @@
 /**
  * AIDriver Simulator - Physics and Robot Simulation Module
- * Handles differential drive kinematics, collision detection, and sensor simulation
+ * Handles differential drive kinematics, collision detection, and sensor simulation.
+ *
+ * All physical constants are derived from RobotConfig (robot-config.js).
+ * Change numbers there — not here — to recalibrate the sim.
  */
 
 const Simulator = (function () {
   "use strict";
 
-  // Physical constants (mm and ms units)
-  const WHEEL_DIAMETER = 65; // mm
-  const WHEEL_CIRCUMFERENCE = Math.PI * WHEEL_DIAMETER; // ~204.2mm
-  const WHEEL_BASE = 120; // Distance between wheels (mm)
-  const MAX_MOTOR_SPEED = 255; // Maximum motor speed value
-  const MM_PER_SPEED_UNIT = 0.8; // mm per frame at speed=1
+  // ── Derived constants from RobotConfig ──────────────────────────
+  const cfg = typeof RobotConfig !== "undefined" ? RobotConfig : {};
+
+  const WHEEL_BASE = cfg.wheelBase_mm || 120;
+  const MAX_MOTOR_SPEED = cfg.maxPWM || 255;
+  const DEAD_ZONE_PWM = cfg.deadZonePWM || 64;
+  const TOP_SPEED_MM_S = (cfg.topSpeed_ms || 0.65) * 1000; // 650 mm/s
+  const MAX_ACCEL_MM_S2 = (cfg.acceleration_ms2 || 1.75) * 1000; // 1750 mm/s²
+  const MAX_DECEL_MM_S2 = (cfg.deceleration_ms2 || 1.75) * 1000; // 1750 mm/s²
 
   // Arena dimensions
-  const ARENA_WIDTH = 2000; // mm
-  const ARENA_HEIGHT = 2000; // mm
-  const ROBOT_WIDTH = 120; // mm
-  const ROBOT_LENGTH = 150; // mm
+  const ARENA_WIDTH = cfg.arenaWidth_mm || 2000;
+  const ARENA_HEIGHT = cfg.arenaHeight_mm || 2000;
+  const ROBOT_WIDTH = cfg.robotWidth_mm || 120;
+  const ROBOT_LENGTH = cfg.robotLength_mm || 150;
 
   // Ultrasonic sensor
-  const ULTRASONIC_MIN = 20; // mm minimum detection
-  const ULTRASONIC_MAX = 2000; // mm maximum detection
-  const ULTRASONIC_CONE_ANGLE = 15; // degrees half-angle
+  const ULTRASONIC_MIN = cfg.ultrasonicMin_mm || 20;
+  const ULTRASONIC_MAX = cfg.ultrasonicMax_mm || 2000;
+  const SENSOR_NOISE = cfg.sensorNoise_mm || 2;
+  const ULTRASONIC_CONE_ANGLE = 15; // degrees half-angle (not currently ray-traced)
 
   // Side sensor placement: "left" or "right" (relative to robot heading)
   let sideSensorSide = "left";
@@ -33,56 +40,78 @@ const Simulator = (function () {
   let obstacles = [];
   let mazeWalls = [];
 
+  // ── Speed conversion ────────────────────────────────────────────
+  // Linear mapping:  DEAD_ZONE_PWM → 0 mm/s,  MAX_MOTOR_SPEED → TOP_SPEED.
+  // Anything below the dead zone produces zero velocity.
+  const LIVE_RANGE = MAX_MOTOR_SPEED - DEAD_ZONE_PWM; // 191
+
   /**
-   * Integrate a single timestep of differential-drive motion for the supplied
-   * robot state. Converts discrete motor speed values into linear and angular
-   * velocities, updates the heading, and returns a new state without mutating
-   * the original reference.
+   * Convert a PWM command (0-255) to a target wheel velocity in mm/s.
+   * Models the real motor dead-zone: values ≤ DEAD_ZONE_PWM yield 0.
+   * Linear between dead-zone and max.
+   */
+  function pwmToVelocity(pwm) {
+    if (pwm <= DEAD_ZONE_PWM) return 0;
+    return ((pwm - DEAD_ZONE_PWM) / LIVE_RANGE) * TOP_SPEED_MM_S;
+  }
+
+  /**
+   * Ramp `current` toward `target` at the given rate (mm/s² × dt = mm/s
+   * delta). Separate accel / decel rates for future tuning flexibility.
+   */
+  function rampVelocity(current, target, dt) {
+    const diff = target - current;
+    // Choose accel or decel rate depending on whether speed is increasing
+    // toward its magnitude (accelerating) or decreasing (braking).
+    const rate =
+      Math.abs(target) >= Math.abs(current) ? MAX_ACCEL_MM_S2 : MAX_DECEL_MM_S2;
+    const maxDelta = rate * dt;
+    if (Math.abs(diff) <= maxDelta) return target;
+    return current + Math.sign(diff) * maxDelta;
+  }
+
+  /**
+   * Integrate a single timestep of differential-drive motion.
    *
-   * @param {{x:number,y:number,heading:number,leftSpeed:number,rightSpeed:number}} robot Current robot pose and wheel speeds.
-   * @param {number} dt Elapsed time in seconds since the previous update.
-   * @returns {{x:number,y:number,heading:number,leftSpeed:number,rightSpeed:number}} Fresh state snapshot after applying kinematics.
+   * 1. Convert commanded PWM → target wheel velocity (with dead-zone).
+   * 2. Ramp actual wheel velocities toward targets (motor inertia).
+   * 3. Compute differential-drive kinematics from actual velocities.
+   *
+   * @param {{x:number,y:number,heading:number,leftSpeed:number,rightSpeed:number,actualLeftV:number,actualRightV:number}} robot
+   * @param {number} dt Seconds since previous update.
+   * @returns {object} New state snapshot.
    */
   function updateKinematics(robot, dt) {
-    const leftSpeed = robot.leftSpeed;
-    const rightSpeed = robot.rightSpeed;
+    // --- Target velocities from commanded PWM (scaled by sim speed) ---
+    const leftTargetV = pwmToVelocity(robot.leftSpeed) * simulationSpeed;
+    const rightTargetV = pwmToVelocity(robot.rightSpeed) * simulationSpeed;
 
-    // Convert motor speed to wheel velocity (mm/s)
-    const leftVelocity =
-      (leftSpeed / MAX_MOTOR_SPEED) *
-      MM_PER_SPEED_UNIT *
-      1000 *
-      simulationSpeed;
-    const rightVelocity =
-      (rightSpeed / MAX_MOTOR_SPEED) *
-      MM_PER_SPEED_UNIT *
-      1000 *
-      simulationSpeed;
+    // --- Motor inertia: ramp actual velocities toward targets ----------
+    const scaledDt = dt * simulationSpeed; // accel also scales with sim speed
+    const actualLeftV = rampVelocity(
+      robot.actualLeftV || 0,
+      leftTargetV,
+      scaledDt,
+    );
+    const actualRightV = rampVelocity(
+      robot.actualRightV || 0,
+      rightTargetV,
+      scaledDt,
+    );
 
-    // Differential drive kinematics
-    // v = (vR + vL) / 2  - linear velocity
-    // ω = (vL - vR) / L  - angular velocity (in this engine's screen-space
-    //                                       heading convention where forward
-    //                                       is (sin h, -cos h), the right
-    //                                       wheel spinning faster must yield
-    //                                       a counter-clockwise rotation —
-    //                                       which is a *decrease* in heading.
-    //                                       That requires the (vL - vR)
-    //                                       sign so that right > left makes
-    //                                       ω < 0.)
+    // --- Differential drive kinematics --------------------------------
+    // v = (vL + vR) / 2,  ω = (vL - vR) / L
+    // Heading convention: forward = (sin h, −cos h) in screen space.
+    // right > left ⇒ ω < 0 ⇒ turn left on screen.
+    const linearVelocity = (actualLeftV + actualRightV) / 2;
+    const angularVelocity = (actualLeftV - actualRightV) / WHEEL_BASE;
 
-    const linearVelocity = (leftVelocity + rightVelocity) / 2;
-    const angularVelocity = (leftVelocity - rightVelocity) / WHEEL_BASE;
-
-    // Update heading (in radians for calculation)
     const headingRad = (robot.heading * Math.PI) / 180;
     const newHeadingRad = headingRad + angularVelocity * dt;
 
-    // Calculate new position
     let newX, newY;
-
     if (Math.abs(angularVelocity) < 0.001) {
-      // Straight line motion
+      // Straight-line motion
       newX = robot.x + linearVelocity * Math.sin(headingRad) * dt;
       newY = robot.y - linearVelocity * Math.cos(headingRad) * dt;
     } else {
@@ -92,10 +121,7 @@ const Simulator = (function () {
       newY = robot.y - R * (Math.sin(newHeadingRad) - Math.sin(headingRad));
     }
 
-    // Convert heading back to degrees
     let newHeading = (newHeadingRad * 180) / Math.PI;
-
-    // Normalize heading to 0-360
     newHeading = ((newHeading % 360) + 360) % 360;
 
     return {
@@ -103,6 +129,8 @@ const Simulator = (function () {
       x: newX,
       y: newY,
       heading: newHeading,
+      actualLeftV,
+      actualRightV,
     };
   }
 
@@ -306,8 +334,8 @@ const Simulator = (function () {
       return -1; // Too far / no reading
     }
 
-    // Add some noise (±2mm)
-    const noise = (Math.random() - 0.5) * 4;
+    // Add noise (±SENSOR_NOISE mm)
+    const noise = (Math.random() - 0.5) * SENSOR_NOISE * 2;
     return Math.round(minDistance + noise);
   }
 
@@ -418,8 +446,8 @@ const Simulator = (function () {
       return -1; // Too far / no reading
     }
 
-    // Add some noise (±2mm)
-    const noise = (Math.random() - 0.5) * 4;
+    // Add noise (±SENSOR_NOISE mm)
+    const noise = (Math.random() - 0.5) * SENSOR_NOISE * 2;
     return Math.round(minDistance + noise);
   }
 
@@ -529,20 +557,24 @@ const Simulator = (function () {
    * @returns {object} New robot state with updated pose, speeds, and trail samples.
    */
   function step(robot, dt) {
-    if (!robot.isMoving && robot.leftSpeed === 0 && robot.rightSpeed === 0) {
+    // Skip if truly stationary: no commanded motion AND no residual velocity.
+    if (
+      !robot.isMoving &&
+      robot.leftSpeed === 0 &&
+      robot.rightSpeed === 0 &&
+      (robot.actualLeftV || 0) === 0 &&
+      (robot.actualRightV || 0) === 0
+    ) {
       return robot;
     }
 
-    // --- D4: substep so fast motion cannot tunnel through walls.
-    // Estimate per-frame travel distance and split into <=5 mm sub-steps.
-    const avgSpeedUnits =
-      (Math.abs(robot.leftSpeed) + Math.abs(robot.rightSpeed)) / 2;
-    const linearVelocityMmPerSec =
-      (avgSpeedUnits / MAX_MOTOR_SPEED) *
-      MM_PER_SPEED_UNIT *
-      1000 *
-      simulationSpeed;
-    const frameTravelMm = linearVelocityMmPerSec * dt;
+    // --- Substep so fast motion cannot tunnel through walls. -----------
+    // Use *actual* wheel velocity (post-ramp) for the travel estimate,
+    // not the commanded PWM which may be much higher than reality.
+    const avgActualV =
+      (Math.abs(robot.actualLeftV || 0) + Math.abs(robot.actualRightV || 0)) /
+      2;
+    const frameTravelMm = avgActualV * dt;
     const SUBSTEP_MAX_MM = 5;
     const substeps = Math.max(1, Math.ceil(frameTravelMm / SUBSTEP_MAX_MM));
     const subDt = dt / substeps;
@@ -571,6 +603,8 @@ const Simulator = (function () {
           ...current,
           leftSpeed: 0,
           rightSpeed: 0,
+          actualLeftV: 0,
+          actualRightV: 0,
           isMoving: false,
           collisionCount: newCount,
           collisionFlashUntil: Date.now() + 200,
@@ -642,6 +676,8 @@ const Simulator = (function () {
       heading: 0, // Facing up
       leftSpeed: 0,
       rightSpeed: 0,
+      actualLeftV: 0, // current real wheel velocity (mm/s)
+      actualRightV: 0, // current real wheel velocity (mm/s)
       isMoving: false,
       trail: [],
     };
