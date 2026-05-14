@@ -384,35 +384,6 @@ const Mazes = (function () {
       );
     }
 
-    // Draw end zone
-    if (maze.endZone) {
-      ctx.fillStyle = "rgba(0, 255, 136, 0.3)";
-      ctx.strokeStyle = "#00ff88";
-      ctx.lineWidth = 3;
-      ctx.fillRect(
-        maze.endZone.x * scale,
-        maze.endZone.y * scale,
-        maze.endZone.width * scale,
-        maze.endZone.height * scale,
-      );
-      ctx.strokeRect(
-        maze.endZone.x * scale,
-        maze.endZone.y * scale,
-        maze.endZone.width * scale,
-        maze.endZone.height * scale,
-      );
-
-      // Draw "EXIT" label
-      ctx.fillStyle = "#00ff88";
-      ctx.font = `${12 * scale}px monospace`;
-      ctx.textAlign = "center";
-      ctx.fillText(
-        "EXIT",
-        (maze.endZone.x + maze.endZone.width / 2) * scale,
-        (maze.endZone.y + maze.endZone.height / 2 + 4) * scale,
-      );
-    }
-
     ctx.restore();
   }
 

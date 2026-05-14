@@ -1738,37 +1738,6 @@ function drawPath(ctx, scale) {
 
   ctx.setLineDash([]);
 
-  // Draw target zone if applicable
-  if (criteria && criteria.zone) {
-    const zone = criteria.zone;
-    ctx.fillStyle = markerColor;
-    ctx.strokeStyle = pathColor;
-    ctx.lineWidth = 3;
-    ctx.setLineDash([]);
-    ctx.fillRect(
-      zone.x * scale,
-      zone.y * scale,
-      zone.width * scale,
-      zone.height * scale,
-    );
-    ctx.strokeRect(
-      zone.x * scale,
-      zone.y * scale,
-      zone.width * scale,
-      zone.height * scale,
-    );
-
-    // Draw "TARGET" label
-    ctx.fillStyle = pathColor;
-    ctx.font = `${14 * scale}px monospace`;
-    ctx.textAlign = "center";
-    ctx.fillText(
-      "TARGET",
-      (zone.x + zone.width / 2) * scale,
-      (zone.y + zone.height / 2 + 5) * scale,
-    );
-  }
-
   // Draw obstacles
   if (App.currentChallengeConfig && App.currentChallengeConfig.obstacles) {
     const obstacles = App.currentChallengeConfig.obstacles;
@@ -1803,74 +1772,10 @@ function drawPath(ctx, scale) {
   }
 
   // Draw finish zone for circle challenges (return to start indicator)
-  if (
-    criteria &&
-    criteria.type === "complete_circle" &&
-    criteria.centerTolerance
-  ) {
-    const startPos = App.currentChallengeConfig.startPosition;
-    const tolerance = criteria.centerTolerance;
-
-    // Draw green square showing the finish zone (same style as other challenges)
-    const zoneSize = tolerance * 2;
-    const zoneX = startPos.x - tolerance;
-    const zoneY = startPos.y - tolerance;
-
-    ctx.fillStyle = markerColor;
-    ctx.strokeStyle = pathColor;
-    ctx.lineWidth = 3;
-    ctx.setLineDash([]);
-    ctx.fillRect(
-      zoneX * scale,
-      zoneY * scale,
-      zoneSize * scale,
-      zoneSize * scale,
-    );
-    ctx.strokeRect(
-      zoneX * scale,
-      zoneY * scale,
-      zoneSize * scale,
-      zoneSize * scale,
-    );
-
-    // Draw "FINISH" label
-    ctx.fillStyle = pathColor;
-    ctx.font = `${14 * scale}px monospace`;
-    ctx.textAlign = "center";
-    ctx.fillText("FINISH", startPos.x * scale, (startPos.y + 5) * scale);
-  }
+  // (Visual marker removed — success is still evaluated by the validator.)
 
   // Draw finish zone for square challenges (return to start zone)
-  if (criteria && criteria.type === "complete_square" && criteria.startZone) {
-    const zone = criteria.startZone;
-
-    ctx.fillStyle = markerColor;
-    ctx.strokeStyle = pathColor;
-    ctx.lineWidth = 3;
-    ctx.setLineDash([]);
-    ctx.fillRect(
-      zone.x * scale,
-      zone.y * scale,
-      zone.width * scale,
-      zone.height * scale,
-    );
-    ctx.strokeRect(
-      zone.x * scale,
-      zone.y * scale,
-      zone.width * scale,
-      zone.height * scale,
-    );
-
-    // Draw "FINISH" label
-    ctx.fillStyle = pathColor;
-    ctx.font = `${14 * scale}px monospace`;
-    ctx.textAlign = "center";
-    ctx.fillText(
-      "FINISH",
-      (zone.x + zone.width / 2) * scale,
-      (zone.y + zone.height / 2 + 5) * scale,
-    );
-  }
+  // (Visual marker removed — success is still evaluated by the validator.)
 
   ctx.restore();
 }

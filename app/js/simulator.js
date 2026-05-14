@@ -204,6 +204,12 @@ const Simulator = (function () {
     var subDt = dt / nSubsteps;
 
     var r = robot;
+    // If we entered the frame already overlapping a wall (e.g. resting
+    // in contact from the previous step), let the user drive out
+    // unconditionally — otherwise every substep would re-detect the
+    // existing overlap, revert, and the car would appear stuck.
+    var alreadyColliding = isColliding(r);
+
     for (var i = 0; i < nSubsteps; i++) {
       var prevX = r.x;
       var prevY = r.y;
@@ -212,17 +218,56 @@ const Simulator = (function () {
 
       var next = updateKinematics(r, subDt);
       next = applyBoundaryConstraints(next);
-      next = checkCollision(next);
-      if ((next.collisionCount || 0) !== prevCC) {
-        // Revert translation/heading; keep velocity ramps + collision
-        // counter so the user code still sees motors as commanded.
-        next.x = prevX;
-        next.y = prevY;
-        next.heading = prevH;
+
+      if (!isColliding(next)) {
         r = next;
-        break; // no point continuing this frame once blocked
+        continue;
       }
+
+      // A collision is happening this substep — always flag it.
+      var bumpedCC = prevCC + 1;
+      var bumpedFlash = Date.now() + 300;
+
+      if (alreadyColliding) {
+        // Robot was already overlapping when the frame started — trust
+        // the requested motion so the user can drive out of contact.
+        next.collisionCount = bumpedCC;
+        next.collisionFlashUntil = bumpedFlash;
+        r = next;
+        continue;
+      }
+
+      // Try wall-sliding: accept the largest sub-component of the move
+      // that doesn't intersect. Order: translation-only (X then Y),
+      // rotation-only. This lets the robot slide along a wall instead
+      // of locking in place when it brushes one at an angle.
+      var slideCandidates = [
+        { ...next, y: prevY, heading: prevH }, // X-translation only
+        { ...next, x: prevX, heading: prevH }, // Y-translation only
+        { ...next, x: prevX, y: prevY }, // rotation only
+      ];
+      var accepted = null;
+      for (var s = 0; s < slideCandidates.length; s++) {
+        if (!isColliding(slideCandidates[s])) {
+          accepted = slideCandidates[s];
+          break;
+        }
+      }
+      if (accepted) {
+        accepted.collisionCount = bumpedCC;
+        accepted.collisionFlashUntil = bumpedFlash;
+        r = accepted;
+        continue;
+      }
+
+      // Truly blocked on every axis — revert pose and stop the frame.
+      next.x = prevX;
+      next.y = prevY;
+      next.heading = prevH;
+      next.collisionCount = bumpedCC;
+      next.collisionFlashUntil = bumpedFlash;
       r = next;
+      break;
     }
     return r;
   }
@@ -444,18 +489,17 @@ const Simulator = (function () {
     return true;
   }
 
-  function checkCollision(robot) {
+  function isColliding(robot) {
     var corners = getRobotCorners(robot);
     var allWalls = mazeWalls.concat(obstacles);
-    var hit = false;
-
-    for (var j = 0; j < allWalls.length && !hit; j++) {
-      if (obbAabbOverlap(corners, allWalls[j])) {
-        hit = true;
-      }
+    for (var j = 0; j < allWalls.length; j++) {
+      if (obbAabbOverlap(corners, allWalls[j])) return true;
     }
+    return false;
+  }
 
-    if (hit) {
+  function checkCollision(robot) {
+    if (isColliding(robot)) {
       return {
         x: robot.x,
         y: robot.y,
