@@ -61,10 +61,18 @@ const Simulator = (function () {
 
     // Differential drive kinematics
     // v = (vR + vL) / 2  - linear velocity
-    // ω = (vR - vL) / L  - angular velocity
+    // ω = (vL - vR) / L  - angular velocity (in this engine's screen-space
+    //                                       heading convention where forward
+    //                                       is (sin h, -cos h), the right
+    //                                       wheel spinning faster must yield
+    //                                       a counter-clockwise rotation —
+    //                                       which is a *decrease* in heading.
+    //                                       That requires the (vL - vR)
+    //                                       sign so that right > left makes
+    //                                       ω < 0.)
 
     const linearVelocity = (leftVelocity + rightVelocity) / 2;
-    const angularVelocity = (rightVelocity - leftVelocity) / WHEEL_BASE;
+    const angularVelocity = (leftVelocity - rightVelocity) / WHEEL_BASE;
 
     // Update heading (in radians for calculation)
     const headingRad = (robot.heading * Math.PI) / 180;

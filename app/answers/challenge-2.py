@@ -1,37 +1,41 @@
 # === ANSWER KEY — Challenge 2 ===
-# Reference solution used by automated tests and as a teacher reference.
-# Students should NOT see this file. The matching starter scaffold is in
-# app/starter-code/challenge-2.py and contains TODOs for them to solve.
+# Identical to app/starter-code/challenge-2.py with the tuned values
+# filled in. Used by automated tests and as a teacher reference.
+# Students should NOT see this file.
 
-# Challenge 2: Wall Follow - PD Control
-# Add the derivative term to dampen oscillations.
+# Challenge 2: Wall Follow — PD Control
+# --------------------------------------------------------------------
+# Adds a Derivative (D) term to the Challenge 1 controller to dampen
+# the zig-zag oscillation. The full algorithm is already written for
+# you. Every numeric setting starts at 0.
+#
+# Tuning guide: docs.html?doc=PID_Real_World_Tuning_Quickstart
+#
+# Values to set:
+#     BASE_SPEED, TARGET_WALL_DISTANCE, MAX_STEERING   (carry forward C1)
+#     side_Kp                                          (carry forward C1)
+#     side_Kd                                          new — Derivative gain
+#
+# Goal: smooth, oscillation-free wall follow to the green exit zone.
+# --------------------------------------------------------------------
 
 from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
+my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160  # Forward speed (must be > 120)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-MAX_STEERING = 40  # Max wheel speed difference
-# Rule: BASE_SPEED - MAX_STEERING must be >= 120 (motor dead zone)
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 160
+TARGET_WALL_DISTANCE = 150
+MAX_STEERING = 40
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40  # Proportional gain — raise in 0.05 steps until zig-zag starts
-# === BLOCK: SIDE_KP END ===
-
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15  # Derivative gain — dampens oscillations
-# === BLOCK: SIDE_KD END ===
+side_Kp = 0.40
+side_Kd = 0.15
 
 side_previous_error = 0
 
-# === MAIN LOOP ===
+
 while True:
-    # === BLOCK: SIDE_FOLLOW_PD START ===
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
@@ -40,11 +44,8 @@ while True:
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
-
-    # Derivative: how fast is the error changing?
     side_derivative = error - side_previous_error
 
-    # PD output
     steering = (side_Kp * error) + (side_Kd * side_derivative)
 
     if steering > MAX_STEERING:
@@ -57,7 +58,5 @@ while True:
 
     my_robot.drive(int(right_speed), int(left_speed))
 
-    side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PD END ===
-
+    side_previous_error = error  # MUST be the last update before hold_state
     hold_state(0.05)

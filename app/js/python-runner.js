@@ -1195,16 +1195,17 @@ def ticks_diff(t1, t2):
         break;
 
       case "rotate_left":
-        // Left wheel forward, right wheel backward → counter-clockwise
-        App.robot.leftSpeed = cmd.params.turnSpeed;
-        App.robot.rightSpeed = -cmd.params.turnSpeed;
+        // Left wheel backward, right wheel forward → counter-clockwise
+        // (matches simulator kinematics where right > left rotates CCW = LEFT)
+        App.robot.leftSpeed = -cmd.params.turnSpeed;
+        App.robot.rightSpeed = cmd.params.turnSpeed;
         App.robot.isMoving = true;
         break;
 
       case "rotate_right":
-        // Left wheel backward, right wheel forward → clockwise
-        App.robot.leftSpeed = -cmd.params.turnSpeed;
-        App.robot.rightSpeed = cmd.params.turnSpeed;
+        // Left wheel forward, right wheel backward → clockwise
+        App.robot.leftSpeed = cmd.params.turnSpeed;
+        App.robot.rightSpeed = -cmd.params.turnSpeed;
         App.robot.isMoving = true;
         break;
 
@@ -1387,16 +1388,16 @@ def ticks_diff(t1, t2):
             break;
 
           case "rotate_left":
-            // Left wheel forward, right wheel backward → counter-clockwise
-            App.robot.leftSpeed = cmd.params.turnSpeed;
-            App.robot.rightSpeed = -cmd.params.turnSpeed;
+            // Left wheel backward, right wheel forward → counter-clockwise
+            App.robot.leftSpeed = -cmd.params.turnSpeed;
+            App.robot.rightSpeed = cmd.params.turnSpeed;
             App.robot.isMoving = true;
             break;
 
           case "rotate_right":
-            // Left wheel backward, right wheel forward → clockwise
-            App.robot.leftSpeed = -cmd.params.turnSpeed;
-            App.robot.rightSpeed = cmd.params.turnSpeed;
+            // Left wheel forward, right wheel backward → clockwise
+            App.robot.leftSpeed = cmd.params.turnSpeed;
+            App.robot.rightSpeed = -cmd.params.turnSpeed;
             App.robot.isMoving = true;
             break;
 

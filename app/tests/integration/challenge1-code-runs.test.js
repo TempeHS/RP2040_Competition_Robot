@@ -68,7 +68,7 @@ function runWallFollow({
   baseSpeed = 160,
   targetWall = 150,
   maxSteering = 40,
-  wallSign = 1, // wall on the LEFT → +1 (matches AIDriver("left"))
+  wallSign = -1, // wall on the LEFT → -1 (matches AIDriver("left"))
   initialHeading = 15, // tilted slightly toward the wall on purpose
   steps = 600,
   dt = 1 / 30,
