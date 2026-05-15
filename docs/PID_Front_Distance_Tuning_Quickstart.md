@@ -10,10 +10,10 @@ Use this checklist to tune the **front-sensor P-controlled deceleration** that t
 ## 1. Safe Starting Setup
 
 ```python
-BASE_SPEED          = 160   # from CONFIG_BASE
+BASE_SPEED          = 200   # from CONFIG_BASE
 FRONT_SLOW_DISTANCE = 400   # mm — start decelerating
-FRONT_STOP_DISTANCE = 120   # mm — stop and turn
-FRONT_Kp            = 0.5   # deceleration gain
+FRONT_STOP_DISTANCE = 150   # mm — stop and turn
+FRONT_Kp            = 1.0   # deceleration gain
 ```
 
 Rule: **`approach_speed` is always clamped to `[120, BASE_SPEED]`** so the wheels never enter the motor dead-zone.
@@ -31,12 +31,12 @@ if approach_speed > BASE_SPEED: approach_speed = BASE_SPEED
 my_robot.drive(approach_speed, approach_speed)
 ```
 
-| `front` | `0.5 × (front − 120)` | After clamp       |
-| ------- | --------------------- | ----------------- |
-| 400 mm  | 140                   | **140**           |
-| 300 mm  | 90                    | **120** (clamped) |
-| 200 mm  | 40                    | **120** (clamped) |
-| 120 mm  | 0                     | **stop → turn**   |
+| `front` | `1.0 × (front − 150)` | After clamp                  |
+| ------- | --------------------- | ---------------------------- |
+| 400 mm  | 250                   | **200** (clamped to BASE)    |
+| 300 mm  | 150                   | **150**                      |
+| 200 mm  | 50                    | **120** (clamped to dead-zone) |
+| 150 mm  | 0                     | **stop → turn**              |
 
 The clamp keeps the chassis crawling at the dead-zone speed all the way to the stop point.
 
@@ -54,12 +54,12 @@ The clamp keeps the chassis crawling at the dead-zone speed all the way to the s
 
 Place the robot ~300 mm from a wall, run the code, and measure where it brakes.
 
-| Stops too far from wall | → Decrease `FRONT_STOP_DISTANCE` (try `100`)           |
+| Stops too far from wall | → Decrease `FRONT_STOP_DISTANCE` (try `120`)           |
 | ----------------------- | ------------------------------------------------------ |
-| Touches the wall        | → Increase `FRONT_STOP_DISTANCE` (try `150`)           |
+| Touches the wall        | → Increase `FRONT_STOP_DISTANCE` (try `180`)           |
 | Inconsistent stop       | → Sensor noise — average 3 readings before the compare |
 
-Typical real-robot value: **100 – 160 mm**. Default in the starter: `120 mm`.
+Typical real-robot value: **120 – 180 mm**. Simulator-tuned answer key: `150 mm`.
 
 ---
 
@@ -88,12 +88,12 @@ Typical real-robot value: **350 – 500 mm**. Default in the starter: `400 mm`.
 
 | Symptom                                     | Cause               | Fix                                    |
 | ------------------------------------------- | ------------------- | -------------------------------------- |
-| Robot crawls almost all the way (boring)    | `FRONT_Kp` low      | +0.1 (try 0.7, 0.9)                    |
+| Robot crawls almost all the way (boring)    | `FRONT_Kp` low      | +0.1 (try 0.7, 0.9, 1.0)               |
 | Robot brakes hard then re-accelerates       | `FRONT_Kp` high     | -0.1                                   |
 | Robot reaches stop point too fast and skids | `FRONT_Kp` high     | -0.1 or increase `FRONT_STOP_DISTANCE` |
 | Robot never reaches the dead-zone clamp     | `FRONT_Kp` very low | +0.2 or shorten `FRONT_SLOW_DISTANCE`  |
 
-Typical real-robot value: **0.4 – 0.9**. Default in the starter: `0.5`.
+Typical real-robot value: **0.4 – 1.0**. Simulator-tuned answer key: `1.0`.
 
 ---
 
@@ -106,14 +106,14 @@ Typical real-robot value: **0.4 – 0.9**. Default in the starter: `0.5`.
 
 ---
 
-## 8. Quick Copy/Paste Block (matches Challenge 4+ starter)
+## 8. Quick Copy/Paste Block (matches Challenge 4+ answer key)
 
 ```python
 FRONT_SLOW_DISTANCE = 400   # mm — start decelerating
-FRONT_STOP_DISTANCE = 120   # mm — stop and turn
-FRONT_Kp            = 0.5   # deceleration gain
+FRONT_STOP_DISTANCE = 150   # mm — stop and turn
+FRONT_Kp            = 1.0   # deceleration gain
 TURN_SPEED          = 180
-TURN_TIME_90        = 0.5   # tuned in the Turn Tuning guide
+TURN_TIME_90        = 0.35  # tuned in the Turn Tuning guide
 ```
 
 When this is solid, move on to the [Turn Tuning Quickstart](pid-tuning.html#turnGuide) to dial in `TURN_TIME_90` and `TURN_TIME_180`.

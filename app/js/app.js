@@ -478,7 +478,7 @@ function loadChallenge(challengeId) {
   const challenge =
     typeof Challenges !== "undefined" ? Challenges.get(challengeId) : null;
 
-  // Update dropdown text
+  // Mark active challenge in dropdown (keep navbar toggle label unchanged)
   const dropdownItems = document.querySelectorAll("[data-challenge]");
   dropdownItems.forEach((item) => {
     // Compare as strings to support both numeric and string IDs
@@ -487,9 +487,6 @@ function loadChallenge(challengeId) {
       itemChallenge === String(challengeId) ||
       parseInt(itemChallenge) === challengeId;
     item.classList.toggle("active", isActive);
-    if (isActive) {
-      App.elements.challengeDropdown.innerHTML = item.innerHTML;
-    }
   });
 
   // Show/hide maze selector when challenge uses a maze

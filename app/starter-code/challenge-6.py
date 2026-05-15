@@ -13,8 +13,8 @@
 #                              toward the wall (range 0.0–0.25)
 #
 # IMPORTANT: keep LOST_WALL_DRIFT small enough that the inside wheel
-# stays >= 120 (the motor dead zone). With BASE_SPEED=160, 0.25 puts
-# the inside wheel exactly on the floor; higher values stall it.
+# stays > 120 (the MIN_MOTOR_SPEED). With BASE_SPEED=200, 0.15 puts
+# the inside wheel at 170; higher values still move but crawl.
 #
 # Goal: complete the full maze without external help.
 # --------------------------------------------------------------------

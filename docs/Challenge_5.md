@@ -93,13 +93,13 @@ hold_state(turn_duration)
 
 ### TURN_TIME_180
 
-A 180° turn takes **twice as long** as a 90° turn on the same `TURN_SPEED`. Start with:
+A 180° turn is **not** exactly twice a 90° turn — the longer turn spends more time at full rotation speed, so the per-second rate is slightly higher. Expect `TURN_TIME_180` to be a little **less** than `2 × TURN_TIME_90`. A good starting point is:
 
 ```python
-TURN_TIME_180 = TURN_TIME_90 * 2
+TURN_TIME_180 = TURN_TIME_90 * 1.7
 ```
 
-Then fine-tune `TURN_TIME_180` separately if the robot over- or under-rotates.
+Then fine-tune `TURN_TIME_180` separately if the robot over- or under-rotates. The simulator-tuned answer key uses `0.60` (with `TURN_TIME_90 = 0.35`).
 
 > [!Tip]
 > Tune `TURN_TIME_90` first in Challenge 4, then derive `TURN_TIME_180` from it here.
@@ -115,8 +115,8 @@ Copy your working Challenge 4 code. The only change is inside the `if front <= F
 ## Step 2 — Add `TURN_TIME_180`
 
 ```python
-TURN_TIME_90  = 0.5   # ← use your tuned value from Challenge 4
-TURN_TIME_180 = TURN_TIME_90 * 2
+TURN_TIME_90  = 0.35  # ← use your tuned value from Challenge 4
+TURN_TIME_180 = 0.60  # ← ≈ 1.7 × TURN_TIME_90, then fine-tune
 ```
 
 ---
@@ -180,33 +180,24 @@ Replace it with:
 
 ## Starter Scaffold
 
-This is what you'll see in the editor when you open the challenge. Comments mark the `TODO` blocks you must complete.
+This is exactly what you'll see in the editor when you open the challenge. The full algorithm — including the side-sensor decision — is already written for you. Every numeric setting starts at `0`. Your job is to tune the values.
 
 ```python
 # Challenge 5: Dead-End Detection (90° vs 180°)
-# ====================================================================
-# GOAL: After braking at a wall ahead, use the SIDE sensor to decide
-#       whether you are at a corner (turn 90°) or a dead end (turn 180°).
+# --------------------------------------------------------------------
+# After braking at a wall ahead, the robot reads its side sensor to
+# decide between turning 90° (corner) or 180° (dead end). The full
+# algorithm is already written for you. Every numeric setting starts
+# at 0.
 #
-# WHAT'S ALREADY DONE FOR YOU:
-#   - Your full PID side-follow controller (from C3).
-#   - The front-detect / approach / brake / turn / reset block from C4
-#     is laid out below — but the turn duration is hard-coded to
-#     TURN_TIME_90. You will REPLACE that with a runtime decision.
+# Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
 #
-# WHAT YOU NEED TO ADD (inside the `if front <= FRONT_STOP_DISTANCE:` block):
-#   1. After braking, read the side sensor:
-#         side_check = my_robot.read_distance_2()
-#   2. Decide the turn:
-#         - If side_check == -1  OR  side_check > FRONT_SLOW_DISTANCE
-#               → corridor is OPEN → use TURN_TIME_90
-#         - Else (wall on the side AND wall in front)
-#               → DEAD END → use TURN_TIME_180
-#      Store the chosen value in a variable called `turn_duration`.
-#   3. Use `turn_duration` in the hold_state call after rotating.
+# Values to set:
+#     all carried-forward C4 values
+#     TURN_TIME_180   new — seconds for ~180° rotation (≈ 1.7 × TURN_TIME_90)
 #
-# READ THIS FIRST: docs/Challenge_5.md
-# ====================================================================
+# Goal: navigate the corner AND the dead-end maze without help.
+# --------------------------------------------------------------------
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -214,43 +205,27 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 0
+TARGET_WALL_DISTANCE = 0
+MAX_STEERING = 0
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40
-# === BLOCK: SIDE_KP END ===
+side_Kp = 0.0
+side_Kd = 0.0
+side_Ki = 0.0
+side_INTEGRAL_MAX = 0
 
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.003
-side_INTEGRAL_MAX = 1200
-# === BLOCK: SIDE_KI END ===
-
-# === BLOCK: FRONT_CONFIG START ===
-FRONT_SLOW_DISTANCE = 400
-FRONT_STOP_DISTANCE = 120
-FRONT_Kp = 0.5
-TURN_SPEED = 180
-TURN_TIME_90 = 0.5  # ← use your tuned value from Challenge 4
-# === BLOCK: FRONT_CONFIG END ===
-
-# === BLOCK: TURN_TIME_180 START ===
-TURN_TIME_180 = 0.0  # TODO: start with TURN_TIME_90 * 2, then fine-tune
-# === BLOCK: TURN_TIME_180 END ===
+FRONT_SLOW_DISTANCE = 0
+FRONT_STOP_DISTANCE = 0
+FRONT_Kp = 0.0
+TURN_SPEED = 0
+TURN_TIME_90 = 0.0
+TURN_TIME_180 = 0.0
 
 side_previous_error = 0
 side_integral = 0
 
-# === MAIN LOOP ===
+
 while True:
-    # === BLOCK: FRONT_DETECT_DEADEND START ===
     front = my_robot.read_distance()
 
     if front != -1 and front < FRONT_SLOW_DISTANCE:
@@ -258,9 +233,14 @@ while True:
             my_robot.brake()
             hold_state(0.3)
 
-            # TODO: read side sensor into  side_check
-            # TODO: choose  turn_duration  based on side_check
-            turn_duration = TURN_TIME_90  # placeholder — replace with your decision
+            # Decide turn size from the side sensor:
+            #   wall on side as well as in front  → dead end  → 180°
+            #   side is open / out of range        → corner    → 90°
+            side_check = my_robot.read_distance_2()
+            if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
+                turn_duration = TURN_TIME_90
+            else:
+                turn_duration = TURN_TIME_180
 
             if my_robot.wall_sign == -1:
                 my_robot.rotate_right(TURN_SPEED)
@@ -270,6 +250,7 @@ while True:
 
             my_robot.brake()
             hold_state(0.3)
+
             side_integral = 0
             side_previous_error = 0
             continue
@@ -282,9 +263,8 @@ while True:
             my_robot.drive(approach_speed, approach_speed)
             hold_state(0.05)
             continue
-    # === BLOCK: FRONT_DETECT_DEADEND END ===
 
-    # === BLOCK: SIDE_FOLLOW_PID START ===
+    # --- Side wall-follow PID ---
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
@@ -318,90 +298,68 @@ while True:
     my_robot.drive(int(right_speed), int(left_speed))
 
     side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PID END ===
-
     hold_state(0.05)
 ```
 
 <details>
 <summary><strong>Reference Solution</strong> — click to expand <em>(only after you've genuinely tried)</em></summary>
 
-```python
-# Challenge 5: Dead End Detection
-# Extend the corner-detection block: after braking, check the side sensor to
-# decide between a 90 degree corner turn and a 180 degree dead-end reversal.
-# This file defines the FROZEN front-detect block reused in C6.
+The simulator-tuned answer key fills in every value. These are the same numbers used by the automated integration tests.
 
+```python
 from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
+my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160  # Forward speed (must be > 120)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-MAX_STEERING = 40  # Max wheel speed difference
-# Rule: BASE_SPEED - MAX_STEERING must be >= 120 (motor dead zone)
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 200
+TARGET_WALL_DISTANCE = 200
+MAX_STEERING = 60
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40  # Proportional gain — raise in 0.05 steps until zig-zag starts
-# === BLOCK: SIDE_KP END ===
+side_Kp = 0.25
+side_Kd = 0.40
+side_Ki = 0.001
+side_INTEGRAL_MAX = 50
 
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15  # Derivative gain — dampens oscillations
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.003  # Integral gain — start very small, raise in 0.002 steps
-side_INTEGRAL_MAX = 1200  # Anti-windup clamp
-# === BLOCK: SIDE_KI END ===
-
-# === BLOCK: FRONT_CONFIG START ===
-FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
-FRONT_STOP_DISTANCE = 120  # Stop and turn (mm)
-FRONT_Kp = 0.5  # Front deceleration gain
+FRONT_SLOW_DISTANCE = 400
+FRONT_STOP_DISTANCE = 150
+FRONT_Kp = 1.0
 TURN_SPEED = 180
-TURN_TIME_90 = 0.5  # Tune for ~90 degree turn
-# === BLOCK: FRONT_CONFIG END ===
-
-# === BLOCK: TURN_TIME_180 START ===
-TURN_TIME_180 = TURN_TIME_90 * 2  # Twice the 90 degree time, then fine-tune
-# === BLOCK: TURN_TIME_180 END ===
+TURN_TIME_90 = 0.35
+TURN_TIME_180 = 0.60
 
 side_previous_error = 0
 side_integral = 0
 
-# === MAIN LOOP ===
+
 while True:
-    # === BLOCK: FRONT_DETECT_DEADEND START ===
-    # Priority 1: Wall ahead — decelerate, then choose 90 degree corner or 180 degree dead-end
     front = my_robot.read_distance()
 
     if front != -1 and front < FRONT_SLOW_DISTANCE:
         if front <= FRONT_STOP_DISTANCE:
             my_robot.brake()
             hold_state(0.3)
-            # Check side sensor to decide corner (90 degree) vs dead end (180 degree)
+
             side_check = my_robot.read_distance_2()
             if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
-                turn_duration = TURN_TIME_90  # corridor open to the side
+                turn_duration = TURN_TIME_90
             else:
-                turn_duration = TURN_TIME_180  # walls on front AND side
-            # Turn away from the wall you are following (wall_sign-aware)
+                turn_duration = TURN_TIME_180
+
             if my_robot.wall_sign == -1:
                 my_robot.rotate_right(TURN_SPEED)
             else:
                 my_robot.rotate_left(TURN_SPEED)
             hold_state(turn_duration)
+
             my_robot.brake()
             hold_state(0.3)
+
             side_integral = 0
             side_previous_error = 0
             continue
         else:
-            # Approaching — slow down proportionally
             approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
             if approach_speed < 120:
                 approach_speed = 120
@@ -410,30 +368,26 @@ while True:
             my_robot.drive(approach_speed, approach_speed)
             hold_state(0.05)
             continue
-    # === BLOCK: FRONT_DETECT_DEADEND END ===
 
-    # === BLOCK: SIDE_FOLLOW_PID START ===
+    # --- Side wall-follow PID ---
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0  # Reset when wall lost — prevents windup
+        side_integral = 0
         hold_state(0.05)
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
 
-    # Integral: accumulated error (clamped against windup)
     side_integral = side_integral + error
     if side_integral > side_INTEGRAL_MAX:
         side_integral = side_INTEGRAL_MAX
     elif side_integral < -side_INTEGRAL_MAX:
         side_integral = -side_INTEGRAL_MAX
 
-    # Derivative
     side_derivative = error - side_previous_error
 
-    # Full PID
     steering = (
         (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
     )
@@ -449,8 +403,6 @@ while True:
     my_robot.drive(int(right_speed), int(left_speed))
 
     side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PID END ===
-
     hold_state(0.05)
 ```
 

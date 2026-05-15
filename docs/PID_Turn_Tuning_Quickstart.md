@@ -37,11 +37,11 @@ So tune `TURN_TIME_90` on the **same surface and with a fresh battery** that you
 
 ```python
 TURN_SPEED    = 180         # do not change during tuning
-TURN_TIME_90  = 0.5         # seconds — starting estimate
-TURN_TIME_180 = TURN_TIME_90 * 2
+TURN_TIME_90  = 0.35        # seconds — simulator-tuned starting point
+TURN_TIME_180 = 0.60
 ```
 
-**Expected behaviour:** robot rotates roughly 90° per `0.5 s` at `TURN_SPEED = 180`. Real value will land between ~`0.35 s` and ~`0.75 s` depending on conditions.
+**Expected behaviour:** robot rotates roughly 90° per `0.35 s` at `TURN_SPEED = 180` in the simulator. Real-robot value will land between ~`0.30 s` and ~`0.70 s` depending on conditions.
 
 ---
 
@@ -70,7 +70,7 @@ Pick a `TURN_SPEED` that **never stalls** on your race surface. Use the same val
 
 Set up a single 90° corner (Challenge 4 maze is ideal). Mark the floor where the chassis should end up after the turn.
 
-1. Set `TURN_TIME_90 = 0.5`.
+1. Set `TURN_TIME_90 = 0.35`.
 2. Run **three times**. Note the average final heading by eye (or with chalk lines).
 3. Adjust in **0.05 s steps** using the table below.
 4. Repeat until three consecutive runs land within ±10° of straight down the next corridor.
@@ -83,7 +83,7 @@ Set up a single 90° corner (Challenge 4 maze is ideal). Mark the floor where th
 | One run short, one run long                | Battery dropping — recharge and re-test                                                   |
 | Wheels slip audibly during turn            | `TURN_SPEED` too high — drop to `160`                                                     |
 
-Typical real-robot `TURN_TIME_90`: **0.35 s – 0.70 s** at `TURN_SPEED = 180`.
+Typical real-robot `TURN_TIME_90`: **0.30 s – 0.70 s** at `TURN_SPEED = 180`. Simulator-tuned answer key: `0.35 s`.
 
 > [!Tip]
 > If you are tuning over many runs, write the value on a sticky note on the robot. Battery voltage drops measurably across a 10-run session — re-tune at the start of each fresh battery.
@@ -96,7 +96,7 @@ A 180° turn is **not** always exactly twice a 90° turn. The rotation profile h
 
 Set up a dead-end (Challenge 5 maze).
 
-1. Start at `TURN_TIME_180 = TURN_TIME_90 * 2`.
+1. Start at `TURN_TIME_180 = TURN_TIME_90 * 1.7` (≈ `0.60` for the answer-key `TURN_TIME_90 = 0.35`).
 2. Run three times. Note overshoot/undershoot.
 3. Adjust in **0.05 s steps**.
 
@@ -107,7 +107,7 @@ Set up a dead-end (Challenge 5 maze).
 | Always 180° in the simulator but short on hardware             | Floor has more friction — keep increasing `TURN_TIME_180` |
 | Robot reverses and starts following the wall on the wrong side | Did not turn far enough — `+0.10` s and re-check          |
 
-Typical real-robot ratio: **`TURN_TIME_180 ≈ 1.85 × TURN_TIME_90`** — tune the offset, do not hard-code `× 2`.
+Typical ratio: **`TURN_TIME_180 ≈ 1.7 – 1.9 × TURN_TIME_90`** — tune the offset, do not hard-code `× 2`. Simulator-tuned answer key: `0.60` (= `1.71 × 0.35`).
 
 ---
 
@@ -143,12 +143,12 @@ If your tuned 90° and 180° times work in isolation but the **wrong** time is b
 
 ---
 
-## 9. Quick Copy/Paste Block (matches Challenge 5+ starter)
+## 9. Quick Copy/Paste Block (matches Challenge 5+ answer key)
 
 ```python
 TURN_SPEED    = 180
-TURN_TIME_90  = 0.50    # ← replace with your tuned value
-TURN_TIME_180 = 0.95    # ← replace; ~1.85 × TURN_TIME_90 is typical
+TURN_TIME_90  = 0.35    # ← simulator-tuned; replace with your real-robot value
+TURN_TIME_180 = 0.60    # ← simulator-tuned; ≈ 1.7 × TURN_TIME_90
 ```
 
 Once these are solid, the corner and dead-end blocks in Challenges 4, 5, and 6 will all behave consistently from a fresh battery start.

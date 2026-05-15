@@ -103,11 +103,12 @@ Instead of slamming on the brakes, use P control on the front sensor to control 
 approach_speed = FRONT_Kp × (front - FRONT_STOP_DISTANCE)
 ```
 
-| Front distance | Kp=0.5, stop=120mm                      | Result speed    |
+| Front distance | Kp=1.0, stop=150mm                      | Result speed    |
 | -------------- | --------------------------------------- | --------------- |
-| 400mm          | 0.5 × (400 − 120) = 140                 | 140             |
-| 300mm          | 0.5 × (300 − 120) = 90 → clamped to 120 | 120             |
-| 120mm          | 0.5 × (120 − 120) = 0                   | **Stop → turn** |
+| 400mm          | 1.0 × (400 − 150) = 250 → clamped to 200 | 200             |
+| 300mm          | 1.0 × (300 − 150) = 150                 | 150             |
+| 200mm          | 1.0 × (200 − 150) = 50 → clamped to 120  | 120             |
+| 150mm          | 1.0 × (150 − 150) = 0                   | **Stop → turn** |
 
 ### Resetting PID After a Turn
 
@@ -120,7 +121,7 @@ side_previous_error = 0
 
 ### Tuning `TURN_TIME_90`
 
-`TURN_TIME_90` controls how long the robot rotates. Start at `0.5` and adjust in `0.1s` steps until the turn is approximately 90°.
+`TURN_TIME_90` controls how long the robot rotates. Start at `0.35` and adjust in `0.05s` steps until the turn is approximately 90°.
 
 ---
 
@@ -139,10 +140,10 @@ Copy your working PID code. You will add:
 ```python
 # Front sensor P-controlled approach
 FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
-FRONT_STOP_DISTANCE = 120  # Stop and turn (mm)
-FRONT_Kp = 0.5
+FRONT_STOP_DISTANCE = 150  # Stop and turn (mm)
+FRONT_Kp = 1.0
 TURN_SPEED = 180
-TURN_TIME_90 = 0           # TODO: tune for ~90 degree turn
+TURN_TIME_90 = 0           # TODO: tune for ~90 degree turn (try 0.35)
 ```
 
 > [!Note]
@@ -216,7 +217,7 @@ The rest of the loop is your existing Challenge 3 PID wall-following code. It on
 | Observation                          | Fix                                                       |
 | ------------------------------------ | --------------------------------------------------------- |
 | Robot doesn't slow down before wall  | Increase `FRONT_SLOW_DISTANCE` (try 500)                  |
-| Robot stops too far from wall        | Decrease `FRONT_STOP_DISTANCE` (try 80)                   |
+| Robot stops too far from wall        | Decrease `FRONT_STOP_DISTANCE` (try 120)                  |
 | Robot crashes before stopping        | Increase `FRONT_STOP_DISTANCE` or `FRONT_Kp`              |
 | Robot doesn't turn enough            | Increase `TURN_TIME_90`                                   |
 | Robot turns too far (overshoots 90°) | Decrease `TURN_TIME_90`                                   |
@@ -226,37 +227,28 @@ The rest of the loop is your existing Challenge 3 PID wall-following code. It on
 
 ## Starter Scaffold
 
-This is what you'll see in the editor when you open the challenge. Comments mark the `TODO` blocks you must complete.
+This is exactly what you'll see in the editor when you open the challenge. The full algorithm is already written for you — every numeric setting starts at `0`. Your job is to tune the values.
 
 ```python
 # Challenge 4: Corner Detection (90° turn)
-# ====================================================================
-# GOAL: Use the FRONT sensor to detect a wall ahead, brake, turn 90°
-#       away from your wall, and then continue PID wall-following.
+# --------------------------------------------------------------------
+# Adds a front-sensor priority block that brakes, rotates 90° away
+# from the wall, and resumes wall-following. The full algorithm is
+# already written for you. Every numeric setting starts at 0.
 #
-# WHAT'S ALREADY DONE FOR YOU:
-#   - Your full PID side-follow controller from Challenge 3.
+# Tuning guides:
+#     docs.html?doc=PID_Front_Distance_Tuning_Quickstart   (FRONT_*, FRONT_Kp)
+#     docs.html?doc=PID_Turn_Tuning_Quickstart             (TURN_SPEED, TURN_TIME_90)
 #
-# WHAT YOU NEED TO ADD (at the TOP of the loop, BEFORE the PID block):
-#   1. Read the front sensor:  front = my_robot.read_distance()
-#   2. If front is valid and  front < FRONT_SLOW_DISTANCE:
-#        a. If  front <= FRONT_STOP_DISTANCE:
-#               - brake, hold 0.3s
-#               - turn AWAY from your wall:
-#                     if my_robot.wall_sign == -1: rotate_right(TURN_SPEED)
-#                     else:                         rotate_left(TURN_SPEED)
-#               - hold for TURN_TIME_90 seconds
-#               - brake, hold 0.3s
-#               - RESET side_integral = 0  AND  side_previous_error = 0
-#               - `continue`
-#        b. Else (still approaching):
-#               - approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-#               - clamp approach_speed between 120 and BASE_SPEED
-#               - my_robot.drive(approach_speed, approach_speed)
-#               - hold_state(0.05); `continue`
+# Values to set:
+#     all carried-forward C3 PID + base values
+#     FRONT_SLOW_DISTANCE, FRONT_STOP_DISTANCE     when to slow / brake (mm)
+#     FRONT_Kp                                      front-approach gain
+#     TURN_SPEED                                    rotation wheel speed
+#     TURN_TIME_90                                  seconds for ~90° rotation
 #
-# READ THIS FIRST: docs/Challenge_4.md
-# ====================================================================
+# Goal: turn the L-corner at speed without clipping either wall.
+# --------------------------------------------------------------------
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -264,45 +256,59 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 0
+TARGET_WALL_DISTANCE = 0
+MAX_STEERING = 0
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40
-# === BLOCK: SIDE_KP END ===
+side_Kp = 0.0
+side_Kd = 0.0
+side_Ki = 0.0
+side_INTEGRAL_MAX = 0
 
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.003
-side_INTEGRAL_MAX = 1200
-# === BLOCK: SIDE_KI END ===
-
-# === BLOCK: FRONT_CONFIG START ===
-FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
-FRONT_STOP_DISTANCE = 120  # Stop and turn (mm)
-FRONT_Kp = 0.5             # Front deceleration gain
-TURN_SPEED = 180
-TURN_TIME_90 = 0.0         # TODO: tune for ~90° turn (try 0.5s, adjust 0.05s steps)
-# === BLOCK: FRONT_CONFIG END ===
+FRONT_SLOW_DISTANCE = 0
+FRONT_STOP_DISTANCE = 0
+FRONT_Kp = 0.0
+TURN_SPEED = 0
+TURN_TIME_90 = 0.0
 
 side_previous_error = 0
 side_integral = 0
 
-# === MAIN LOOP ===
-while True:
-    # === BLOCK: FRONT_DETECT_90 START ===
-    # TODO: implement the front-detect priority block here.
-    # See the steps at the top of this file. When there is no wall
-    # ahead, fall through to the side-follow PID below.
-    # === BLOCK: FRONT_DETECT_90 END ===
 
-    # === BLOCK: SIDE_FOLLOW_PID START ===
+while True:
+    # --- Front-sensor priority: detect & turn 90° at corners ---
+    front = my_robot.read_distance()
+
+    if front != -1 and front < FRONT_SLOW_DISTANCE:
+        if front <= FRONT_STOP_DISTANCE:
+            my_robot.brake()
+            hold_state(0.3)
+
+            # Rotate AWAY from the wall (wall_sign tells us which side).
+            if my_robot.wall_sign == -1:
+                my_robot.rotate_right(TURN_SPEED)
+            else:
+                my_robot.rotate_left(TURN_SPEED)
+            hold_state(TURN_TIME_90)
+
+            my_robot.brake()
+            hold_state(0.3)
+
+            side_integral = 0
+            side_previous_error = 0
+            continue
+        else:
+            # Approach the wall on a P-controlled deceleration ramp.
+            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
+            if approach_speed < 120:
+                approach_speed = 120
+            if approach_speed > BASE_SPEED:
+                approach_speed = BASE_SPEED
+            my_robot.drive(approach_speed, approach_speed)
+            hold_state(0.05)
+            continue
+
+    # --- Side wall-follow PID (carried forward from Challenge 3) ---
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
@@ -336,78 +342,62 @@ while True:
     my_robot.drive(int(right_speed), int(left_speed))
 
     side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PID END ===
-
     hold_state(0.05)
 ```
 
 <details>
 <summary><strong>Reference Solution</strong> — click to expand <em>(only after you've genuinely tried)</em></summary>
 
-```python
-# Challenge 4: Corner Detection
-# Combine front sensor with side PID wall following to make a single 90 degree turn.
+The simulator-tuned answer key fills in every value. These are the same numbers used by the automated integration tests.
 
+```python
 from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
+my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160  # Forward speed (must be > 120)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-MAX_STEERING = 40  # Max wheel speed difference
-# Rule: BASE_SPEED - MAX_STEERING must be >= 120 (motor dead zone)
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 200
+TARGET_WALL_DISTANCE = 200
+MAX_STEERING = 60
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40  # Proportional gain — raise in 0.05 steps until zig-zag starts
-# === BLOCK: SIDE_KP END ===
+side_Kp = 0.25
+side_Kd = 0.40
+side_Ki = 0.001
+side_INTEGRAL_MAX = 50
 
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15  # Derivative gain — dampens oscillations
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.003  # Integral gain — start very small, raise in 0.002 steps
-side_INTEGRAL_MAX = 1200  # Anti-windup clamp
-# === BLOCK: SIDE_KI END ===
-
-# === BLOCK: FRONT_CONFIG START ===
-FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
-FRONT_STOP_DISTANCE = 120  # Stop and turn (mm)
-FRONT_Kp = 0.5  # Front deceleration gain
+FRONT_SLOW_DISTANCE = 400
+FRONT_STOP_DISTANCE = 150
+FRONT_Kp = 1.0
 TURN_SPEED = 180
-TURN_TIME_90 = 0.5  # Tune for ~90 degree turn
-# === BLOCK: FRONT_CONFIG END ===
+TURN_TIME_90 = 0.35
 
 side_previous_error = 0
 side_integral = 0
 
-# === MAIN LOOP ===
+
 while True:
-    # === BLOCK: FRONT_DETECT_90 START ===
-    # Priority 1: Wall ahead — P-controlled deceleration then 90 degree turn
+    # --- Front-sensor priority: detect & turn 90° at corners ---
     front = my_robot.read_distance()
 
     if front != -1 and front < FRONT_SLOW_DISTANCE:
         if front <= FRONT_STOP_DISTANCE:
             my_robot.brake()
             hold_state(0.3)
-            # Turn away from the wall you are following (wall_sign-aware)
-            if my_robot.wall_sign == -1:  # following left wall → turn right
+
+            if my_robot.wall_sign == -1:
                 my_robot.rotate_right(TURN_SPEED)
-            else:  # following right wall → turn left
+            else:
                 my_robot.rotate_left(TURN_SPEED)
             hold_state(TURN_TIME_90)
+
             my_robot.brake()
             hold_state(0.3)
+
             side_integral = 0
             side_previous_error = 0
             continue
         else:
-            # Approaching — slow down proportionally
             approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
             if approach_speed < 120:
                 approach_speed = 120
@@ -416,30 +406,26 @@ while True:
             my_robot.drive(approach_speed, approach_speed)
             hold_state(0.05)
             continue
-    # === BLOCK: FRONT_DETECT_90 END ===
 
-    # === BLOCK: SIDE_FOLLOW_PID START ===
+    # --- Side wall-follow PID (carried forward from Challenge 3) ---
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0  # Reset when wall lost — prevents windup
+        side_integral = 0
         hold_state(0.05)
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
 
-    # Integral: accumulated error (clamped against windup)
     side_integral = side_integral + error
     if side_integral > side_INTEGRAL_MAX:
         side_integral = side_INTEGRAL_MAX
     elif side_integral < -side_INTEGRAL_MAX:
         side_integral = -side_INTEGRAL_MAX
 
-    # Derivative
     side_derivative = error - side_previous_error
 
-    # Full PID
     steering = (
         (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
     )
@@ -455,8 +441,6 @@ while True:
     my_robot.drive(int(right_speed), int(left_speed))
 
     side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PID END ===
-
     hold_state(0.05)
 ```
 

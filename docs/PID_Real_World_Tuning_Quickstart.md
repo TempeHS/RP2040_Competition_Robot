@@ -12,9 +12,9 @@ Use this checklist to tune the **side-wall PID** on the real robot. The variable
 These constants come from the canonical `CONFIG_BASE` block used by every challenge:
 
 ```python
-BASE_SPEED           = 160   # Forward speed (must be > 120)
-TARGET_WALL_DISTANCE = 150   # mm
-MAX_STEERING         = 40    # Max wheel speed difference
+BASE_SPEED           = 200   # Forward speed (must be > 120)
+TARGET_WALL_DISTANCE = 200   # mm
+MAX_STEERING         = 60    # Max wheel speed difference
 # Loop delay: hold_state(0.05)
 # Rule: BASE_SPEED - MAX_STEERING >= 120 (motor dead zone)
 ```
@@ -59,10 +59,11 @@ Keep `side_Ki = 0` and `side_Kd = 0` throughout this step.
 
 | Oscillation at | Final `side_Kp` |
 | -------------- | --------------- |
+| 0.35           | 0.25 – 0.28     |
 | 0.50           | 0.35 – 0.40     |
 | 0.60           | 0.42 – 0.48     |
 
-Typical final `side_Kp` on the real robot: **0.30 – 0.55**.
+Typical final `side_Kp` on the real robot: **0.20 – 0.55**. Simulator-tuned answer key: `0.25`.
 
 ---
 
@@ -72,7 +73,7 @@ Typical final `side_Kp` on the real robot: **0.30 – 0.55**.
 2. Increase by `0.05` per run
 3. Stop when oscillation is mostly gone but response is still snappy
 
-Typical final `side_Kd`: **0.15 – 0.45**. Default in the starter code is `0.15`.
+Typical final `side_Kd`: **0.15 – 0.45**. Simulator-tuned answer key: `0.40`.
 
 **Expected behaviour:** Zig-zagging shrinks. Robot follows the wall smoothly with small, quick corrections only.
 
@@ -80,18 +81,18 @@ Typical final `side_Kd`: **0.15 – 0.45**. Default in the starter code is `0.15
 
 ## 5. Add `side_Ki` to Remove Steady Drift
 
-1. Start `side_Ki = 0.003`
-2. Increase by `0.002` per run
+1. Start `side_Ki = 0.001`
+2. Increase by `0.001` per run
 3. Stop when long-run offset is removed
 4. If a slow weave appears, `side_Ki` is too high — back off
 
-Typical final `side_Ki`: **0.003 – 0.015**.
+Typical final `side_Ki`: **0.001 – 0.015**. Simulator-tuned answer key: `0.001`.
 
 ---
 
 ## 6. Set `side_INTEGRAL_MAX` Properly
 
-Aim for an I-term contribution of about **8–16 steering units** at the clamp:
+Aim for an I-term contribution of about **5–16 steering units** at the clamp:
 
 ```
 I_term_max = side_Ki * side_INTEGRAL_MAX
@@ -99,7 +100,8 @@ I_term_max = side_Ki * side_INTEGRAL_MAX
 
 | `side_Ki` | Suggested `side_INTEGRAL_MAX` |
 | --------- | ----------------------------- |
-| 0.003     | 1200 (default)                |
+| 0.001     | 50 – 200 (answer key uses 50) |
+| 0.003     | 1200                          |
 | 0.008     | 1000 – 2000                   |
 | 0.015     | 600 – 1100                    |
 
@@ -131,17 +133,17 @@ If the robot suddenly veers when re-acquiring the wall, lower `side_INTEGRAL_MAX
 
 ---
 
-## 9. Quick Copy/Paste Block (matches Challenge 3+ starter)
+## 9. Quick Copy/Paste Block (matches Challenge 3+ answer key)
 
 ```python
-BASE_SPEED           = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING         = 40
+BASE_SPEED           = 200
+TARGET_WALL_DISTANCE = 200
+MAX_STEERING         = 60
 
-side_Kp           = 0.40
-side_Kd           = 0.15
-side_Ki           = 0.003
-side_INTEGRAL_MAX = 1200
+side_Kp           = 0.25
+side_Kd           = 0.40
+side_Ki           = 0.001
+side_INTEGRAL_MAX = 50
 
 side_previous_error = 0
 side_integral       = 0
