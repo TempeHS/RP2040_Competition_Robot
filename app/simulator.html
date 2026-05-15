@@ -89,8 +89,8 @@
                 </li>
                 <li>
                   <a class="dropdown-item" href="docs.html?doc=Challenge_6">
-                    <i class="bi bi-sign-u-turn me-2"></i>Challenge 6: Dead End
-                    Detection
+                    <i class="bi bi-arrow-return-left me-2"></i>Challenge 6:
+                    Dead End Detection
                   </a>
                 </li>
                 <li>
@@ -581,61 +581,152 @@
         ></button>
       </div>
       <div class="offcanvas-body">
-        <h6>AIDriver Methods</h6>
+        <p class="small text-muted mb-2">
+          Import once at the top of every challenge:
+        </p>
+        <pre class="bg-light border rounded p-2 small mb-3"><code>from aidriver import AIDriver, hold_state
+import aidriver
+
+aidriver.DEBUG_AIDRIVER = False    # set True for verbose logs
+my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
+
+        <h6>Sensors</h6>
         <div class="list-group list-group-flush mb-3">
           <div class="list-group-item">
-            <code>drive_forward(right_speed, left_speed)</code>
+            <code>my_robot.read_distance()</code>
             <small class="text-muted d-block"
-              >Drive forward with specified wheel speeds (0-255)</small
+              >Front ultrasonic. Returns mm (20–2000) or
+              <code>-1</code> if out of range / no echo.</small
             >
           </div>
           <div class="list-group-item">
-            <code>drive_backward(right_speed, left_speed)</code>
+            <code>my_robot.read_distance_2()</code>
             <small class="text-muted d-block"
-              >Drive backward with specified wheel speeds (0-255)</small
-            >
-          </div>
-          <div class="list-group-item">
-            <code>rotate_left(turn_speed)</code>
-            <small class="text-muted d-block"
-              >Rotate counter-clockwise on the spot</small
-            >
-          </div>
-          <div class="list-group-item">
-            <code>rotate_right(turn_speed)</code>
-            <small class="text-muted d-block"
-              >Rotate clockwise on the spot</small
-            >
-          </div>
-          <div class="list-group-item">
-            <code>brake()</code>
-            <small class="text-muted d-block">Stop both motors</small>
-          </div>
-          <div class="list-group-item">
-            <code>read_distance()</code>
-            <small class="text-muted d-block"
-              >Read ultrasonic sensor (returns mm, or -1 if invalid)</small
+              >Side ultrasonic (the wall-follow sensor). Same units, same
+              <code>-1</code> sentinel — used to detect outside corners.</small
             >
           </div>
         </div>
 
-        <h6>Helper Functions</h6>
+        <h6>Driving</h6>
+        <div class="list-group list-group-flush mb-3">
+          <div class="list-group-item">
+            <code>my_robot.drive(right_speed, left_speed)</code>
+            <small class="text-muted d-block"
+              ><strong>Preferred for PID.</strong> Signed speeds (-255…255):
+              positive = forward, negative = backward. Anything with
+              <code>abs(speed) &lt; 100</code> stops that wheel
+              (<code>MIN_MOTOR_SPEED</code> dead zone).</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.drive_forward(right_speed, left_speed)</code>
+            <small class="text-muted d-block"
+              >Both wheels forward at unsigned speeds (0–255).</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.drive_backward(right_speed, left_speed)</code>
+            <small class="text-muted d-block"
+              >Both wheels backward at unsigned speeds (0–255).</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.rotate_left(turn_speed)</code>
+            <small class="text-muted d-block"
+              >Spin in place counter-clockwise at <code>turn_speed</code>.</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.rotate_right(turn_speed)</code>
+            <small class="text-muted d-block"
+              >Spin in place clockwise at <code>turn_speed</code>.</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.brake()</code>
+            <small class="text-muted d-block">Cut power to both motors.</small>
+          </div>
+        </div>
+
+        <h6>State / Diagnostics</h6>
+        <div class="list-group list-group-flush mb-3">
+          <div class="list-group-item">
+            <code>my_robot.wall_sign</code>
+            <small class="text-muted d-block"
+              >Property: <code>-1</code> when constructed with
+              <code>"left"</code>, <code>+1</code> for <code>"right"</code>.
+              Multiply your steering term by it so the same code mirror-solves
+              both modes.</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.get_motor_speeds()</code>
+            <small class="text-muted d-block"
+              >Returns the last commanded
+              <code>(right_speed, left_speed)</code> tuple.</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.is_moving()</code>
+            <small class="text-muted d-block"
+              >Returns <code>True</code> if either wheel is currently powered.</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>my_robot.service()</code>
+            <small class="text-muted d-block"
+              >Tick the safety heartbeat. Called for you by
+              <code>hold_state()</code> — only call it directly if you write
+              your own busy loop.</small
+            >
+          </div>
+        </div>
+
+        <h6>Module Helpers</h6>
         <div class="list-group list-group-flush mb-3">
           <div class="list-group-item">
             <code>hold_state(seconds)</code>
             <small class="text-muted d-block"
-              >Pause for specified seconds while logging</small
+              >Pause for <code>seconds</code> while servicing the heartbeat and
+              logging current state. Use this — never <code>time.sleep()</code>.</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>aidriver.DEBUG_AIDRIVER = True / False</code>
+            <small class="text-muted d-block"
+              >Toggle verbose <code>[AIDriver]</code> log output. Off by default
+              in answers; turn it on while debugging your own code.</small
+            >
+          </div>
+          <div class="list-group-item">
+            <code>aidriver.heartbeat(period_ms=1000)</code>
+            <small class="text-muted d-block"
+              >Manual LED + safety heartbeat tick (advanced — normally handled
+              automatically by <code>hold_state</code>).</small
             >
           </div>
         </div>
 
+        <h6>Constants</h6>
+        <ul class="small">
+          <li>
+            <code>MIN_MOTOR_SPEED = 100</code> — wheels below this stall.
+            Any <code>BASE_SPEED - MAX_STEERING</code> must stay <code>≥ 100</code>.
+          </li>
+          <li>
+            Ultrasonic range: <strong>20 mm – 2000 mm</strong>. Outside this
+            range both <code>read_distance()</code> and
+            <code>read_distance_2()</code> return <code>-1</code>.
+          </li>
+        </ul>
+
         <h6>Speed Guidelines</h6>
         <ul class="small">
-          <li><strong>0-80:</strong> Stopped (too slow to move)</li>
-          <li><strong>81-120:</strong> Very slow</li>
-          <li><strong>121-180:</strong> Slow</li>
-          <li><strong>181-220:</strong> Normal</li>
-          <li><strong>221-255:</strong> Very fast</li>
+          <li><strong>0–99:</strong> Below dead zone — wheel stops</li>
+          <li><strong>100–140:</strong> Slow / careful</li>
+          <li><strong>141–200:</strong> Normal cruise</li>
+          <li><strong>201–255:</strong> Fast — watch for slip on turns</li>
         </ul>
 
         <h6>Keyboard Shortcuts</h6>
@@ -727,7 +818,7 @@
     <script src="js/validator.js?v=13"></script>
     <script src="js/robot-config.js?v=1"></script>
     <script src="js/simulator.js?v=13"></script>
-    <script src="js/challenges.js?v=20"></script>
+    <script src="js/challenges.js?v=21"></script>
     <script src="js/mazes.js?v=29"></script>
     <script src="js/gamepad.js?v=10"></script>
     <script src="js/aidriver-stub.js?v=21"></script>
