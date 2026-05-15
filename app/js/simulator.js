@@ -237,15 +237,28 @@ const Simulator = (function () {
         continue;
       }
 
-      // Try wall-sliding: accept the largest sub-component of the move
-      // that doesn't intersect. Order: translation-only (X then Y),
-      // rotation-only. This lets the robot slide along a wall instead
-      // of locking in place when it brushes one at an angle.
-      var slideCandidates = [
-        { ...next, y: prevY, heading: prevH }, // X-translation only
-        { ...next, x: prevX, heading: prevH }, // Y-translation only
-        { ...next, x: prevX, y: prevY }, // rotation only
-      ];
+      // Try wall-sliding, but only for *grazing* contacts. A translation
+      // slide is allowed only when the motion is mostly along that axis
+      // — the dominant component must be more than twice the other.
+      // This means a head-on or 45° approach gets blocked (the car
+      // stops), while brushing a wall while travelling roughly parallel
+      // to it still slides smoothly. Rotation-only is always tried last
+      // since it can't tunnel through a wall in a single substep.
+      var dx = next.x - prevX;
+      var dy = next.y - prevY;
+      var SLIDE_RATIO = 2;
+      var allowSlideX = Math.abs(dx) > SLIDE_RATIO * Math.abs(dy);
+      var allowSlideY = Math.abs(dy) > SLIDE_RATIO * Math.abs(dx);
+
+      var slideCandidates = [];
+      if (allowSlideX) {
+        slideCandidates.push({ ...next, y: prevY, heading: prevH });
+      }
+      if (allowSlideY) {
+        slideCandidates.push({ ...next, x: prevX, heading: prevH });
+      }
+      slideCandidates.push({ ...next, x: prevX, y: prevY }); // rotation-only
+
       var accepted = null;
       for (var s = 0; s < slideCandidates.length; s++) {
         if (!isColliding(slideCandidates[s])) {
