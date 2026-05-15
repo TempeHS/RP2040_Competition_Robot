@@ -239,11 +239,11 @@ describe("Full Application Integration", () => {
 
   describe("PID Challenge Mode", () => {
     test("all challenges should require code (no gamepad mode)", () => {
-      // PID challenges 1-5 all require user code
-      for (let i = 1; i <= 5; i++) {
+      // PID challenges 1-7 all require user code
+      for (let i = 1; i <= 7; i++) {
         App.currentChallenge = i;
         const isCodeChallenge =
-          App.currentChallenge >= 1 && App.currentChallenge <= 5;
+          App.currentChallenge >= 1 && App.currentChallenge <= 7;
         expect(isCodeChallenge).toBe(true);
       }
     });

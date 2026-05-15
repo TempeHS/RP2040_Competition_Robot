@@ -3,20 +3,23 @@
 # filled in. Used by automated tests and as a teacher reference.
 # Students should NOT see this file.
 
-# Challenge 5: Dead-End Detection (90° vs 180°)
+# Challenge 5: Outside Corners — Lost-Wall Recovery
 # --------------------------------------------------------------------
-# After braking at a wall ahead, the robot reads its side sensor to
-# decide between turning 90° (corner) or 180° (dead end). The full
-# algorithm is already written for you. Every numeric setting starts
-# at 0.
+# When the wall the robot is following ends abruptly (an outside /
+# convex corner, or a free-standing "nib"), the side sensor returns
+# -1. Without help the robot drives straight and loses the wall
+# completely. This challenge adds a gentle curve toward where the
+# wall WAS so the robot wraps around the corner.
 #
-# Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
+# Tuning guide: docs.html?doc=PID_Real_World_Tuning_Quickstart
 #
 # Values to set:
 #     all carried-forward C4 values
-#     TURN_TIME_180   new — seconds for ~180° rotation (≈ 2 × TURN_TIME_90)
+#     LOST_WALL_DRIFT   new — fraction of BASE_SPEED subtracted from
+#                              the inside wheel to curve back toward
+#                              the wall (range 0.0–0.30).
 #
-# Goal: navigate the corner AND the dead-end maze without help.
+# Goal: wrap around the free-standing block to reach the exit zone.
 # --------------------------------------------------------------------
 
 from aidriver import AIDriver, hold_state
@@ -39,13 +42,15 @@ FRONT_STOP_DISTANCE = 150
 FRONT_Kp = 1.0
 TURN_SPEED = 180
 TURN_TIME_90 = 0.35
-TURN_TIME_180 = 0.60
+
+LOST_WALL_DRIFT = 0.20
 
 side_previous_error = 0
 side_integral = 0
 
 
 while True:
+    # --- Front-sensor priority: 90° corner detection (carried from C4) ---
     front = my_robot.read_distance()
 
     if front != -1 and front < FRONT_SLOW_DISTANCE:
@@ -53,20 +58,11 @@ while True:
             my_robot.brake()
             hold_state(0.3)
 
-            # Decide turn size from the side sensor:
-            #   wall on side as well as in front  → dead end  → 180°
-            #   side is open / out of range        → corner    → 90°
-            side_check = my_robot.read_distance_2()
-            if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
-                turn_duration = TURN_TIME_90
-            else:
-                turn_duration = TURN_TIME_180
-
             if my_robot.wall_sign == -1:
                 my_robot.rotate_right(TURN_SPEED)
             else:
                 my_robot.rotate_left(TURN_SPEED)
-            hold_state(turn_duration)
+            hold_state(TURN_TIME_90)
 
             my_robot.brake()
             hold_state(0.3)
@@ -76,22 +72,26 @@ while True:
             continue
         else:
             approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
+            if approach_speed < 100:
+                approach_speed = 100
             if approach_speed > BASE_SPEED:
                 approach_speed = BASE_SPEED
             my_robot.drive(approach_speed, approach_speed)
             hold_state(0.05)
             continue
 
-    # --- Side wall-follow PID ---
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
+    # --- Lost-wall recovery: curve gently toward the wall when sensor blanks ---
+    side = my_robot.read_distance_2()
+    if side == -1:
+        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * LOST_WALL_DRIFT)
+        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * LOST_WALL_DRIFT)
+        my_robot.drive(r, l)
         side_integral = 0
         hold_state(0.05)
         continue
+
+    # --- Side wall-follow PID (carried forward from C3) ---
+    wall_distance = side
 
     error = wall_distance - TARGET_WALL_DISTANCE
 

@@ -103,12 +103,12 @@ Instead of slamming on the brakes, use P control on the front sensor to control 
 approach_speed = FRONT_Kp × (front - FRONT_STOP_DISTANCE)
 ```
 
-| Front distance | Kp=1.0, stop=150mm                      | Result speed    |
-| -------------- | --------------------------------------- | --------------- |
+| Front distance | Kp=1.0, stop=150mm                       | Result speed    |
+| -------------- | ---------------------------------------- | --------------- |
 | 400mm          | 1.0 × (400 − 150) = 250 → clamped to 200 | 200             |
-| 300mm          | 1.0 × (300 − 150) = 150                 | 150             |
+| 300mm          | 1.0 × (300 − 150) = 150                  | 150             |
 | 200mm          | 1.0 × (200 − 150) = 50 → clamped to 120  | 120             |
-| 150mm          | 1.0 × (150 − 150) = 0                   | **Stop → turn** |
+| 150mm          | 1.0 × (150 − 150) = 0                    | **Stop → turn** |
 
 ### Resetting PID After a Turn
 
@@ -447,6 +447,7 @@ while True:
 </details>
 
 ---
+
 ## Debugging Tips
 
 - Add `print("front:", front)` at the top of the loop to confirm the sensor is reading correctly.
@@ -458,4 +459,4 @@ while True:
 
 ## What's Next
 
-In [Challenge 5](docs.html?doc=Challenge_5) you will extend this code to also handle a **180° dead end** by checking the side sensor after stopping to decide which turn angle to use.
+In [Challenge 5](docs.html?doc=Challenge_5) you will handle the opposite case — an **outside (convex) corner** where the wall ends abruptly — by adding gentle "lost-wall" recovery so the robot wraps the corner instead of driving off.

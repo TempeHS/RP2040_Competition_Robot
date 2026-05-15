@@ -1,6 +1,6 @@
-# Side Wall PID Tuning Quickstart
+# Real-World Side-Wall PID Tuning Quickstart (On-Robot)
 
-Use this checklist to tune the **side-wall PID** on the real robot. The variables match the [Challenge starter code](docs.html?doc=Challenge_3) (`side_` prefix everywhere) so values you find here paste straight into Challenges 1–6.
+Use this checklist to tune the **side-wall PID** on the real robot. The variables match the [Challenge starter code](docs.html?doc=Challenge_3) (`side_` prefix everywhere) so values you find here paste straight into Challenges 1–7.
 
 > [!Tip]
 > Tune in the simulator first to learn the workflow, then re-tune on the real robot. Real motors and sensors behave differently — expect smaller `side_Kp` and `side_Ki` values on hardware than in the simulator.
@@ -12,11 +12,11 @@ Use this checklist to tune the **side-wall PID** on the real robot. The variable
 These constants come from the canonical `CONFIG_BASE` block used by every challenge:
 
 ```python
-BASE_SPEED           = 200   # Forward speed (must be > 120)
+BASE_SPEED           = 200   # Forward speed (must be >= 100)
 TARGET_WALL_DISTANCE = 200   # mm
 MAX_STEERING         = 60    # Max wheel speed difference
 # Loop delay: hold_state(0.05)
-# Rule: BASE_SPEED - MAX_STEERING >= 120 (motor dead zone)
+# Rule: BASE_SPEED - MAX_STEERING >= 100 (MIN_MOTOR_SPEED dead zone)
 ```
 
 Start every gain at **zero**:
@@ -109,7 +109,30 @@ If the robot suddenly veers when re-acquiring the wall, lower `side_INTEGRAL_MAX
 
 ---
 
-## 7. Symptom → Fix
+## 7. Tune `LOST_WALL_DRIFT` (Challenge 5+)
+
+`LOST_WALL_DRIFT` is the fraction of `BASE_SPEED` subtracted from the **inside** wheel whenever the side sensor returns `-1` (an outside corner or a free-standing wall ending). It curls the robot back toward where the wall used to be so it wraps the corner instead of driving off into open space.
+
+```python
+LOST_WALL_DRIFT = 0.20   # answer-key value, range 0.0 – 0.30
+```
+
+Tune against a single outside corner — the **Challenge 5 maze** is purpose-built for this. Run three times per value, in `0.05` steps:
+
+| Symptom at the outside corner                                  | Adjustment                                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Robot drives straight off the corner — never finds wall        | `+0.05` to `LOST_WALL_DRIFT`                                                  |
+| Robot wraps too tight — pivots in place / spins past wall      | `-0.05` to `LOST_WALL_DRIFT`                                                  |
+| Inside wheel stalls audibly / robot rotates instead of curving | Inside wheel below `MIN_MOTOR_SPEED` (100). Lower drift OR raise `BASE_SPEED` |
+| Big PID jolt the moment the wall reappears                     | Make sure `side_integral = 0` is reset inside the `side == -1` branch         |
+
+**Stall guard:** keep `BASE_SPEED * (1 - LOST_WALL_DRIFT) >= 100`. With `BASE_SPEED = 200` any drift up to `0.50` is theoretically safe; in practice keep it `<= 0.30` so the curl is gentle. With `BASE_SPEED = 140`, cap drift at `0.28`.
+
+Typical final `LOST_WALL_DRIFT` on the real robot: **0.15 – 0.25**. Simulator-tuned answer key: `0.20`.
+
+---
+
+## 8. Symptom → Fix
 
 | Symptom                              | Likely cause       | Fix                                                   |
 | ------------------------------------ | ------------------ | ----------------------------------------------------- |
@@ -124,16 +147,17 @@ If the robot suddenly veers when re-acquiring the wall, lower `side_INTEGRAL_MAX
 
 ---
 
-## 8. Field Test Routine
+## 9. Field Test Routine
 
 1. Three straight-corridor passes
 2. Three L-corner passes (Challenge 3 maze)
-3. Three zig-zag passes (Challenge 6 maze)
-4. Change **one gain at a time**; record values + behaviour after each run
+3. Three outside-corner wraps (Challenge 5 maze) — confirms `LOST_WALL_DRIFT`
+4. Three zig-zag passes (Challenge 7 maze)
+5. Change **one gain at a time**; record values + behaviour after each run
 
 ---
 
-## 9. Quick Copy/Paste Block (matches Challenge 3+ answer key)
+## 10. Quick Copy/Paste Block (matches Challenge 3+ answer key)
 
 ```python
 BASE_SPEED           = 200

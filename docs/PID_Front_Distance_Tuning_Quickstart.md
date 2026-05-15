@@ -1,4 +1,4 @@
-# Front-Sensor P-Controller Tuning Quickstart
+# Real-World Front-Sensor P-Controller Tuning Quickstart (On-Robot)
 
 Use this checklist to tune the **front-sensor P-controlled deceleration** that triggers a corner or dead-end turn. Variables match the canonical `FRONT_CONFIG` block in [Challenges 4–6](docs.html?doc=Challenge_4).
 
@@ -31,12 +31,12 @@ if approach_speed > BASE_SPEED: approach_speed = BASE_SPEED
 my_robot.drive(approach_speed, approach_speed)
 ```
 
-| `front` | `1.0 × (front − 150)` | After clamp                  |
-| ------- | --------------------- | ---------------------------- |
-| 400 mm  | 250                   | **200** (clamped to BASE)    |
-| 300 mm  | 150                   | **150**                      |
+| `front` | `1.0 × (front − 150)` | After clamp                    |
+| ------- | --------------------- | ------------------------------ |
+| 400 mm  | 250                   | **200** (clamped to BASE)      |
+| 300 mm  | 150                   | **150**                        |
 | 200 mm  | 50                    | **120** (clamped to dead-zone) |
-| 150 mm  | 0                     | **stop → turn**              |
+| 150 mm  | 0                     | **stop → turn**                |
 
 The clamp keeps the chassis crawling at the dead-zone speed all the way to the stop point.
 
@@ -75,7 +75,7 @@ This is **how early** the robot starts slowing down. It must be far enough to gi
 Typical real-robot value: **350 – 500 mm**. Default in the starter: `400 mm`.
 
 > [!Important]
-> `FRONT_SLOW_DISTANCE` is also the **threshold for the side-sensor check** in the dead-end decision (Challenge 5+). If you raise it, also re-check that corners are still classified as 90° not 180°.
+> `FRONT_SLOW_DISTANCE` is also the **threshold for the side-sensor check** in the dead-end decision (Challenge 6+). If you raise it, also re-check that corners are still classified as 90° not 180°.
 
 ---
 

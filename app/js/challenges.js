@@ -156,9 +156,39 @@ const Challenges = (function () {
       maze: "corner",
     },
 
-    // Challenge 5: Dead End Detection — 90° corner OR 180° dead end
+    // Challenge 5: Outside Corners — Lost-Wall Recovery
     5: {
       id: 5,
+      title: "Outside Corners",
+      subtitle: "Lost-Wall Recovery",
+      icon: "bi-bounding-box",
+      menuGroup: "advanced",
+      difficulty: DIFFICULTY.MEDIUM,
+      description:
+        "When the wall ends abruptly (an outside / convex corner), the side sensor returns -1. Add a gentle curl toward where the wall was so the robot wraps around the corner instead of driving off into open space.",
+      goal: "Follow the inside edge of the nib, then wrap around its top corner to reach the pocket behind it.",
+      hints: [
+        "side == -1 means the wall has ended — that's the outside corner",
+        "When lost, slow the inside wheel slightly (LOST_WALL_DRIFT)",
+        "Keep the inside wheel ≥ MIN_MOTOR_SPEED (100) or it will stall",
+        "Reset side_integral when the wall blanks so the PID re-locks cleanly",
+        "Use wall_sign so the same code wraps in either AIDriver mode",
+      ],
+      startPosition: { x: 1000, y: 1700, heading: 0 },
+      successCriteria: {
+        type: "reach_zone",
+        // Top-left pocket behind the left nib. Mirrors to top-right
+        // for AIDriver("right").
+        zone: { x: 0, y: 0, width: 400, height: 400 },
+      },
+      path: null,
+      obstacles: [],
+      maze: "outside_corners",
+    },
+
+    // Challenge 6: Dead End Detection — 90° corner OR 180° dead end
+    6: {
+      id: 6,
       title: "Dead End Detection",
       subtitle: "Sensor Fusion",
       icon: "bi-sign-u-turn",
@@ -186,9 +216,9 @@ const Challenges = (function () {
       maze: "dead_end",
     },
 
-    // Challenge 6: Full Maze Solving — Hand on Wall
-    6: {
-      id: 6,
+    // Challenge 7: Full Maze Solving — Hand on Wall
+    7: {
+      id: 7,
       title: "Maze Solver",
       subtitle: "Hand-on-Wall",
       icon: "bi-signpost-split",

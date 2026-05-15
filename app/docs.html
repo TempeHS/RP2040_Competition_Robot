@@ -226,13 +226,19 @@
                 </li>
                 <li>
                   <a class="dropdown-item" href="docs.html?doc=Challenge_5">
-                    <i class="bi bi-sign-u-turn me-2"></i>Challenge 5: Dead End
-                    Detection
+                    <i class="bi bi-bounding-box me-2"></i>Challenge 5: Outside
+                    Corners
                   </a>
                 </li>
                 <li>
                   <a class="dropdown-item" href="docs.html?doc=Challenge_6">
-                    <i class="bi bi-signpost-split me-2"></i>Challenge 6: Maze
+                    <i class="bi bi-sign-u-turn me-2"></i>Challenge 6: Dead End
+                    Detection
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="docs.html?doc=Challenge_7">
+                    <i class="bi bi-signpost-split me-2"></i>Challenge 7: Maze
                     Solver
                   </a>
                 </li>
@@ -254,7 +260,7 @@
                 role="button"
                 data-bs-toggle="dropdown"
               >
-                <i class="bi bi-sliders me-1"></i>PID Tuning
+                <i class="bi bi-sliders me-1"></i>Real-World PID Tuning
               </a>
               <ul class="dropdown-menu" aria-labelledby="pidTuningDropdown">
                 <li>
@@ -262,7 +268,8 @@
                     class="dropdown-item"
                     href="docs.html?doc=PID_Real_World_Tuning_Quickstart"
                   >
-                    <i class="bi bi-arrow-left-right me-2"></i>Side Wall PID
+                    <i class="bi bi-arrow-left-right me-2"></i>Side-Wall PID
+                    (On-Robot)
                   </a>
                 </li>
                 <li>
@@ -270,7 +277,8 @@
                     class="dropdown-item"
                     href="docs.html?doc=PID_Front_Distance_Tuning_Quickstart"
                   >
-                    <i class="bi bi-arrow-up me-2"></i>Front Distance PID
+                    <i class="bi bi-arrow-up me-2"></i>Front-Distance PID
+                    (On-Robot)
                   </a>
                 </li>
                 <li>
@@ -278,8 +286,8 @@
                     class="dropdown-item"
                     href="docs.html?doc=PID_Turn_Tuning_Quickstart"
                   >
-                    <i class="bi bi-arrow-clockwise me-2"></i>Turn Time (90° /
-                    180°)
+                    <i class="bi bi-arrow-clockwise me-2"></i>Turn Time 90° /
+                    180° (On-Robot)
                   </a>
                 </li>
               </ul>
@@ -579,7 +587,7 @@
       });
     </script>
     <!-- Challenges module for dynamic menu -->
-    <script src="js/challenges.js?v=18"></script>
+    <script src="js/challenges.js?v=19"></script>
     <script>
       // Populate the challenge simulator menu after challenges.js loads
       if (typeof Challenges !== "undefined") {

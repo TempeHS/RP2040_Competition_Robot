@@ -86,6 +86,36 @@ const Mazes = (function () {
       ],
     },
 
+    // Outside Corners — two free-standing nib walls, one on each side
+    // of the arena, mirror-symmetric about x = 1000. The robot spawns
+    // in the centre of the arena. Each nib presents the inside edge as
+    // a wall to follow upward, then ends abruptly (an outside / convex
+    // corner) so the side sensor returns -1. The learner must add a
+    // gentle "lost-wall" curl so the robot wraps around the top of the
+    // nib and reaches the goal pocket on the far side.
+    outside_corners: {
+      id: "outside_corners",
+      name: "Outside Corners",
+      difficulty: "Medium",
+      symmetric: true,
+      description:
+        "Two free-standing nib walls, one each side. Spawn in the centre, follow the inside edge of your nib up, then wrap around its outside corner to reach the pocket behind it.",
+      // Spawn dead-centre, heading north. Mirror keeps it on x = 1000.
+      startPosition: { x: 1000, y: 1700, heading: 0 },
+      // Goal pocket sits behind the LEFT nib (top-left corner of the
+      // arena). For AIDriver("right") the simulator mirrors this to
+      // the top-right pocket automatically.
+      endZone: { x: 0, y: 0, width: 400, height: 400 },
+      walls: [
+        // Left nib: vertical bar from y = 600 to y = 1700 at x = 500..600.
+        // Outside corner at the TOP (y = 600) — that's where the side
+        // sensor blanks out and the lost-wall recovery must kick in.
+        { x: 500, y: 600, width: 100, height: 1100 },
+        // Right nib: mirror of the left nib about x = 1000.
+        { x: 1400, y: 600, width: 100, height: 1100 },
+      ],
+    },
+
     // Dead end — TWO sealed pockets, one on each side of the arena.
     // Dead End — single full-height central block, mirror-symmetric
     // about x = 1000. The two 400 mm wide side channels (x < 400 and

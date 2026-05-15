@@ -275,7 +275,7 @@ global.PythonRunner = {
   isRunning: jest.fn().mockReturnValue(false),
 };
 
-// Mock Challenges globally (PID progression: challenges 1-5)
+// Mock Challenges globally (PID progression: challenges 1-7)
 global.Challenges = {
   list: [
     {
@@ -301,14 +301,28 @@ global.Challenges = {
     },
     {
       id: 4,
-      name: "Challenge 4: Dead End Detection",
+      name: "Challenge 4: Corner Detection",
+      description: "Test",
+      maze: "corner",
+      successCriteria: () => true,
+    },
+    {
+      id: 5,
+      name: "Challenge 5: Outside Corners",
+      description: "Test",
+      maze: "outside_corners",
+      successCriteria: () => true,
+    },
+    {
+      id: 6,
+      name: "Challenge 6: Dead End Detection",
       description: "Test",
       maze: "dead_end",
       successCriteria: () => true,
     },
     {
-      id: 5,
-      name: "Challenge 5: Maze Solver",
+      id: 7,
+      name: "Challenge 7: Maze Solver",
       description: "Test",
       maze: "zigzag",
       successCriteria: () => true,

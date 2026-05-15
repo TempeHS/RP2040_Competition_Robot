@@ -748,8 +748,8 @@ describe("§14 PD wall-follow in straight corridor", () => {
         steer = Math.max(-MAX_STEER, Math.min(MAX_STEER, steer));
         r.leftSpeed = Math.round(BASE + wallSign * steer);
         r.rightSpeed = Math.round(BASE - wallSign * steer);
-        if (Math.abs(r.leftSpeed) < 120) r.leftSpeed = 0;
-        if (Math.abs(r.rightSpeed) < 120) r.rightSpeed = 0;
+        if (Math.abs(r.leftSpeed) < 100) r.leftSpeed = 0;
+        if (Math.abs(r.rightSpeed) < 100) r.rightSpeed = 0;
         prevError = error;
       }
       r.isMoving = true;

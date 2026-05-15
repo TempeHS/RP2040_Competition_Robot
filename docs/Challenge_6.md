@@ -1,26 +1,26 @@
-# Challenge 6: Full Maze Navigation
+# Challenge 6: Dead End Detection
 
-In this final challenge, your robot must use **all your skills** to navigate a maze with multiple turns, dead ends, and open spaces. You will combine **side PID wall following**, **front wall detection**, **corner/dead-end logic**, and **lost-wall recovery** to reach the exit.
+In this challenge you will extend your corner-detection code to also handle a **180° dead end**. After stopping at a front wall, the robot checks the **side sensor** to decide whether it is at a corner (turn 90°) or a dead end (turn 180°).
 
 You will learn:
 
-- How to combine all previous algorithms into a robust maze solver.
-- How to handle open spaces where no side wall is detected.
-- How to tune all PID and threshold variables for best performance.
+- How to use sensor data to **choose between two behaviours** at runtime.
+- Why the same code must handle **multiple manoeuvre types** in a real maze.
+- How to tune separate turn times for 90° and 180° turns.
 
 ---
 
 ## Success Criteria
 
-My robot navigates the maze, handles corners and dead ends, recovers from open spaces, and reaches the **green exit zone** within 60 seconds.
+My robot follows the wall, **correctly identifies the dead end**, **turns 180°**, and reaches the **green exit zone**.
 
 ---
 
 ## Before You Begin
 
-1. Complete [Challenge 5](docs.html?doc=Challenge_5) — you need working corner and dead-end detection.
+1. Complete [Challenge 4](docs.html?doc=Challenge_4) — you need working corner detection.
 2. Open the **Simulator** and select **Challenge 6**.
-3. Run your Challenge 5 code here — the robot will get stuck at open junctions where the side wall disappears.
+3. Run your Challenge 4 code here — the robot will attempt a 90° turn instead of 180° and fail to reach the exit.
 
 ---
 
@@ -30,22 +30,24 @@ My robot navigates the maze, handles corners and dead ends, recovers from open s
 flowchart TD
     A[Start Program] --> B[Setup Robot & Variables]
     B --> C{Control Loop}
-    C --> D[Read front & side sensors]
+    C --> D[Read front sensor]
     D --> E{"Wall ahead?<br>(front < FRONT_SLOW_DISTANCE)"}
     E -- Yes --> F{"Very close?<br>(front <= FRONT_STOP_DISTANCE)"}
     F -- Yes --> G[Brake + Check side sensor]
-    G --> H{"Side open?"}
-    H -- Yes --> I["Turn 90° away from wall + Reset PID"]
-    H -- No --> J["Turn 180° + Reset PID"]
-    I --> C
-    J --> C
-    F -- No --> K["Slow down proportionally"]
+    G --> H{"Side open?<br>(side == -1 or side > FRONT_SLOW_DISTANCE)"}
+    H -- Yes --> I["Turn 90° away from wall"]
+    H -- No --> J["Turn 180° (reverse direction)"]
+    I --> K[Reset PID + continue]
+    J --> K
     K --> C
-    E -- No --> L{"Side wall detected?<br>(side != -1)"}
-    L -- Yes --> M[PID wall follow]
-    M --> C
-    L -- No --> N["Drift toward wall + reset side_integral"]
-    N --> C
+    F -- No --> L["Slow down proportionally"]
+    L --> C
+    E -- No --> M[Read side sensor]
+    M --> N{Sensor OK?}
+    N -- No --> O[Drive straight + reset side_integral]
+    O --> C
+    N -- Yes --> P[PID wall follow]
+    P --> C
 
     style A fill:#e1f5fe,color:#000000
     style B fill:#000000,color:#ffffff
@@ -56,121 +58,145 @@ flowchart TD
     style H fill:#ffe0b2,color:#000000
     style I fill:#e8f5e8,color:#000000
     style J fill:#e8f5e8,color:#000000
-    style M fill:#e8f5e8,color:#000000
+    style P fill:#e8f5e8,color:#000000
 ```
 
 ---
 
 ## Key Concepts
 
-### The New Priority: Lost Wall Recovery
+### Distinguishing Corner from Dead End
 
-Challenges 4 and 5 assume the side wall is always present. In a full maze, the robot passes **open junctions** where the side wall disappears. Without recovery logic the robot drives straight until it crashes.
+After stopping at a front wall, read the **side sensor** to identify the situation:
 
-**Priority structure:**
-
-| Priority | Condition                     | Action                              |
-| -------- | ----------------------------- | ----------------------------------- |
-| 1        | `front < FRONT_SLOW_DISTANCE` | Decelerate or stop + turn           |
-| 2        | `side == -1`                  | Drift toward the expected wall side |
-| 3        | Wall visible                  | PID wall follow                     |
-
-### Drifting Toward the Wall
-
-When `side == -1`, gently curve toward the wall using `wall_sign`:
+| Side sensor reading             | Situation                               | Turn needed        |
+| ------------------------------- | --------------------------------------- | ------------------ |
+| `-1` or `> FRONT_SLOW_DISTANCE` | **Corner** — corridor opens to the side | 90° away from wall |
+| Small value (wall nearby)       | **Dead end** — walls on front AND side  | 180° reversal      |
 
 ```python
-elif side == -1:
-    r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * 0.20)
-    l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * 0.20)
-    my_robot.drive(r, l)
+my_robot.brake()
+hold_state(0.3)
+side_check = my_robot.read_distance_2()
+
+if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
+    turn_duration = TURN_TIME_90   # corner
+else:
+    turn_duration = TURN_TIME_180  # dead end
+
+if my_robot.wall_sign == -1:
+    my_robot.rotate_right(TURN_SPEED)
+else:
+    my_robot.rotate_left(TURN_SPEED)
+hold_state(turn_duration)
 ```
 
-`wall_sign` automatically curves toward the correct side. Adjust `0.20`:
+### TURN_TIME_180
 
-- Higher value → tighter curve (re-acquires wall faster, may overshoot or stall the inside wheel)
-- Lower value → gentler curve (smoother, may drift too far before re-acquiring)
-
-> [!Important]
-> Keep `LOST_WALL_DRIFT` small enough that the inside wheel stays ≥ `120` (motor dead zone). With `BASE_SPEED = 200`, the absolute maximum is `(200 - 120) / 200 = 0.40`. The simulator-tuned answer key uses `0.20`.
-
----
-
-## Step 1 — Start from Your Challenge 5 Code
-
-Copy your working Challenge 5 code. The only addition is a new `elif side == -1:` block between the front-sensor check and the PID block.
-
----
-
-## Step 2 — Add the Lost-Wall Recovery Block
-
-Find the `# Priority 2: Side wall following with PID` section and split it:
+A 180° turn is **not** exactly twice a 90° turn — the longer turn spends more time at full rotation speed, so the per-second rate is slightly higher. Expect `TURN_TIME_180` to be a little **less** than `2 × TURN_TIME_90`. A good starting point is:
 
 ```python
-    # Priority 2: Lost the wall — drift toward it to reacquire
-    side = my_robot.read_distance_2()
-    if side == -1:
-        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * 0.20)
-        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * 0.20)
-        my_robot.drive(r, l)
-        side_integral = 0
-        hold_state(0.05)
-        continue
+TURN_TIME_180 = TURN_TIME_90 * 1.7
+```
 
-    # Priority 3: Wall visible — PID follow
-    error = side - TARGET_WALL_DISTANCE
-    # ... rest of PID code (unchanged from Challenge 5) ...
+Then fine-tune `TURN_TIME_180` separately if the robot over- or under-rotates. The simulator-tuned answer key uses `0.60` (with `TURN_TIME_90 = 0.35`).
+
+> [!Tip]
+> Tune `TURN_TIME_90` first in Challenge 4, then derive `TURN_TIME_180` from it here.
+
+---
+
+## Step 1 — Start from Your Challenge 4 Code
+
+Copy your working Challenge 4 code. The only change is inside the `if front <= FRONT_STOP_DISTANCE:` block — replace the fixed 90° turn with a side-sensor check.
+
+---
+
+## Step 2 — Add `TURN_TIME_180`
+
+```python
+TURN_TIME_90  = 0.35  # ← use your tuned value from Challenge 4
+TURN_TIME_180 = 0.60  # ← ≈ 1.7 × TURN_TIME_90, then fine-tune
 ```
 
 ---
 
-## Step 3 — Tune and Test
+## Step 3 — Replace the Turn Block
 
-Use the **maze selector** in the simulator to try different mazes:
+Find this block from Challenge 4:
 
-| Maze    | Difficulty | Good for testing                |
-| ------- | ---------- | ------------------------------- |
-| Zigzag  | Default    | Sharp corners, narrow corridors |
-| Simple  | Easy       | Basic L-shape                   |
-| Spiral  | Medium     | Long winding path               |
-| Classic | Hard       | Multiple junctions              |
+```python
+        if front <= FRONT_STOP_DISTANCE:
+            my_robot.brake()
+            hold_state(0.3)
+            if my_robot.wall_sign == -1:
+                my_robot.rotate_right(TURN_SPEED)
+            else:
+                my_robot.rotate_left(TURN_SPEED)
+            hold_state(TURN_TIME_90)
+            my_robot.brake()
+            hold_state(0.3)
+            side_integral = 0
+            side_previous_error = 0
+            continue
+```
 
-### Tuning Guide
+Replace it with:
 
-| Symptom                                 | Fix                                                     |
-| --------------------------------------- | ------------------------------------------------------- |
-| Robot gets stuck at a junction          | Check Priority 2 lost-wall drift logic                  |
-| Robot spins at junctions                | Reduce `LOST_WALL_DRIFT` (try `0.15`)                   |
-| Robot crashes into walls on tight turns | Increase `FRONT_SLOW_DISTANCE`                          |
-| Robot takes too long (> 60 seconds)     | Increase `BASE_SPEED` (test carefully)                  |
-| Robot follows wrong wall after a turn   | Check `AIDriver("left"/"right")` matches physical setup |
+```python
+        if front <= FRONT_STOP_DISTANCE:
+            my_robot.brake()
+            hold_state(0.3)
+            # Check side sensor to decide corner (90°) vs dead end (180°)
+            side_check = my_robot.read_distance_2()
+            if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
+                turn_duration = TURN_TIME_90   # corridor is open to the side
+            else:
+                turn_duration = TURN_TIME_180  # walls on front and side = dead end
+            if my_robot.wall_sign == -1:
+                my_robot.rotate_right(TURN_SPEED)
+            else:
+                my_robot.rotate_left(TURN_SPEED)
+            hold_state(turn_duration)
+            my_robot.brake()
+            hold_state(0.3)
+            side_integral = 0
+            side_previous_error = 0
+            continue
+```
+
+---
+
+## Step 4 — Tune
+
+| Observation                        | Fix                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Robot turns 90° at the dead end    | Increase `TURN_TIME_180`, or lower the threshold — `FRONT_SLOW_DISTANCE` may be too small for the side check |
+| Robot turns 180° at a corner       | Increase `FRONT_SLOW_DISTANCE` used as threshold, or check that side sensor reads -1 at corners              |
+| Robot doesn't turn enough (< 180°) | Increase `TURN_TIME_180`                                                                                     |
+| Robot turns too far (> 180°)       | Decrease `TURN_TIME_180`                                                                                     |
 
 ---
 
 ## Starter Scaffold
 
-This is exactly what you'll see in the editor when you open the challenge. The full algorithm — including lost-wall recovery — is already written for you. Every numeric setting starts at `0`. Your job is to tune the values.
+This is exactly what you'll see in the editor when you open the challenge. The full algorithm — including the side-sensor decision — is already written for you. Every numeric setting starts at `0`. Your job is to tune the values.
 
 ```python
-# Challenge 6: Full Maze Navigation
+# Challenge 6: Dead-End Detection (90° vs 180°)
 # --------------------------------------------------------------------
-# Adds lost-wall recovery so the robot can cross open junctions
-# (where the side sensor briefly returns -1) without driving straight
-# into the opposite wall. The full algorithm is already written for
-# you. Every numeric setting starts at 0.
+# After braking at a wall ahead, the robot reads its side sensor to
+# decide between turning 90° (corner) or 180° (dead end). The full
+# algorithm is already written for you. Every numeric setting starts
+# at 0.
 #
-# Tuning guide: docs.html?doc=PID_Real_World_Tuning_Quickstart
+# Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
 #
 # Values to set:
-#     all carried-forward C5 values
-#     LOST_WALL_DRIFT   new — fraction of BASE_SPEED used to curve back
-#                              toward the wall (range 0.0–0.25)
+#     all carried-forward C4 values
+#     TURN_TIME_180   new — seconds for ~180° rotation (≈ 1.7 × TURN_TIME_90)
 #
-# IMPORTANT: keep LOST_WALL_DRIFT small enough that the inside wheel
-# stays > 120 (the MIN_MOTOR_SPEED). With BASE_SPEED=200, 0.15 puts
-# the inside wheel at 170; higher values still move but crawl.
-#
-# Goal: complete the full maze without external help.
+# Goal: navigate the corner AND the dead-end maze without help.
 # --------------------------------------------------------------------
 
 from aidriver import AIDriver, hold_state
@@ -195,8 +221,6 @@ TURN_SPEED = 0
 TURN_TIME_90 = 0.0
 TURN_TIME_180 = 0.0
 
-LOST_WALL_DRIFT = 0.0
-
 side_previous_error = 0
 side_integral = 0
 
@@ -208,18 +232,25 @@ while True:
         if front <= FRONT_STOP_DISTANCE:
             my_robot.brake()
             hold_state(0.3)
+
+            # Decide turn size from the side sensor:
+            #   wall on side as well as in front  → dead end  → 180°
+            #   side is open / out of range        → corner    → 90°
             side_check = my_robot.read_distance_2()
             if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
                 turn_duration = TURN_TIME_90
             else:
                 turn_duration = TURN_TIME_180
+
             if my_robot.wall_sign == -1:
                 my_robot.rotate_right(TURN_SPEED)
             else:
                 my_robot.rotate_left(TURN_SPEED)
             hold_state(turn_duration)
+
             my_robot.brake()
             hold_state(0.3)
+
             side_integral = 0
             side_previous_error = 0
             continue
@@ -233,18 +264,14 @@ while True:
             hold_state(0.05)
             continue
 
-    # --- Lost-wall recovery: curve gently toward the wall when sensor blanks ---
-    side = my_robot.read_distance_2()
-    if side == -1:
-        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * LOST_WALL_DRIFT)
-        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * LOST_WALL_DRIFT)
-        my_robot.drive(r, l)
+    # --- Side wall-follow PID ---
+    wall_distance = my_robot.read_distance_2()
+
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
         side_integral = 0
         hold_state(0.05)
         continue
-
-    # --- Side wall-follow PID (uses the reading we already have) ---
-    wall_distance = side
 
     error = wall_distance - TARGET_WALL_DISTANCE
 
@@ -302,8 +329,6 @@ TURN_SPEED = 180
 TURN_TIME_90 = 0.35
 TURN_TIME_180 = 0.60
 
-LOST_WALL_DRIFT = 0.20
-
 side_previous_error = 0
 side_integral = 0
 
@@ -315,18 +340,22 @@ while True:
         if front <= FRONT_STOP_DISTANCE:
             my_robot.brake()
             hold_state(0.3)
+
             side_check = my_robot.read_distance_2()
             if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
                 turn_duration = TURN_TIME_90
             else:
                 turn_duration = TURN_TIME_180
+
             if my_robot.wall_sign == -1:
                 my_robot.rotate_right(TURN_SPEED)
             else:
                 my_robot.rotate_left(TURN_SPEED)
             hold_state(turn_duration)
+
             my_robot.brake()
             hold_state(0.3)
+
             side_integral = 0
             side_previous_error = 0
             continue
@@ -340,18 +369,14 @@ while True:
             hold_state(0.05)
             continue
 
-    # --- Lost-wall recovery ---
-    side = my_robot.read_distance_2()
-    if side == -1:
-        r = BASE_SPEED - int(my_robot.wall_sign * BASE_SPEED * LOST_WALL_DRIFT)
-        l = BASE_SPEED + int(my_robot.wall_sign * BASE_SPEED * LOST_WALL_DRIFT)
-        my_robot.drive(r, l)
+    # --- Side wall-follow PID ---
+    wall_distance = my_robot.read_distance_2()
+
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
         side_integral = 0
         hold_state(0.05)
         continue
-
-    # --- Side wall-follow PID (uses the reading we already have) ---
-    wall_distance = side
 
     error = wall_distance - TARGET_WALL_DISTANCE
 
@@ -384,24 +409,23 @@ while True:
 </details>
 
 ---
+
 ## Debugging Tips
 
-- Add `print("P1" if (front != -1 and front < FRONT_SLOW_DISTANCE) else "P2" if side == -1 else "P3")` to see which priority is active.
-- Watch the simulator trace to see where the robot is getting stuck.
-- If the robot circles forever at a junction, the drift curve may not be strong enough — try increasing `LOST_WALL_DRIFT`.
-- If it works in the simulator but not on the real robot, re-tune `TURN_TIME_90`, `TURN_TIME_180`, and the PID gains for physical conditions.
+- Add `print("side_check:", side_check, "turn:", turn_duration)` inside the stop block to verify the correct turn is chosen.
+- If the robot always picks 90°, the side sensor may be reading -1 even at the dead end — check the sensor range and `FRONT_SLOW_DISTANCE` threshold value.
+- If the robot always picks 180°, the side sensor may not be returning -1 at the corner — the wall may still be partially visible. Try using a larger threshold (e.g. `side_check > 600`).
 
 ---
 
-## What You've Learned
+## What's Next
 
-Congratulations! Over these 6 challenges you have built a complete autonomous navigation system:
+In [Challenge 7](docs.html?doc=Challenge_7) you will combine everything into a **full maze solver** that handles open junctions, multiple turns, and lost-wall recovery.
 
-| Challenge | Skill                                             |
-| --------- | ------------------------------------------------- |
-| 1         | P controller — proportional steering              |
-| 2         | PD controller — damped steering                   |
-| 3         | Full PID — steady-state correction                |
-| 4         | Corner detection — 90° turn with front sensor     |
-| 5         | Dead end detection — 90° vs 180° sensor fusion    |
-| 6         | Full maze solver — priorities, lost-wall recovery |
+You will learn:
+
+- How to combine all previous algorithms into a robust maze solver.
+- How to handle open spaces (no wall detected).
+- How to tune all PID and threshold variables for best performance.
+
+---

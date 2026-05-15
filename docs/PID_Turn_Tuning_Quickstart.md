@@ -1,6 +1,6 @@
-# Turn Time Tuning Quickstart (90° and 180°)
+# Real-World Turn-Time Tuning Quickstart — 90° and 180° (On-Robot)
 
-Use this checklist to tune `TURN_TIME_90` and `TURN_TIME_180` on the real robot so corners and dead-end reversals end pointing exactly down the next corridor. Variables match the canonical `FRONT_CONFIG` and `TURN_TIME_180` blocks in [Challenges 4–6](docs.html?doc=Challenge_4).
+Use this checklist to tune `TURN_TIME_90` and `TURN_TIME_180` on the real robot so corners and dead-end reversals end pointing exactly down the next corridor. Variables match the canonical `FRONT_CONFIG` and `TURN_TIME_180` blocks in [Challenges 4–7](docs.html?doc=Challenge_4).
 
 > [!Important]
 > A turn is **open-loop** — the robot rotates for a fixed time. Floor friction, battery voltage, and tyre wear all change how far the robot turns per second, so these times must be re-tuned on the real surface you race on.
@@ -94,7 +94,7 @@ Typical real-robot `TURN_TIME_90`: **0.30 s – 0.70 s** at `TURN_SPEED = 180`. 
 
 A 180° turn is **not** always exactly twice a 90° turn. The rotation profile has acceleration, steady-state, and deceleration phases — the longer the turn, the larger the steady-state portion, so the **per-second rate is slightly higher**. Expect `TURN_TIME_180` to be **slightly less than** `2 × TURN_TIME_90`.
 
-Set up a dead-end (Challenge 5 maze).
+Set up a dead-end (Challenge 6 maze).
 
 1. Start at `TURN_TIME_180 = TURN_TIME_90 * 1.7` (≈ `0.60` for the answer-key `TURN_TIME_90 = 0.35`).
 2. Run three times. Note overshoot/undershoot.
@@ -113,7 +113,7 @@ Typical ratio: **`TURN_TIME_180 ≈ 1.7 – 1.9 × TURN_TIME_90`** — tune the 
 
 ## 7. Distinguishing 90° vs 180° at Runtime
 
-Challenge 5+ uses the side sensor **after braking** to choose which time to apply:
+Challenge 6+ uses the side sensor **after braking** to choose which time to apply:
 
 ```python
 my_robot.brake()
@@ -138,12 +138,12 @@ If your tuned 90° and 180° times work in isolation but the **wrong** time is b
 
 1. **Five clean 90° turns** on a fresh battery — record final heading variance.
 2. **Five clean 180° turns** — same surface, same battery.
-3. **One full Challenge 6 run** — confirms 90° + 180° + lost-wall recovery interact correctly.
+3. **One full Challenge 7 run** — confirms 90° + 180° + lost-wall recovery interact correctly.
 4. Re-measure if you swap battery, change surface, or add hardware to the chassis.
 
 ---
 
-## 9. Quick Copy/Paste Block (matches Challenge 5+ answer key)
+## 9. Quick Copy/Paste Block (matches Challenge 6+ answer key)
 
 ```python
 TURN_SPEED    = 180

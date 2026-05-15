@@ -5,7 +5,7 @@
  */
 
 describe("drive() - Python shim behaviour", () => {
-  const MIN_MOTOR_SPEED = 120;
+  const MIN_MOTOR_SPEED = 100;
 
   /**
    * Minimal reimplementation of the drive() logic from the Python shim
@@ -53,32 +53,32 @@ describe("drive() - Python shim behaviour", () => {
     });
   });
 
-  describe("Dead zone handling (MIN_MOTOR_SPEED = 120)", () => {
+  describe("Dead zone handling (MIN_MOTOR_SPEED = 100)", () => {
     test("speed below MIN_MOTOR_SPEED should be zeroed", () => {
-      const result = drive(119, 200);
+      const result = drive(99, 200);
       expect(result.rightSpeed).toBe(0);
     });
 
     test("negative speed with magnitude below MIN_MOTOR_SPEED should be zeroed", () => {
-      const result = drive(-100, -200);
+      const result = drive(-80, -200);
       expect(result.rightSpeed).toBe(0);
     });
 
     test("speed exactly at MIN_MOTOR_SPEED should be kept", () => {
-      const result = drive(120, 120);
-      expect(result.rightSpeed).toBe(120);
-      expect(result.leftSpeed).toBe(120);
+      const result = drive(100, 100);
+      expect(result.rightSpeed).toBe(100);
+      expect(result.leftSpeed).toBe(100);
     });
 
     test("speed just below MIN_MOTOR_SPEED should be zeroed", () => {
-      const result = drive(119, 119);
+      const result = drive(99, 99);
       // Both below dead zone → both zero → brake
       expect(result.type).toBe("brake");
       expect(result.isMoving).toBe(false);
     });
 
     test("one wheel in dead zone, other above → one wheel stops", () => {
-      const result = drive(100, 200);
+      const result = drive(80, 200);
       expect(result.rightSpeed).toBe(0);
       expect(result.leftSpeed).toBe(200);
       expect(result.type).toBe("drive");
@@ -136,11 +136,11 @@ describe("drive() - Python shim behaviour", () => {
     });
 
     test("large correction pushing one wheel into dead zone", () => {
-      const BASE_SPEED = 160;
+      const BASE_SPEED = 140;
       const correction = 50;
       const result = drive(BASE_SPEED + correction, BASE_SPEED - correction);
-      // Right = 210 (ok), Left = 110 (below 120 → 0)
-      expect(result.rightSpeed).toBe(210);
+      // Right = 190 (ok), Left = 90 (below 100 → 0)
+      expect(result.rightSpeed).toBe(190);
       expect(result.leftSpeed).toBe(0);
     });
 
@@ -161,7 +161,7 @@ describe("drive() - AIDriverStub integration", () => {
   beforeEach(() => {
     stubImpl = {
       commandQueue: [],
-      MIN_MOTOR_SPEED: 120,
+      MIN_MOTOR_SPEED: 100,
 
       queueCommand(cmd) {
         this.commandQueue.push(cmd);

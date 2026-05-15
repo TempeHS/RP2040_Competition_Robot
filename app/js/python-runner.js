@@ -281,7 +281,7 @@ class AIDriver:
         return distance_mm
     
     # Minimum reliable motor speed - motors stutter below this due to undervoltage
-    MIN_MOTOR_SPEED = 120
+    MIN_MOTOR_SPEED = 100
 
     def drive(self, right_speed, left_speed):
         """Drive robot with signed speeds for PID control.

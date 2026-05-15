@@ -237,7 +237,7 @@ const AIDriverStub = {
           /**
            * Minimum reliable motor speed constant matching the hardware library.
            */
-          $loc.MIN_MOTOR_SPEED = new Sk.builtin.int_(120);
+          $loc.MIN_MOTOR_SPEED = new Sk.builtin.int_(100);
 
           /**
            * Drive with signed speeds for PID control.
@@ -252,7 +252,7 @@ const AIDriverStub = {
             rightSpeed,
             leftSpeed,
           ) {
-            const MIN_MOTOR_SPEED = 120;
+            const MIN_MOTOR_SPEED = 100;
             let rs = Math.max(
               -255,
               Math.min(255, Sk.ffi.remapToJs(rightSpeed)),
