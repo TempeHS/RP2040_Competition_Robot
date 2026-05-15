@@ -761,3 +761,162 @@ describe("§14 PD wall-follow in straight corridor", () => {
     expect(r.collisionCount).toBe(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  §15  U-turn (180°) at a dead-end channel
+//
+//  Re-creates the Challenge 5/6 dead_end maze geometry: a 1200×2000
+//  central block at x=400..1600, leaving a 400 mm wide channel on the
+//  left (x=0..400). The robot drives up, brakes at the dead end (arena
+//  top boundary at y=0), then spin-turns 180° in place.
+// ═══════════════════════════════════════════════════════════════════
+describe("§15 Dead-end U-turn in 400 mm channel", () => {
+  function deadEndWalls() {
+    return [{ x: 400, y: 0, width: 1200, height: 2000 }];
+  }
+
+  test("CONTROL: spin in open arena (no walls) reaches ~180° in 0.6 s", () => {
+    S.clearObstacles();
+    S.setMazeWalls([]);
+    var r = makeRobot({
+      x: 1000,
+      y: 1000,
+      heading: 0,
+      leftSpeed: 180,
+      rightSpeed: -180,
+      isMoving: true,
+    });
+    for (var i = 0; i < 24; i++) r = S.step(r, 0.025);
+    var change = (((r.heading - 0) % 360) + 360) % 360;
+    var offBy180 = Math.abs(change - 180);
+    // Free space: this MUST reach close to 180°.
+    expect(offBy180).toBeLessThan(30);
+    expect(r.collisionCount).toBe(0);
+  });
+
+  test("Robot can drive up the channel and stop near the dead end", () => {
+    S.clearObstacles();
+    S.setMazeWalls(deadEndWalls());
+    var r = makeRobot({
+      x: 200,
+      y: 1700,
+      heading: 0, // facing -Y (up)
+      leftSpeed: 200,
+      rightSpeed: 200,
+      isMoving: true,
+    });
+    for (var i = 0; i < 200; i++) {
+      var front = S.simulateUltrasonic(r);
+      if (front !== -1 && front <= 150) {
+        r.leftSpeed = 0;
+        r.rightSpeed = 0;
+      }
+      r = S.step(r, 0.05);
+    }
+    // Robot should be near the top boundary, not crashed, no overlap.
+    expect(r.y - 75).toBeGreaterThanOrEqual(0);
+    expect(r.y).toBeLessThan(300);
+    expect(r.collisionCount).toBe(0);
+    expect(r.x).toBeGreaterThan(60);
+    expect(r.x).toBeLessThan(340);
+  });
+
+  test("Robot completes a 180° spin turn in place without colliding", () => {
+    S.clearObstacles();
+    S.setMazeWalls(deadEndWalls());
+    // Place robot near the dead end, centred in the channel.
+    // NOTE: rotation pivots about the rear axle (75 mm behind centre),
+    // so during a 180° spin the centre legitimately swings ~150 mm.
+    var r = makeRobot({
+      x: 200,
+      y: 200,
+      heading: 0,
+      leftSpeed: 180,
+      rightSpeed: -180, // rotate_right: left forward, right backward
+      isMoving: true,
+    });
+    var startHeading = r.heading;
+    for (var i = 0; i < 24; i++) {
+      r = S.step(r, 0.025);
+    }
+    var change = (((r.heading - startHeading) % 360) + 360) % 360;
+    var offBy180 = Math.abs(change - 180);
+    expect(offBy180).toBeLessThan(30);
+    // X stays inside the 400 mm channel (walls at 0 and 400, half-width 60).
+    expect(r.x).toBeGreaterThan(60);
+    expect(r.x).toBeLessThan(340);
+    // No collisions during the spin (the swept envelope must clear walls).
+    expect(r.collisionCount).toBe(0);
+  });
+
+  test("Full drive-up-then-180-then-drive-back sequence in the channel", () => {
+    S.clearObstacles();
+    S.setMazeWalls(deadEndWalls());
+    var r = makeRobot({
+      x: 200,
+      y: 1700,
+      heading: 0,
+      leftSpeed: 200,
+      rightSpeed: 200,
+      isMoving: true,
+    });
+
+    // Phase 1: drive forward until front sensor trips.
+    // Phase 2: brake long enough for the wheels to fully stop (the
+    //          motors don't reverse instantly — actualV must ramp down
+    //          before the spin command produces clean rotation).
+    // Phase 3: spin 180°.
+    // Phase 4: brake again so spin momentum decays before driving.
+    // Phase 5: drive forward in the new heading.
+    var phase = "drive_up";
+    var phaseFrames = 0;
+    var TURN_FRAMES = 28;
+    var BRAKE_FRAMES = 24; // ~0.6 s — enough for ±395 mm/s to ramp to 0
+    var done = false;
+    for (var i = 0; i < 1500 && !done; i++) {
+      if (phase === "drive_up") {
+        var front = S.simulateUltrasonic(r);
+        if (front !== -1 && front <= 150) {
+          r.leftSpeed = 0;
+          r.rightSpeed = 0;
+          phase = "brake1";
+          phaseFrames = 0;
+        }
+      } else if (phase === "brake1") {
+        if (phaseFrames > BRAKE_FRAMES) {
+          r.leftSpeed = 180;
+          r.rightSpeed = -180;
+          phase = "turn";
+          phaseFrames = 0;
+        }
+      } else if (phase === "turn") {
+        if (phaseFrames >= TURN_FRAMES) {
+          r.leftSpeed = 0;
+          r.rightSpeed = 0;
+          phase = "brake2";
+          phaseFrames = 0;
+        }
+      } else if (phase === "brake2") {
+        if (phaseFrames > BRAKE_FRAMES) {
+          r.leftSpeed = 200;
+          r.rightSpeed = 200;
+          phase = "drive_back";
+          phaseFrames = 0;
+        }
+      } else if (phase === "drive_back") {
+        if (r.y > 1400) done = true;
+      }
+      r = S.step(r, 0.025);
+      phaseFrames++;
+    }
+
+    expect(done).toBe(true);
+    expect(r.collisionCount).toBe(0);
+    expect(r.y).toBeGreaterThan(1400);
+    // Robot may end pressed against the left wall (x=0) due to motor
+    // inertia during brake2 — heading overshoots ~180° + ramp-down
+    // omega. The relevant invariant is: it stayed inside the channel.
+    expect(r.x).toBeGreaterThan(60);
+    expect(r.x).toBeLessThan(340);
+  });
+});

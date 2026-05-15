@@ -1210,8 +1210,13 @@ def ticks_diff(t1, t2):
         break;
 
       case "brake":
+        // Active brake — H-bridge shorts both motor leads, wheels stop
+        // immediately. We zero actualV here so the centre doesn't keep
+        // coasting (or rotating, in the case of a spin-then-brake U-turn).
         App.robot.leftSpeed = 0;
         App.robot.rightSpeed = 0;
+        App.robot.actualLeftV = 0;
+        App.robot.actualRightV = 0;
         App.robot.isMoving = false;
         break;
 
