@@ -70,7 +70,6 @@ const Challenges = (function () {
       },
       path: null,
       obstacles: [],
-      maze: "straight_corridor",
     },
 
     // Challenge 2: PD Controller — Off-Centre Start
@@ -91,7 +90,7 @@ const Challenges = (function () {
         "Start with Kd = 0.3, then tune",
         "Remember to save previous_error each loop",
       ],
-      startPosition: { x: 150, y: 1700, heading: 10 },
+      startPosition: { x: 150, y: 1700, heading: 0 },
       spawnXRange: { min: 110, max: 410 },
       successCriteria: {
         type: "reach_zone",
@@ -99,7 +98,6 @@ const Challenges = (function () {
       },
       path: null,
       obstacles: [],
-      maze: "straight_corridor",
     },
 
     // Challenge 3: Full PID — L-Shaped Corridor
@@ -128,7 +126,6 @@ const Challenges = (function () {
       },
       path: null,
       obstacles: [],
-      maze: "simple",
     },
 
     // Challenge 4: Corner Detection — single 90° turn
