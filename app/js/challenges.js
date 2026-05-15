@@ -177,11 +177,12 @@ const Challenges = (function () {
         "Use wall_sign to pick the correct rotation direction",
         "Reset side_integral and side_previous_error after every turn",
       ],
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      spawnXRange: { min: 110, max: 410 },
+      startPosition: { x: 200, y: 1700, heading: 0 },
       successCriteria: {
         type: "reach_zone",
-        zone: { x: 1600, y: 100, width: 300, height: 200 },
+        // Top of the left channel (dead-end). Mirrors to the right
+        // channel top for AIDriver("right").
+        zone: { x: 0, y: 0, width: 400, height: 400 },
       },
       path: null,
       obstacles: [],

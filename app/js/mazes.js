@@ -87,9 +87,11 @@ const Mazes = (function () {
     },
 
     // Dead end — TWO sealed pockets, one on each side of the arena.
-    // The robot spawns in the matching pocket and must drive up to the
-    // dead-end cap (front sensor reads ~0). Reach the zone just below
-    // the cap to complete.
+    // Dead End — single full-height central block, mirror-symmetric
+    // about x = 1000. The two 400 mm wide side channels (x < 400 and
+    // x > 1600) are dead-ends capped only by the arena's top boundary,
+    // so the robot must detect the front wall (arena edge) and turn
+    // 180° to head back.
     dead_end: {
       id: "dead_end",
       name: "Dead End (Both Sides)",
@@ -98,17 +100,13 @@ const Mazes = (function () {
       description:
         'U-shaped arena with a dead end on each side. Pick AIDriver("left") or AIDriver("right") and the spawn moves to the matching pocket — drive to the dead end and stop before colliding.',
       walls: [
-        // Vertical walls sealing each outer corridor from the central area
-        { x: 400, y: 0, width: WALL_THICKNESS, height: 2000 },
-        { x: 1570, y: 0, width: WALL_THICKNESS, height: 2000 },
-        // Horizontal caps creating the dead-end pockets (~200 mm from top)
-        { x: 0, y: 300, width: 430, height: WALL_THICKNESS },
-        { x: 1570, y: 300, width: 430, height: WALL_THICKNESS },
+        // Central block fills the entire arena height between the two
+        // outer channels. The arena boundary acts as the end wall.
+        { x: 400, y: 0, width: 1200, height: 2000 },
       ],
-      // Spawn near the bottom of the left pocket; mirror puts right spawn at x=1800
+      // Spawn near the bottom of the left channel; mirror puts the
+      // right-mode spawn at x = 1800.
       startPosition: { x: 200, y: 1700, heading: 0 },
-      // Goal: the dead-end pocket just under the cap on the chosen side
-      endZone: { x: 30, y: 350, width: 370, height: 250 },
     },
 
     // Simple — single 90° turn into a wide top room. Symmetric pair
