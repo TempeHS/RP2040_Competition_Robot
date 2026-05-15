@@ -10,7 +10,7 @@ const App = {
   isRunning: false,
   isPaused: false,
   hasRun: false, // Track if code has been run (requires reset before running again)
-  speedMultiplier: 2,
+  speedMultiplier: 1,
   startHeadingOffset: 0, // User-selected rotation offset (0, 90, 180, 270)
 
   // ACE Editor instance
