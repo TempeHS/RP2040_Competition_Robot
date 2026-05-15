@@ -191,7 +191,7 @@ const Challenges = (function () {
       id: 6,
       title: "Dead End Detection",
       subtitle: "Sensor Fusion",
-      icon: "bi-arrow-return-left",
+      icon: "bi-arrow-counterclockwise",
       menuGroup: "advanced",
       difficulty: DIFFICULTY.MEDIUM,
       description:

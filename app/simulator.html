@@ -89,8 +89,8 @@
                 </li>
                 <li>
                   <a class="dropdown-item" href="docs.html?doc=Challenge_6">
-                    <i class="bi bi-arrow-return-left me-2"></i>Challenge 6:
-                    Dead End Detection
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Challenge
+                    6: Dead End Detection
                   </a>
                 </li>
                 <li>
@@ -584,7 +584,9 @@
         <p class="small text-muted mb-2">
           Import once at the top of every challenge:
         </p>
-        <pre class="bg-light border rounded p-2 small mb-3"><code>from aidriver import AIDriver, hold_state
+        <pre
+          class="bg-light border rounded p-2 small mb-3"
+        ><code>from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = False    # set True for verbose logs
@@ -595,8 +597,8 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
           <div class="list-group-item">
             <code>my_robot.read_distance()</code>
             <small class="text-muted d-block"
-              >Front ultrasonic. Returns mm (20–2000) or
-              <code>-1</code> if out of range / no echo.</small
+              >Front ultrasonic. Returns mm (20–2000) or <code>-1</code> if out
+              of range / no echo.</small
             >
           </div>
           <div class="list-group-item">
@@ -615,8 +617,10 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
             <small class="text-muted d-block"
               ><strong>Preferred for PID.</strong> Signed speeds (-255…255):
               positive = forward, negative = backward. Anything with
-              <code>abs(speed) &lt; 100</code> stops that wheel
-              (<code>MIN_MOTOR_SPEED</code> dead zone).</small
+              <code>abs(speed) &lt; 100</code> stops that wheel (<code
+                >MIN_MOTOR_SPEED</code
+              >
+              dead zone).</small
             >
           </div>
           <div class="list-group-item">
@@ -634,7 +638,8 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
           <div class="list-group-item">
             <code>my_robot.rotate_left(turn_speed)</code>
             <small class="text-muted d-block"
-              >Spin in place counter-clockwise at <code>turn_speed</code>.</small
+              >Spin in place counter-clockwise at
+              <code>turn_speed</code>.</small
             >
           </div>
           <div class="list-group-item">
@@ -670,7 +675,8 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
           <div class="list-group-item">
             <code>my_robot.is_moving()</code>
             <small class="text-muted d-block"
-              >Returns <code>True</code> if either wheel is currently powered.</small
+              >Returns <code>True</code> if either wheel is currently
+              powered.</small
             >
           </div>
           <div class="list-group-item">
@@ -689,7 +695,8 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
             <code>hold_state(seconds)</code>
             <small class="text-muted d-block"
               >Pause for <code>seconds</code> while servicing the heartbeat and
-              logging current state. Use this — never <code>time.sleep()</code>.</small
+              logging current state. Use this — never
+              <code>time.sleep()</code>.</small
             >
           </div>
           <div class="list-group-item">
@@ -711,8 +718,8 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
         <h6>Constants</h6>
         <ul class="small">
           <li>
-            <code>MIN_MOTOR_SPEED = 100</code> — wheels below this stall.
-            Any <code>BASE_SPEED - MAX_STEERING</code> must stay <code>≥ 100</code>.
+            <code>MIN_MOTOR_SPEED = 100</code> — wheels below this stall. Any
+            <code>BASE_SPEED - MAX_STEERING</code> must stay <code>≥ 100</code>.
           </li>
           <li>
             Ultrasonic range: <strong>20 mm – 2000 mm</strong>. Outside this
@@ -818,7 +825,7 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
     <script src="js/validator.js?v=13"></script>
     <script src="js/robot-config.js?v=1"></script>
     <script src="js/simulator.js?v=13"></script>
-    <script src="js/challenges.js?v=21"></script>
+    <script src="js/challenges.js?v=22"></script>
     <script src="js/mazes.js?v=29"></script>
     <script src="js/gamepad.js?v=10"></script>
     <script src="js/aidriver-stub.js?v=21"></script>
