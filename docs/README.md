@@ -19,7 +19,7 @@ All components can be purchased from [AliExpress](https://www.aliexpress.com/) a
 4. [RP2040 Uno Development Board](https://www.aliexpress.com/item/1005009315359179.html)
 5. [Omni Wheel](https://www.aliexpress.com/item/32954940078.html)
 6. [L298NH Motor Shield](https://www.aliexpress.com/item/32801279582.html)
-7. 4x [Dupoint Cables](https://www.aliexpress.com/item/4000053353555.html)
+7. 4x [Dupont Cables](https://www.aliexpress.com/item/4000053353555.html)
 8. 2x [TT Tyre](https://www.aliexpress.com/item/1005005767062155.html)
 9. 2x [TT DC plastic geared motor](https://www.aliexpress.com/item/1005004854068015.html)
 10. [5x2.1 Barrel Jack](https://www.aliexpress.com/item/33024967273.html)

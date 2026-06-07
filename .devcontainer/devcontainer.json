@@ -31,7 +31,8 @@
         "pietrocz.close-all-serial-ports",
         "raspberry-pi.raspberry-pi-pico",
         "streetsidesoftware.code-spell-checker",
-        "tal7aouy.icons",
+        "streetsidesoftware.code-spell-checker-british-english",
+        "yusifaliyevpro.vscicons",
         "saeris.markdown-github-alerts"
       ]
     }

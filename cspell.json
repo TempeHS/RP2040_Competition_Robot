@@ -1,0 +1,39 @@
+{
+  "version": "0.2",
+  "language": "en-GB",
+  "words": [
+    "aidriver",
+    "AIDRIVER",
+    "BOOTSEL",
+    "Thonny",
+    "micropython",
+    "MicroPython",
+    "elif",
+    "Skulpt",
+    "AABB",
+    "windup",
+    "Dupont",
+    "Tonka",
+    "Arduino",
+    "mechatronic",
+    "mechatronics",
+    "motorshield",
+    "benpaddlejones",
+    "overcorrects",
+    "unscored",
+    "accel",
+    "susp"
+  ],
+  "ignoreWords": ["robt", "pritn", "whlie", "ture"],
+  "ignorePaths": [
+    "micropython/**",
+    "node_modules/**",
+    "_Firmware/**",
+    ".devcontainer/**",
+    ".vscode/**"
+  ],
+  "ignoreRegExpList": [
+    "https?://[^\\s)\"'>]+",
+    "AIDriver_MicroPython_Challanges"
+  ]
+}
