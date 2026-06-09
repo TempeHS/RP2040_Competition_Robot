@@ -1,6 +1,5 @@
 {
   "recommendations": [
-    "badlogicgames.serial-plotter",
     "bierner.markdown-mermaid",
     "bierner.markdown-preview-github-styles",
     "esbenp.prettier-vscode",
@@ -13,15 +12,12 @@
     "ms-python.pylint",
     "ms-python.python",
     "ms-python.vscode-python-envs",
-    "ms-vscode.vscode-serial-monitor",
     "narasimapandiyan.jetbrainsmono",
     "oderwat.indent-rainbow",
-    "paulober.pico-w-go",
-    "pietrocz.close-all-serial-ports",
-    "raspberry-pi.raspberry-pi-pico",
     "streetsidesoftware.code-spell-checker",
     "streetsidesoftware.code-spell-checker-british-english",
     "yusifaliyevpro.vscicons",
-    "saeris.markdown-github-alerts"
+    "saeris.markdown-github-alerts",
+    "benpaddlejones.pico-bridge"
   ]
 }
