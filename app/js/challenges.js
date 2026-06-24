@@ -144,7 +144,7 @@ const Challenges = (function () {
         "If front <= FRONT_STOP_DISTANCE → stop and turn 90° away from your wall",
         "Use wall_sign to pick the correct turn direction automatically",
         "Reset side_integral and side_previous_error after turning",
-        "Tune TURN_TIME_90 so the robot turns approximately 90 degrees",
+        "Call my_robot.turn_90('left'/'right') — the gyro turns exactly 90°",
       ],
       startPosition: { x: 200, y: 1700, heading: 0 },
       successCriteria: {
@@ -199,8 +199,8 @@ const Challenges = (function () {
       goal: "Follow the wall, detect the dead end, turn 180°, and reach the exit.",
       hints: [
         "Stop at the front wall — then check the side sensor",
-        "Side sensor open (== -1 or very far) → corner → turn 90°",
-        "Side sensor blocked → dead end → turn 180° (two TURN_TIME_90 durations)",
+        "Side sensor open (== -1 or very far) → corner → turn_90",
+        "Side sensor blocked → dead end → turn_180 (gyro reverses 180°)",
         "Use wall_sign to pick the correct rotation direction",
         "Reset side_integral and side_previous_error after every turn",
       ],

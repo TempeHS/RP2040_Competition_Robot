@@ -51,8 +51,21 @@ hold_state(2)
 robot.brake()
 hold_state(1)
 
-# Test 5: Ultrasonic Sensors
-print("Test 5: ultrasonic distance readings (sensor 1 + sensor 2)")
+# Test 5: Gyro closed-loop turns (90 degrees each way)
+if robot.has_gyro:
+    print("Test 5: turn_90 right (gyro PID)")
+    turned = robot.turn_90("right")
+    print("  turned", round(turned, 1), "deg")
+    hold_state(1)
+    print("Test 5: turn_90 left (gyro PID)")
+    turned = robot.turn_90("left")
+    print("  turned", round(turned, 1), "deg")
+    hold_state(1)
+else:
+    print("Test 5 skipped: no IMU/gyro detected (check GP16/GP17 wiring)")
+
+# Test 6: Ultrasonic Sensors
+print("Test 6: ultrasonic distance readings (sensor 1 + sensor 2)")
 for i in range(5):
     distance_1 = robot.read_distance()
     distance_2 = robot.read_distance_2()

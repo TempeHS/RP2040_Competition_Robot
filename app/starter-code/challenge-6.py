@@ -1,15 +1,17 @@
 # Challenge 6: Dead-End Detection (90° vs 180°)
 # --------------------------------------------------------------------
 # After braking at a wall ahead, the robot reads its side sensor to
-# decide between turning 90° (corner) or 180° (dead end). The full
-# algorithm is already written for you. Every numeric setting starts
-# at 0.
+# decide between a gyro 90° turn (corner) or a gyro 180° turn (dead
+# end). The full algorithm is already written for you. Every numeric
+# setting starts at 0.
 #
 # Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
 #
 # Values to set:
 #     all carried-forward C5 values
-#     TURN_TIME_180   new — seconds for ~180° rotation (≈ 2 × TURN_TIME_90)
+#
+# Both turn sizes are handled by the gyroscope (my_robot.turn_90 /
+# my_robot.turn_180), so the angle is accurate without any timing.
 #
 # Goal: navigate the corner AND the dead-end maze without help.
 # --------------------------------------------------------------------
@@ -32,9 +34,6 @@ side_INTEGRAL_MAX = 0
 FRONT_SLOW_DISTANCE = 0
 FRONT_STOP_DISTANCE = 0
 FRONT_Kp = 0.0
-TURN_SPEED = 0
-TURN_TIME_90 = 0.0
-TURN_TIME_180 = 0.0
 
 side_previous_error = 0
 side_integral = 0
@@ -52,16 +51,13 @@ while True:
             #   wall on side as well as in front  → dead end  → 180°
             #   side is open / out of range        → corner    → 90°
             side_check = my_robot.read_distance_2()
-            if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
-                turn_duration = TURN_TIME_90
-            else:
-                turn_duration = TURN_TIME_180
+            dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
 
-            if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
+            turn_dir = "right" if my_robot.wall_sign == -1 else "left"
+            if dead_end:
+                my_robot.turn_180(turn_dir)
             else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(turn_duration)
+                my_robot.turn_90(turn_dir)
 
             my_robot.brake()
             hold_state(0.3)

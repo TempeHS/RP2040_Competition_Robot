@@ -218,6 +218,191 @@ const AIDriverStub = {
           });
 
           /**
+           * Read the simulated gyroscope yaw rate (deg/s) about the Z axis.
+           * Mirrors the hardware LSM6DS3.read_gyro_z_dps().
+           * @returns {Sk.builtin.float_} Yaw rate in degrees per second.
+           */
+          $loc.read_gyro_z_dps = new Sk.builtin.func(function (self) {
+            let rate = 0;
+            if (
+              typeof Simulator !== "undefined" &&
+              typeof App !== "undefined" &&
+              App.robot
+            ) {
+              rate = Simulator.simulateGyroZ(App.robot);
+            }
+            return new Sk.builtin.float_(rate);
+          });
+
+          /**
+           * Closed-loop gyro turn shared by turn_degrees/turn_90/turn_180.
+           * Spins the robot and integrates the simulated gyro until the target
+           * angle is reached, then brakes — accurate regardless of "battery"
+           * or "friction" (which the timed turns could not guarantee).
+           * @param {object} self Python instance.
+           * @param {number} target Magnitude of the turn in degrees.
+           * @param {boolean} isRight True = clockwise/right, false = left.
+           * @returns {Sk.misceval.Suspension} Resolves when the turn completes.
+           */
+          function runGyroTurn(self, target, isRight) {
+            const Kp = readTurnGain(self, "turn_Kp", 6.0);
+            const Ki = readTurnGain(self, "turn_Ki", 0.0);
+            const Kd = readTurnGain(self, "turn_Kd", 0.4);
+            const tolerance = readTurnGain(self, "turn_tolerance", 2.0);
+            const maxSpeed = readTurnGain(self, "turn_max_speed", 200);
+            const timeoutMs = readTurnGain(self, "turn_timeout_ms", 4000);
+            const MIN_SPEED = 100;
+
+            function applySpin(speed) {
+              if (typeof App === "undefined" || !App.robot) return;
+              if (isRight) {
+                // clockwise: left wheel forward, right wheel backward
+                App.robot.leftSpeed = speed;
+                App.robot.rightSpeed = -speed;
+              } else {
+                App.robot.leftSpeed = -speed;
+                App.robot.rightSpeed = speed;
+              }
+              App.robot.isMoving = true;
+            }
+
+            self.isMoving = true;
+
+            return new Sk.misceval.promiseToSuspension(
+              new Promise((resolve) => {
+                let heading = 0;
+                let integral = 0;
+                let prevError = target;
+                let settle = 0;
+                let simElapsed = 0; // simulated seconds
+                let last = performance.now();
+
+                function finish() {
+                  if (typeof App !== "undefined" && App.robot) {
+                    App.robot.leftSpeed = 0;
+                    App.robot.rightSpeed = 0;
+                    App.robot.actualLeftV = 0;
+                    App.robot.actualRightV = 0;
+                    App.robot.isMoving = false;
+                  }
+                  self.isMoving = false;
+                  AIDriverStub.queueCommand({ type: "brake", params: {} });
+                  resolve(Sk.builtin.none.none$);
+                }
+
+                function tick() {
+                  const now = performance.now();
+                  let dt = ((now - last) / 1000) * (App.speedMultiplier || 1);
+                  last = now;
+                  if (dt <= 0) dt = 0.001;
+                  simElapsed += dt;
+
+                  const gz =
+                    typeof Simulator !== "undefined" && App.robot
+                      ? Simulator.simulateGyroZ(App.robot)
+                      : 0;
+                  heading += Math.abs(gz) * dt;
+                  const error = target - heading;
+
+                  if (Math.abs(error) <= tolerance) {
+                    settle++;
+                    if (settle >= 2) {
+                      finish();
+                      return;
+                    }
+                  } else {
+                    settle = 0;
+                  }
+
+                  if (simElapsed * 1000 > timeoutMs) {
+                    finish();
+                    return;
+                  }
+
+                  integral += error * dt;
+                  const derivative = (error - prevError) / dt;
+                  prevError = error;
+                  let output = Kp * error + Ki * integral + Kd * derivative;
+                  let speed = Math.round(output);
+                  if (speed < MIN_SPEED) speed = MIN_SPEED;
+                  if (speed > maxSpeed) speed = maxSpeed;
+                  applySpin(speed);
+
+                  setTimeout(tick, 15);
+                }
+
+                applySpin(maxSpeed);
+                setTimeout(tick, 15);
+              }),
+            );
+          }
+
+          /**
+           * Read a turn-gain attribute off the Python instance, falling back to
+           * a default when the learner has not overridden it.
+           */
+          function readTurnGain(self, name, fallback) {
+            try {
+              const v = self.tp$getattr(new Sk.builtin.str(name));
+              if (v !== undefined && !(v instanceof Sk.builtin.none)) {
+                return Sk.ffi.remapToJs(v);
+              }
+            } catch (e) {
+              /* attribute not set — use fallback */
+            }
+            return fallback;
+          }
+
+          /**
+           * Turn on the spot by target_deg using the simulated gyro-PID loop.
+           * @param {Sk.builtin.int_} targetDeg Magnitude of the turn (deg).
+           * @param {Sk.builtin.str} [direction] "left"/"right"; sign of
+           *        targetDeg is used when omitted (positive = right).
+           * @returns {Sk.misceval.Suspension}
+           */
+          $loc.turn_degrees = new Sk.builtin.func(function (
+            self,
+            targetDeg,
+            direction,
+          ) {
+            const raw = Sk.ffi.remapToJs(targetDeg);
+            const target = Math.abs(raw);
+            let isRight;
+            if (
+              direction !== undefined &&
+              !(direction instanceof Sk.builtin.none)
+            ) {
+              isRight =
+                String(Sk.ffi.remapToJs(direction)).toLowerCase()[0] === "r";
+            } else {
+              isRight = raw >= 0;
+            }
+            return runGyroTurn(self, target, isRight);
+          });
+
+          /**
+           * Turn 90° left or right using the gyro-PID loop.
+           * @param {Sk.builtin.str} direction "left" or "right".
+           * @returns {Sk.misceval.Suspension}
+           */
+          $loc.turn_90 = new Sk.builtin.func(function (self, direction) {
+            const isRight =
+              String(Sk.ffi.remapToJs(direction)).toLowerCase()[0] === "r";
+            return runGyroTurn(self, 90, isRight);
+          });
+
+          /**
+           * Turn 180° left or right using the gyro-PID loop.
+           * @param {Sk.builtin.str} direction "left" or "right".
+           * @returns {Sk.misceval.Suspension}
+           */
+          $loc.turn_180 = new Sk.builtin.func(function (self, direction) {
+            const isRight =
+              String(Sk.ffi.remapToJs(direction)).toLowerCase()[0] === "r";
+            return runGyroTurn(self, 180, isRight);
+          });
+
+          /**
            * Immediately stop all movement and queue a brake command.
            * @returns {null}
            */

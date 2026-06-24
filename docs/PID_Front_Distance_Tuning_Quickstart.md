@@ -112,8 +112,6 @@ Typical real-robot value: **0.4 – 1.0**. Simulator-tuned answer key: `1.0`.
 FRONT_SLOW_DISTANCE = 400   # mm — start decelerating
 FRONT_STOP_DISTANCE = 150   # mm — stop and turn
 FRONT_Kp            = 1.0   # deceleration gain
-TURN_SPEED          = 180
-TURN_TIME_90        = 0.35  # tuned in the Turn Tuning guide
 ```
 
-When this is solid, move on to the [Turn Tuning Quickstart](pid-tuning.html#turnGuide) to dial in `TURN_TIME_90` and `TURN_TIME_180`.
+When this is solid, move on to the [Turn Tuning Quickstart](pid-tuning.html#turnGuide) to dial in the gyro turn gains (`turn_Kp`, `turn_Kd`) used by `turn_90` and `turn_180`.

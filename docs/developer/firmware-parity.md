@@ -6,17 +6,19 @@ Learner scripts written for the physical RP2040 firmware must behave the same wa
 
 ## AIDriver API Support
 
-| Method                                       | Hardware Behaviour                                    | Simulator Equivalent                                                         |
-| -------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `AIDriver(wall_side)`                        | Initializes motor driver and telemetry queue          | Queues an `init` command so the simulator knows a session began              |
-| `drive_forward(right, left)`                 | Sets forward PWM on each motor                        | Enqueues `drive_forward` with rounded integer speeds                         |
-| `drive_backward(right, left)`                | Sets reverse PWM                                      | Enqueues `drive_backward` for the physics engine                             |
-| `rotate_left(speed)` / `rotate_right(speed)` | Counter-rotates wheels for on-spot turns              | Issues `rotate_left` / `rotate_right` commands                               |
-| `set_motor_speeds(right, left)`              | Direct speed override                                 | Enqueues `set_motor_speeds` and updates cached motor state                   |
-| `brake()`                                    | Applies motor brakes                                  | Issues `brake` and zeros cached speeds                                       |
-| `read_distance()`                            | Returns ultrasonic reading (blocking until available) | Queues `read_distance`; JavaScript fills in actual distance before returning |
-| `is_moving()` / `get_motor_speeds()`         | Reflect internal motor state                          | Reads cached state updated by previous commands                              |
-| `service()`                                  | Handles background maintenance (LED heartbeat)        | No-op, kept for API parity                                                   |
+| Method                                                      | Hardware Behaviour                                        | Simulator Equivalent                                                                          |
+| ----------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `AIDriver(wall_side)`                                       | Initializes motor driver and telemetry queue              | Queues an `init` command so the simulator knows a session began                               |
+| `drive_forward(right, left)`                                | Sets forward PWM on each motor                            | Enqueues `drive_forward` with rounded integer speeds                                          |
+| `drive_backward(right, left)`                               | Sets reverse PWM                                          | Enqueues `drive_backward` for the physics engine                                              |
+| `rotate_left(speed)` / `rotate_right(speed)`                | Counter-rotates wheels for on-spot turns                  | Issues `rotate_left` / `rotate_right` commands                                                |
+| `turn_90(dir)` / `turn_180(dir)` / `turn_degrees(deg, dir)` | Closed-loop gyro-PID rotation to a target angle (LSM6DS3) | Spins the robot and integrates `simulateGyroZ` until the target angle is reached, then brakes |
+| `read_gyro_z_dps()`                                         | Returns the LSM6DS3 yaw rate in deg/s                     | Returns `Simulator.simulateGyroZ(robot)` (wheel-derived yaw rate)                             |
+| `set_motor_speeds(right, left)`                             | Direct speed override                                     | Enqueues `set_motor_speeds` and updates cached motor state                                    |
+| `brake()`                                                   | Applies motor brakes                                      | Issues `brake` and zeros cached speeds                                                        |
+| `read_distance()`                                           | Returns ultrasonic reading (blocking until available)     | Queues `read_distance`; JavaScript fills in actual distance before returning                  |
+| `is_moving()` / `get_motor_speeds()`                        | Reflect internal motor state                              | Reads cached state updated by previous commands                                               |
+| `service()`                                                 | Handles background maintenance (LED heartbeat)            | No-op, kept for API parity                                                                    |
 
 The shim also provides `hold_state(seconds)` so existing firmware exercises can wait while the simulator advances the command queue. The helper scales delays by the UI-selected speed multiplier and delegates to JavaScript for movement playback.
 

@@ -420,6 +420,27 @@ const Simulator = (function () {
     return applyUltrasonicLimits(castRay(sx, sy, dx, dy));
   }
 
+  /**
+   * Simulated LSM6DS3 gyroscope — yaw rate about the vertical (Z) axis.
+   *
+   * Returns the instantaneous angular velocity of the chassis in degrees per
+   * second, derived from the SAME differential-drive kinematics that move the
+   * robot (so an integrated gyro turn matches the rendered rotation exactly).
+   *
+   * Sign convention matches the heading: clockwise (heading increasing) is
+   * positive, which is what a real LSM6DS3 mounted face-up reports for a
+   * right/clockwise turn.
+   *
+   * @param {object} robot Robot state with actual wheel velocities.
+   * @returns {number} Yaw rate in deg/s.
+   */
+  function simulateGyroZ(robot) {
+    var actL = robot.actualLeftV || 0;
+    var actR = robot.actualRightV || 0;
+    var omega = (actL - actR) / WHEEL_BASE; // rad/s, +clockwise
+    return omega * RAD2DEG;
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   //  Collision detection
   // ═══════════════════════════════════════════════════════════════════
@@ -639,6 +660,7 @@ const Simulator = (function () {
     step: step,
     simulateUltrasonic: simulateUltrasonic,
     simulateUltrasonicSide: simulateUltrasonicSide,
+    simulateGyroZ: simulateGyroZ,
     checkCollision: checkCollision,
     getRobotCorners: getRobotCorners,
     applyBoundaryConstraints: applyBoundaryConstraints,

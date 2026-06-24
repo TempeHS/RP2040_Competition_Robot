@@ -1,37 +1,31 @@
 """
 grove_ultrasonic.py
-MicroPython driver for the Seeed Grove Ultrasonic Ranger (single-pin SIG protocol).
+MicroPython library for the Seeed Grove Ultrasonic Ranger (single-pin SIG protocol).
 
-Ported from Seeed's Ultrasonic.cpp (MIT Licence, seeed technology inc., 2012).
+Ported from:
+- Seeed C++ library: https://github.com/Seeed-Studio/Seeed_Arduino_UltrasonicRanger/archive/master.zip
+- MicroPython reference: https://github.com/rsc1975/micropython-hcsr04
 
-Protocol difference from HC-SR04
----------------------------------
-HC-SR04 uses two pins: a dedicated TRIG output and a dedicated ECHO input.
-The Grove Ultrasonic Ranger uses a single SIG pin that is switched between
-OUTPUT (to send the trigger pulse) and INPUT (to receive the echo) each read.
+Hardware:
+https://www.seeedstudio.com/Grove-Ultrasonic-Distance-Sensor.html
 
-Wiring
-------
-    Grove SIG  →  any GP pin (pass as sig_pin to constructor)
-    Grove VCC  →  3.3 V or 5 V
-    Grove GND  →  GND
+Hardware documentation:
+https://wiki.seeedstudio.com/Grove-Ultrasonic_Ranger/
 
-Usage
------
+Implementation notes:
+- Uses machine.time_pulse_us() to time the echo pulse, which can be more accurate
+    than manual loop timing in Python.
+- Seeed documentation also recommends using a resistor divider on the sensor
+    signal line when required by your target board's GPIO voltage tolerance.
+
+This module provides a single class, GroveUltrasonic, with read helpers that
+return distance in millimeters, centimeters, or inches.
+
+Example:
     from grove_ultrasonic import GroveUltrasonic
 
     sensor = GroveUltrasonic(sig_pin=16)
-    distance_mm = sensor.read_distance_mm()   # returns int mm, or -1 on error
-
-Drop-in replacement for UltrasonicSensor in aidriver.py
---------------------------------------------------------
-Both classes expose the same read_distance_mm() → int interface so a
-GroveUltrasonic instance can be assigned to AIDriver.ultrasonic_1 or
-AIDriver.ultrasonic_2 without any other code changes:
-
-    from grove_ultrasonic import GroveUltrasonic
-    robot = AIDriver("left")
-    robot.ultrasonic_2 = GroveUltrasonic(sig_pin=4)
+    distance_mm = sensor.read_distance_mm()
 """
 
 from machine import Pin, time_pulse_us
@@ -50,14 +44,14 @@ _TIMEOUT_US = 38_000
 
 
 class GroveUltrasonic:
-    """Seeed Grove Ultrasonic Ranger — single-pin SIG protocol.
+    """Library driver for the Seeed Grove Ultrasonic Ranger.
 
     Args:
         sig_pin: GPIO pin number connected to the Grove SIG line.
         max_distance_mm: Readings above this value are discarded (default 4000).
         timeout_us: Echo wait timeout in microseconds (default 38 000).
         timeout_strategy:
-            "strict"   -> return -1 on timeout/error (default, safest for PID logic)
+            "strict"   -> return -1 on timeout/error (default)
             "saturate" -> convert timeout/error to a large finite range reading
                           instead of returning -1.
     """
@@ -147,12 +141,10 @@ class GroveUltrasonic:
     def read_distance_mm(self):
         """Measure distance and return it in millimetres.
 
-        Equivalent to Ultrasonic::MeasureInMillimeters() scaled to integers.
-
         Formula (integer arithmetic, avoids floating point):
             distance_mm = duration_µs * 5 // 29
             (derived from: mm = µs × 0.343 mm/µs ÷ 2,
-             approximated as × 5 ÷ 29  — same as the C++ source)
+             approximated as × 5 ÷ 29)
 
         Returns:
             int: Distance in mm (20–4000), or -1 if out of range or error.
@@ -171,10 +163,7 @@ class GroveUltrasonic:
         return -1
 
     def read_distance_cm(self):
-        """Return distance in centimetres, or -1 on error.
-
-        Equivalent to Ultrasonic::MeasureInCentimeters().
-        """
+        """Return distance in centimetres, or -1 on error."""
         duration = self._duration_us()
         if duration < 0:
             return -1
@@ -184,10 +173,7 @@ class GroveUltrasonic:
         return -1
 
     def read_distance_inches(self):
-        """Return distance in inches, or -1 on error.
-
-        Equivalent to Ultrasonic::MeasureInInches().
-        """
+        """Return distance in inches, or -1 on error."""
         duration = self._duration_us()
         if duration < 0:
             return -1

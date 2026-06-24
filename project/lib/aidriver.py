@@ -12,6 +12,17 @@ from machine import Pin, PWM, time_pulse_us
 from time import sleep_us, sleep_ms, sleep as _sleep, ticks_ms, ticks_diff
 
 try:
+    from grove_ultrasonic import GroveUltrasonic
+except Exception:
+    GroveUltrasonic = None
+
+try:
+    from lsm6ds3 import LSM6DS3, _recover_i2c_bus
+except Exception:
+    LSM6DS3 = None
+    _recover_i2c_bus = None
+
+try:
     import eventlog
 except Exception:
     eventlog = None
@@ -492,7 +503,12 @@ class L298N:
 
 class AIDriver:
     """
-    Unified robot driver class with L298NH motor control and SR-HC04 ultrasonic sensors
+    Unified robot driver class with L298NH motor control and ultrasonic sensors.
+
+    By default, AIDriver uses Grove single-pin ultrasonic sensors via
+    GroveUltrasonic when available. The legacy HC-SR04 UltrasonicSensor class
+    remains in this file and is used as an automatic fallback.
+
     The L298NH requires L298N channels to be called simultaneously.
     """
 
@@ -506,9 +522,14 @@ class AIDriver:
         left_dir_pin=13,  # GP13
         left_brake_pin=8,  # GP8
         trig_pin=6,  # GP6 (front sensor)
-        echo_pin=7,  # GP7 (front sensor)
+        echo_pin=7,  # GP7 (front sensor, legacy HC-SR04 fallback)
         trig_pin_2=4,  # GP4 (second sensor)
-        echo_pin_2=5,  # GP5 (second sensor)
+        echo_pin_2=5,  # GP5 (second sensor, legacy HC-SR04 fallback)
+        ultrasonic_mode="auto",  # "auto" (default), "grove", or "hcsr04"
+        imu_sda=16,  # GP16 — IMU I2C SDA (SoftI2C)
+        imu_scl=17,  # GP17 — IMU I2C SCL (SoftI2C)
+        imu_addr=0x6A,  # LSM6DS3 I2C address (0x6A or 0x6B)
+        imu_freq=50_000,  # SoftI2C bus frequency (Hz)
     ):
         """Initialize RP2040 based AIDriver differential drive robot.
 
@@ -523,10 +544,22 @@ class AIDriver:
             right_brake_pin: Digital pin for right motor brake (default GP9)
             left_dir_pin: Digital pin for left motor direction (default GP13)
             left_brake_pin: Digital pin for left motor brake (default GP8)
-            trig_pin: Ultrasonic sensor 1 trigger pin (default GP6)
-            echo_pin: Ultrasonic sensor 1 echo pin (default GP7)
-            trig_pin_2: Ultrasonic sensor 2 trigger pin (default GP4)
-            echo_pin_2: Ultrasonic sensor 2 echo pin (default GP5)
+            trig_pin: Ultrasonic sensor 1 SIG pin for Grove mode (default GP6).
+                      In legacy HC-SR04 fallback mode this is TRIG pin.
+            echo_pin: Ultrasonic sensor 1 ECHO pin for legacy HC-SR04 fallback.
+            trig_pin_2: Ultrasonic sensor 2 SIG pin for Grove mode (default GP4).
+                        In legacy HC-SR04 fallback mode this is TRIG pin.
+            echo_pin_2: Ultrasonic sensor 2 ECHO pin for legacy HC-SR04 fallback.
+            ultrasonic_mode: Sensor backend mode:
+                "auto"   -> use GroveUltrasonic when available, else HC-SR04 fallback
+                "grove"  -> force GroveUltrasonic (raises if unavailable)
+                "hcsr04" -> force legacy HC-SR04 UltrasonicSensor
+            imu_sda: LSM6DS3 gyro I2C SDA pin (default GP16). The IMU runs on a
+                     bit-banged SoftI2C bus that does not clash with the motor or
+                     ultrasonic pins, so its position on the chassis is free.
+            imu_scl: LSM6DS3 gyro I2C SCL pin (default GP17).
+            imu_addr: LSM6DS3 I2C address — 0x6A or 0x6B (default 0x6A).
+            imu_freq: SoftI2C bus frequency in Hz (default 50_000).
         """
         # wall_sign: 1 = right wall, -1 = left wall
         # Used in the unified steering formula so direction is always correct.
@@ -547,11 +580,11 @@ class AIDriver:
             left_dir_pin,
             "L_BRK=",
             left_brake_pin,
-            "TRIG=",
+            "SIG_1/TRIG_1=",
             trig_pin,
-            "ECHO=",
+            "ECHO_1=",
             echo_pin,
-            "TRIG_2=",
+            "SIG_2/TRIG_2=",
             trig_pin_2,
             "ECHO_2=",
             echo_pin_2,
@@ -561,9 +594,29 @@ class AIDriver:
         self.motor_right = L298N(right_speed_pin, right_dir_pin, right_brake_pin)
         self.motor_left = L298N(left_speed_pin, left_dir_pin, left_brake_pin)
 
-        # Initialize ultrasonic sensors
-        self.ultrasonic_1 = UltrasonicSensor(trig_pin, echo_pin)
-        self.ultrasonic_2 = UltrasonicSensor(trig_pin_2, echo_pin_2)
+        # Initialize ultrasonic sensors.
+        # Preferred: Grove single-pin driver (SIG). Fallback: legacy HC-SR04.
+        mode = str(ultrasonic_mode).strip().lower()
+        if mode not in ("auto", "grove", "hcsr04"):
+            mode = "auto"
+
+        if mode == "grove" and GroveUltrasonic is None:
+            raise ImportError(
+                "ultrasonic_mode='grove' requested but grove_ultrasonic module is unavailable"
+            )
+
+        use_grove = (mode == "grove") or (
+            mode == "auto" and GroveUltrasonic is not None
+        )
+
+        if use_grove:
+            self.ultrasonic_1 = GroveUltrasonic(sig_pin=trig_pin)
+            self.ultrasonic_2 = GroveUltrasonic(sig_pin=trig_pin_2)
+            _d("Ultrasonic mode: GroveUltrasonic (single-pin SIG)")
+        else:
+            self.ultrasonic_1 = UltrasonicSensor(trig_pin, echo_pin)
+            self.ultrasonic_2 = UltrasonicSensor(trig_pin_2, echo_pin_2)
+            _d("Ultrasonic mode: UltrasonicSensor (legacy HC-SR04 fallback)")
 
         # Silent hardware sanity ping for sensor 1 (only visible if DEBUG_AIDRIVER is True)
         try:
@@ -577,7 +630,7 @@ class AIDriver:
                 "Ultrasonic 1 preflight error:",
                 type(exc).__name__,
                 str(exc),
-                "– check TRIG/ECHO pins and sensor power.",
+                "– check SIG_1/TRIG_1 and ECHO_1 wiring plus sensor power.",
             )
 
         # Silent hardware sanity ping for sensor 2
@@ -592,7 +645,7 @@ class AIDriver:
                 "Ultrasonic 2 preflight error:",
                 type(exc).__name__,
                 str(exc),
-                "– check TRIG_2/ECHO_2 pins and sensor power.",
+                "– check SIG_2/TRIG_2 and ECHO_2 wiring plus sensor power.",
             )
 
         _d("AIDriver initialized - debug logging active")
@@ -613,6 +666,53 @@ class AIDriver:
         self._is_rotating = False
         self._last_rotate_speed = 0
         self._last_rotate_is_right = True
+
+        # ── Gyro (LSM6DS3) for closed-loop turns ──────────────────────────
+        # Turns are NO LONGER timed/open-loop. turn_90()/turn_180()/
+        # turn_degrees() run a PID loop on the integrated gyro angle so a 90°
+        # turn is 90° regardless of battery, friction, or tyre wear.
+        #
+        # Gain defaults — override per robot after construction, e.g.:
+        #     my_robot.turn_Kp = 4.5
+        # Output of the PID is a wheel-speed magnitude in the 0–255 range.
+        self.turn_Kp = 6.0  # proportional gain (deg-error → speed)
+        self.turn_Ki = 0.0  # integral gain (usually 0 for turns)
+        self.turn_Kd = 0.4  # derivative gain (damps overshoot)
+        self.turn_tolerance = 2.0  # deg — stop when |error| within this band
+        self.turn_max_speed = 200  # clamp on turn wheel speed
+        self.turn_timeout_ms = 4000  # safety: abort a turn after this long
+        self._gyro_bias_dps = 0.0  # measured stationary yaw-rate offset
+
+        self.imu = None
+        self.has_gyro = False
+        if LSM6DS3 is not None:
+            try:
+                if _recover_i2c_bus is not None:
+                    _recover_i2c_bus(imu_sda, imu_scl)
+                self.imu = LSM6DS3(
+                    sda=imu_sda,
+                    scl=imu_scl,
+                    freq=imu_freq,
+                    address=imu_addr,
+                    use_soft=True,
+                    gyro_range=1000,
+                    gyro_rate=416,
+                )
+                self.imu.begin()
+                self.has_gyro = True
+                _d("IMU OK on GP{}/GP{} @ 0x{:02X}".format(imu_sda, imu_scl, imu_addr))
+                self._calibrate_gyro_bias()
+            except Exception as exc:
+                self.imu = None
+                self.has_gyro = False
+                _d(
+                    "IMU init failed:",
+                    type(exc).__name__,
+                    str(exc),
+                    "– gyro turns unavailable. Check GP{}/GP{} wiring and address.".format(
+                        imu_sda, imu_scl
+                    ),
+                )
 
         # Start PWM-based heartbeat - runs entirely in hardware
         # with zero CPU interrupts or impact on motor control.
@@ -784,8 +884,7 @@ class AIDriver:
         try:
             # Ramp up from MIN_MOTOR_SPEED to turn_speed over ROTATE_RAMP_MS.
             # This makes spin-up time deterministic regardless of battery
-            # voltage, so hold_state(TURN_TIME_90) always sees the same
-            # constant-speed window.
+            # voltage, giving a smooth, repeatable rotation.
             steps = max(self.ROTATE_RAMP_MS // 10, 1)
             speed_range = turn_speed - self.MIN_MOTOR_SPEED
             for i in range(steps):
@@ -842,6 +941,165 @@ class AIDriver:
             _explain_error(exc)
             raise
 
+    # ── Gyro-PID closed-loop turns ────────────────────────────────────────
+    def _calibrate_gyro_bias(self, samples=100, delay_ms=5):
+        """Measure and store the stationary gyro-Z bias (deg/s).
+
+        Even at rest the gyro reports a small non-zero rate. Left uncorrected
+        that bias integrates into a large false angle, so it is subtracted
+        from every reading during a turn. Keep the robot still while this runs
+        (it is called once automatically from __init__).
+        """
+        if not self.has_gyro:
+            return 0.0
+        total = 0.0
+        n = 0
+        for _ in range(samples):
+            try:
+                total += self.imu.read_gyro_z_dps()
+                n += 1
+            except Exception:
+                pass
+            sleep_ms(delay_ms)
+        self._gyro_bias_dps = (total / n) if n else 0.0
+        _d("Gyro Z bias = {:+.3f} deg/s".format(self._gyro_bias_dps))
+        return self._gyro_bias_dps
+
+    def turn_degrees(self, target_deg, direction=None):
+        """Rotate on the spot by *target_deg* using a gyro-PID closed loop.
+
+        The integrated gyro angle is driven to ``target_deg`` with a PID
+        controller, so the turn is accurate regardless of battery voltage,
+        floor friction, or tyre wear — unlike the old timed turns.
+
+        Args:
+            target_deg: Magnitude of the turn in degrees (always positive when
+                        ``direction`` is given; a negative value with no
+                        ``direction`` means turn left/counter-clockwise).
+            direction:  "right"/"cw" or "left"/"ccw". If None, the sign of
+                        ``target_deg`` chooses (positive = right).
+
+        Returns:
+            float: Actual degrees turned (for debugging / logging).
+
+        Raises:
+            RuntimeError: if no gyro is available.
+        """
+        if not self.has_gyro:
+            raise RuntimeError(
+                "turn_degrees needs the LSM6DS3 gyro, but none was initialised. "
+                "Check the IMU wiring (GP16/GP17) and address."
+            )
+
+        target = abs(target_deg)
+        if direction is None:
+            is_right = target_deg >= 0
+        else:
+            is_right = str(direction).lower()[0] == "r"
+
+        if eventlog is not None:
+            try:
+                eventlog.log_event(
+                    "Gyro turn {} {:.0f} deg".format(
+                        "right" if is_right else "left", target
+                    )
+                )
+            except Exception:
+                pass
+
+        heading = 0.0
+        integral = 0.0
+        prev_error = target
+        settle = 0
+        last_ms = ticks_ms()
+        start_ms = last_ms
+
+        try:
+            while True:
+                gz = self.imu.read_gyro_z_dps() - self._gyro_bias_dps
+
+                now = ticks_ms()
+                dt = ticks_diff(now, last_ms) / 1000.0
+                if dt <= 0:
+                    dt = 0.001
+                last_ms = now
+
+                heading += abs(gz) * dt
+                error = target - heading
+
+                # Stop once we have settled inside the tolerance band.
+                if abs(error) <= self.turn_tolerance:
+                    settle += 1
+                    if settle >= 2:
+                        break
+                else:
+                    settle = 0
+
+                # Safety timeout so a wiring/stall fault cannot spin forever.
+                if ticks_diff(now, start_ms) > self.turn_timeout_ms:
+                    _d("turn_degrees: timeout, stopping early")
+                    break
+
+                # PID → wheel-speed magnitude.
+                integral += error * dt
+                derivative = (error - prev_error) / dt
+                prev_error = error
+                output = (
+                    self.turn_Kp * error
+                    + self.turn_Ki * integral
+                    + self.turn_Kd * derivative
+                )
+
+                speed = int(output)
+                if speed < self.MIN_MOTOR_SPEED:
+                    speed = self.MIN_MOTOR_SPEED
+                if speed > self.turn_max_speed:
+                    speed = self.turn_max_speed
+
+                self.motor_right.set_speed(speed)
+                self.motor_left.set_speed(speed)
+                if is_right:
+                    self.motor_right.forward()
+                    self.motor_left.forward()
+                else:
+                    self.motor_right.backward()
+                    self.motor_left.backward()
+
+                sleep_ms(5)
+        except Exception as exc:
+            _explain_error(exc)
+            raise
+        finally:
+            # Hard stop — the loop drove the motors directly, so clear state.
+            self._is_rotating = False
+            self.motor_right.stop()
+            self.motor_left.stop()
+
+        _d("turn_degrees: target={:.0f} actual={:.1f} deg".format(target, heading))
+        return heading
+
+    def turn_90(self, direction):
+        """Turn 90° in *direction* ("left" or "right") using the gyro PID."""
+        return self.turn_degrees(90, direction)
+
+    def turn_180(self, direction):
+        """Turn 180° in *direction* ("left" or "right") using the gyro PID."""
+        return self.turn_degrees(180, direction)
+
+    def read_gyro_z_dps(self):
+        """Return the bias-corrected gyro Z yaw rate in deg/s.
+
+        Mirrors the simulator API so the same learner code runs on both. A
+        positive value is a clockwise/right rotation. Returns 0.0 when no gyro
+        is available rather than raising, so polling code degrades gracefully.
+        """
+        if not self.has_gyro:
+            return 0.0
+        try:
+            return self.imu.read_gyro_z_dps() - self._gyro_bias_dps
+        except Exception:
+            return 0.0
+
     # Minimum reliable motor speed - motors stutter below this due to undervoltage.
     # 120 is the empirically measured dead-zone threshold for the L298N at typical
     # operating voltages. DO NOT lower this: values 100-119 pass the guard but
@@ -852,8 +1110,6 @@ class AIDriver:
     # rotate_right() and rotate_left() (ramp-up) and brake() after a rotation
     # (ramp-down).  80 ms = 8 × 10 ms steps.  Increase for heavier robots or
     # lower supply voltages; decrease if turns feel sluggish to start.
-    # NOTE: because rotate_right/left now block for ROTATE_RAMP_MS before
-    # returning, re-tune TURN_TIME_90 after changing this value.
     ROTATE_RAMP_MS = 80
 
     def drive(self, right_speed, left_speed):

@@ -78,50 +78,31 @@ After stopping at a front wall, read the **side sensor** to identify the situati
 my_robot.brake()
 hold_state(0.3)
 side_check = my_robot.read_distance_2()
+dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
 
-if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
-    turn_duration = TURN_TIME_90   # corner
+turn_dir = "right" if my_robot.wall_sign == -1 else "left"
+if dead_end:
+    my_robot.turn_180(turn_dir)   # walls front AND side
 else:
-    turn_duration = TURN_TIME_180  # dead end
-
-if my_robot.wall_sign == -1:
-    my_robot.rotate_right(TURN_SPEED)
-else:
-    my_robot.rotate_left(TURN_SPEED)
-hold_state(turn_duration)
+    my_robot.turn_90(turn_dir)    # corner
 ```
 
-### TURN_TIME_180
+### `turn_180` — a Gyro 180° Reversal
 
-A 180° turn is **not** exactly twice a 90° turn — the longer turn spends more time at full rotation speed, so the per-second rate is slightly higher. Expect `TURN_TIME_180` to be a little **less** than `2 × TURN_TIME_90`. A good starting point is:
-
-```python
-TURN_TIME_180 = TURN_TIME_90 * 1.7
-```
-
-Then fine-tune `TURN_TIME_180` separately if the robot over- or under-rotates. The simulator-tuned answer key uses `0.60` (with `TURN_TIME_90 = 0.35`).
+Just like `turn_90`, `my_robot.turn_180("left"/"right")` uses the **gyroscope** to rotate the robot exactly 180° and stop. There is no timing to guess and no `1.7×` rule to derive — the same closed-loop controller simply targets a larger angle. Because the robot measures its own rotation, a 180° reversal is just as accurate as a 90° corner.
 
 > [!Tip]
-> Tune `TURN_TIME_90` first in Challenge 4, then derive `TURN_TIME_180` from it here.
+> The turn accuracy is set once by the gyro PID gains (`turn_Kp`, `turn_Kd`) — see the [PID Turn Tuning Quickstart](docs.html?doc=PID_Turn_Tuning_Quickstart). You do not tune anything per-challenge.
 
 ---
 
 ## Step 1 — Start from Your Challenge 4 Code
 
-Copy your working Challenge 4 code. The only change is inside the `if front <= FRONT_STOP_DISTANCE:` block — replace the fixed 90° turn with a side-sensor check.
+Copy your working Challenge 4 code. The only change is inside the `if front <= FRONT_STOP_DISTANCE:` block — replace the fixed `turn_90` with a side-sensor check that chooses between `turn_90` and `turn_180`.
 
 ---
 
-## Step 2 — Add `TURN_TIME_180`
-
-```python
-TURN_TIME_90  = 0.35  # ← use your tuned value from Challenge 4
-TURN_TIME_180 = 0.60  # ← ≈ 1.7 × TURN_TIME_90, then fine-tune
-```
-
----
-
-## Step 3 — Replace the Turn Block
+## Step 2 — Replace the Turn Block
 
 Find this block from Challenge 4:
 
@@ -130,10 +111,9 @@ Find this block from Challenge 4:
             my_robot.brake()
             hold_state(0.3)
             if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
+                my_robot.turn_90("right")
             else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME_90)
+                my_robot.turn_90("left")
             my_robot.brake()
             hold_state(0.3)
             side_integral = 0
@@ -149,15 +129,12 @@ Replace it with:
             hold_state(0.3)
             # Check side sensor to decide corner (90°) vs dead end (180°)
             side_check = my_robot.read_distance_2()
-            if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
-                turn_duration = TURN_TIME_90   # corridor is open to the side
+            dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
+            turn_dir = "right" if my_robot.wall_sign == -1 else "left"
+            if dead_end:
+                my_robot.turn_180(turn_dir)  # walls on front and side
             else:
-                turn_duration = TURN_TIME_180  # walls on front and side = dead end
-            if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
-            else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(turn_duration)
+                my_robot.turn_90(turn_dir)   # corridor is open to the side
             my_robot.brake()
             hold_state(0.3)
             side_integral = 0
@@ -167,14 +144,13 @@ Replace it with:
 
 ---
 
-## Step 4 — Tune
+## Step 3 — Tune
 
-| Observation                        | Fix                                                                                                          |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Robot turns 90° at the dead end    | Increase `TURN_TIME_180`, or lower the threshold — `FRONT_SLOW_DISTANCE` may be too small for the side check |
-| Robot turns 180° at a corner       | Increase `FRONT_SLOW_DISTANCE` used as threshold, or check that side sensor reads -1 at corners              |
-| Robot doesn't turn enough (< 180°) | Increase `TURN_TIME_180`                                                                                     |
-| Robot turns too far (> 180°)       | Decrease `TURN_TIME_180`                                                                                     |
+| Observation                     | Fix                                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Robot turns 90° at the dead end | Side check too strict — the side reading is being treated as "open"; lower the threshold it compares against              |
+| Robot turns 180° at a corner    | Side check too loose — raise `FRONT_SLOW_DISTANCE`, or verify the side sensor reads -1 at corners                         |
+| Turn under- or over-rotates     | Adjust the gyro PID gains (`turn_Kp`, `turn_Kd`) in the [PID Turn Tuning guide](docs.html?doc=PID_Turn_Tuning_Quickstart) |
 
 ---
 
@@ -186,15 +162,17 @@ This is exactly what you'll see in the editor when you open the challenge. The f
 # Challenge 6: Dead-End Detection (90° vs 180°)
 # --------------------------------------------------------------------
 # After braking at a wall ahead, the robot reads its side sensor to
-# decide between turning 90° (corner) or 180° (dead end). The full
-# algorithm is already written for you. Every numeric setting starts
-# at 0.
+# decide between a gyro 90° turn (corner) or a gyro 180° turn (dead
+# end). The full algorithm is already written for you. Every numeric
+# setting starts at 0.
 #
 # Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
 #
 # Values to set:
 #     all carried-forward C4 values
-#     TURN_TIME_180   new — seconds for ~180° rotation (≈ 1.7 × TURN_TIME_90)
+#
+# Both turn sizes are handled by the gyroscope (my_robot.turn_90 /
+# my_robot.turn_180).
 #
 # Goal: navigate the corner AND the dead-end maze without help.
 # --------------------------------------------------------------------
@@ -217,9 +195,6 @@ side_INTEGRAL_MAX = 0
 FRONT_SLOW_DISTANCE = 0
 FRONT_STOP_DISTANCE = 0
 FRONT_Kp = 0.0
-TURN_SPEED = 0
-TURN_TIME_90 = 0.0
-TURN_TIME_180 = 0.0
 
 side_previous_error = 0
 side_integral = 0
@@ -237,16 +212,13 @@ while True:
             #   wall on side as well as in front  → dead end  → 180°
             #   side is open / out of range        → corner    → 90°
             side_check = my_robot.read_distance_2()
-            if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
-                turn_duration = TURN_TIME_90
-            else:
-                turn_duration = TURN_TIME_180
+            dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
 
-            if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
+            turn_dir = "right" if my_robot.wall_sign == -1 else "left"
+            if dead_end:
+                my_robot.turn_180(turn_dir)
             else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(turn_duration)
+                my_robot.turn_90(turn_dir)
 
             my_robot.brake()
             hold_state(0.3)
@@ -325,9 +297,6 @@ side_INTEGRAL_MAX = 50
 FRONT_SLOW_DISTANCE = 400
 FRONT_STOP_DISTANCE = 150
 FRONT_Kp = 1.0
-TURN_SPEED = 180
-TURN_TIME_90 = 0.35
-TURN_TIME_180 = 0.60
 
 side_previous_error = 0
 side_integral = 0
@@ -342,16 +311,13 @@ while True:
             hold_state(0.3)
 
             side_check = my_robot.read_distance_2()
-            if side_check == -1 or side_check > FRONT_SLOW_DISTANCE:
-                turn_duration = TURN_TIME_90
-            else:
-                turn_duration = TURN_TIME_180
+            dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
 
-            if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
+            turn_dir = "right" if my_robot.wall_sign == -1 else "left"
+            if dead_end:
+                my_robot.turn_180(turn_dir)
             else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(turn_duration)
+                my_robot.turn_90(turn_dir)
 
             my_robot.brake()
             hold_state(0.3)
@@ -412,7 +378,7 @@ while True:
 
 ## Debugging Tips
 
-- Add `print("side_check:", side_check, "turn:", turn_duration)` inside the stop block to verify the correct turn is chosen.
+- Add `print("side_check:", side_check, "dead_end:", dead_end)` inside the stop block to verify the correct turn is chosen.
 - If the robot always picks 90°, the side sensor may be reading -1 even at the dead end — check the sensor range and `FRONT_SLOW_DISTANCE` threshold value.
 - If the robot always picks 180°, the side sensor may not be returning -1 at the corner — the wall may still be partially visible. Try using a larger threshold (e.g. `side_check > 600`).
 

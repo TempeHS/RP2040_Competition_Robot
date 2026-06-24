@@ -249,7 +249,42 @@ class AIDriver:
         _queue_command("rotate_right", {"turnSpeed": int(turn_speed)})
         if DEBUG_AIDRIVER:
             print("[AIDriver] rotate_right:", turn_speed)
-    
+
+    def read_gyro_z_dps(self):
+        """Read simulated gyro Z yaw rate in deg/s (JS overrides value)."""
+        _queue_command("read_gyro_z_dps")
+        return 0.0
+
+    def turn_degrees(self, target_deg, direction=None):
+        """Closed-loop gyro turn by target_deg. direction: 'left' or 'right'.
+
+        Replaces timed turns: the simulator rotates exactly target_deg.
+        """
+        global DEBUG_AIDRIVER
+        import time
+        target = abs(target_deg)
+        if direction is None:
+            is_right = target_deg >= 0
+        else:
+            is_right = str(direction).lower()[0] == "r"
+        self._is_moving = True
+        _queue_command("gyro_turn", {"target": target, "right": is_right})
+        if DEBUG_AIDRIVER:
+            print("[AIDriver] turn_degrees:", target,
+                  "right" if is_right else "left")
+        # Give the simulator wall-clock time to render the rotation.
+        time.sleep(0.4 / _SPEED_MULTIPLIER)
+        self._is_moving = False
+        return target
+
+    def turn_90(self, direction):
+        """Turn 90 degrees ('left' or 'right') using the gyro."""
+        return self.turn_degrees(90, direction)
+
+    def turn_180(self, direction):
+        """Turn 180 degrees ('left' or 'right') using the gyro."""
+        return self.turn_degrees(180, direction)
+
     def brake(self):
         """Stop the robot"""
         global DEBUG_AIDRIVER
@@ -1209,6 +1244,20 @@ def ticks_diff(t1, t2):
         App.robot.isMoving = true;
         break;
 
+      case "gyro_turn": {
+        // Closed-loop gyro turn (trace/step mode): snap the heading by the
+        // target angle. Clockwise/right increases heading.
+        const t = (cmd.params && cmd.params.target) || 0;
+        const right = !!(cmd.params && cmd.params.right);
+        App.robot.heading += right ? t : -t;
+        App.robot.leftSpeed = 0;
+        App.robot.rightSpeed = 0;
+        App.robot.actualLeftV = 0;
+        App.robot.actualRightV = 0;
+        App.robot.isMoving = false;
+        break;
+      }
+
       case "brake":
         // Active brake — H-bridge shorts both motor leads, wheels stop
         // immediately. We zero actualV here so the centre doesn't keep
@@ -1405,6 +1454,19 @@ def ticks_diff(t1, t2):
             App.robot.rightSpeed = -cmd.params.turnSpeed;
             App.robot.isMoving = true;
             break;
+
+          case "gyro_turn": {
+            // Closed-loop gyro turn: snap heading by the target angle.
+            const t = (cmd.params && cmd.params.target) || 0;
+            const right = !!(cmd.params && cmd.params.right);
+            App.robot.heading += right ? t : -t;
+            App.robot.leftSpeed = 0;
+            App.robot.rightSpeed = 0;
+            App.robot.actualLeftV = 0;
+            App.robot.actualRightV = 0;
+            App.robot.isMoving = false;
+            break;
+          }
 
           case "brake":
             App.robot.leftSpeed = 0;

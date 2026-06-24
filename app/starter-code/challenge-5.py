@@ -40,8 +40,6 @@ side_INTEGRAL_MAX = 0
 FRONT_SLOW_DISTANCE = 0
 FRONT_STOP_DISTANCE = 0
 FRONT_Kp = 0.0
-TURN_SPEED = 0
-TURN_TIME_90 = 0.0
 
 LOST_WALL_DRIFT = 0.0
 
@@ -59,10 +57,9 @@ while True:
             hold_state(0.3)
 
             if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
+                my_robot.turn_90("right")
             else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME_90)
+                my_robot.turn_90("left")
 
             my_robot.brake()
             hold_state(0.3)

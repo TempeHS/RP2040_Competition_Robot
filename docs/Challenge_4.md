@@ -77,7 +77,7 @@ When you have two sensors, you need **rules about which one takes priority**:
 
 ### Using `wall_sign` for Automatic Turn Direction
 
-Instead of hardcoding `rotate_left` or `rotate_right`, use `my_robot.wall_sign`:
+Instead of hardcoding the turn direction, use `my_robot.wall_sign`:
 
 | `AIDriver(...)` | `wall_sign` | Turn direction at a corner         |
 | --------------- | ----------- | ---------------------------------- |
@@ -87,13 +87,12 @@ Instead of hardcoding `rotate_left` or `rotate_right`, use `my_robot.wall_sign`:
 ```python
 # Turn away from the wall you are following
 if my_robot.wall_sign == -1:   # following left wall → turn right
-    my_robot.rotate_right(TURN_SPEED)
+    my_robot.turn_90("right")
 else:                          # following right wall → turn left
-    my_robot.rotate_left(TURN_SPEED)
-hold_state(TURN_TIME_90)
+    my_robot.turn_90("left")
 ```
 
-This means the same code works whether the robot is set to `"left"` or `"right"` — no hardcoded direction needed.
+This means the same code works whether the robot is set to `"left"` or `"right"` — no hardcoded direction needed. `turn_90` uses the **gyroscope** to rotate exactly 90°, so the turn is accurate no matter the battery voltage or floor friction.
 
 ### P Control on the Front Sensor — Smooth Deceleration
 
@@ -119,9 +118,9 @@ side_integral = 0
 side_previous_error = 0
 ```
 
-### Tuning `TURN_TIME_90`
+### Gyro Turns: `turn_90`
 
-`TURN_TIME_90` controls how long the robot rotates. Start at `0.35` and adjust in `0.05s` steps until the turn is approximately 90°.
+`my_robot.turn_90("left")` or `my_robot.turn_90("right")` rotates the robot using a **closed-loop gyroscope PID**. The robot measures its own rotation rate and stops at exactly 90° — there is no timing value to guess. This replaces the old `rotate_* + hold_state(TURN_TIME_90)` pattern entirely.
 
 ---
 
@@ -130,8 +129,7 @@ side_previous_error = 0
 Copy your working PID code. You will add:
 
 1. Front sensor variables: `FRONT_SLOW_DISTANCE`, `FRONT_STOP_DISTANCE`, `FRONT_Kp`.
-2. `TURN_SPEED` and `TURN_TIME_90` variables.
-3. A front-sensor check at the **top** of the loop (before the PID code).
+2. A front-sensor check at the **top** of the loop (before the PID code) that calls `my_robot.turn_90(...)`.
 
 ---
 
@@ -142,12 +140,10 @@ Copy your working PID code. You will add:
 FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
 FRONT_STOP_DISTANCE = 150  # Stop and turn (mm)
 FRONT_Kp = 1.0
-TURN_SPEED = 180
-TURN_TIME_90 = 0           # TODO: tune for ~90 degree turn (try 0.35)
 ```
 
 > [!Note]
-> `TURN_TIME_90 = 0` is intentionally zero — you **must** tune this yourself.
+> The 90° turn is handled by the gyroscope (`my_robot.turn_90`), so there is no turn-timing value left to tune.
 
 ---
 
@@ -166,10 +162,9 @@ while True:
             my_robot.brake()
             hold_state(0.3)
             if my_robot.wall_sign == -1:   # following left wall → turn right
-                my_robot.rotate_right(TURN_SPEED)
+                my_robot.turn_90("right")
             else:                          # following right wall → turn left
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME_90)
+                my_robot.turn_90("left")
             my_robot.brake()
             hold_state(0.3)
             side_integral = 0
@@ -214,14 +209,14 @@ The rest of the loop is your existing Challenge 3 PID wall-following code. It on
 
 ## Step 5 — Tune
 
-| Observation                          | Fix                                                       |
-| ------------------------------------ | --------------------------------------------------------- |
-| Robot doesn't slow down before wall  | Increase `FRONT_SLOW_DISTANCE` (try 500)                  |
-| Robot stops too far from wall        | Decrease `FRONT_STOP_DISTANCE` (try 120)                  |
-| Robot crashes before stopping        | Increase `FRONT_STOP_DISTANCE` or `FRONT_Kp`              |
-| Robot doesn't turn enough            | Increase `TURN_TIME_90`                                   |
-| Robot turns too far (overshoots 90°) | Decrease `TURN_TIME_90`                                   |
-| Robot jerks badly after turning      | Check `side_integral` and `side_previous_error` are reset |
+| Observation                           | Fix                                                          |
+| ------------------------------------- | ------------------------------------------------------------ |
+| Robot doesn't slow down before wall   | Increase `FRONT_SLOW_DISTANCE` (try 500)                     |
+| Robot stops too far from wall         | Decrease `FRONT_STOP_DISTANCE` (try 120)                     |
+| Robot crashes before stopping         | Increase `FRONT_STOP_DISTANCE` or `FRONT_Kp`                 |
+| Robot doesn't turn a full 90°         | Raise `turn_Kp` or lower `turn_tolerance` (see tuning guide) |
+| Robot overshoots / oscillates on turn | Raise `turn_Kd` (see PID Turn Tuning guide)                  |
+| Robot jerks badly after turning       | Check `side_integral` and `side_previous_error` are reset    |
 
 ---
 
@@ -233,19 +228,20 @@ This is exactly what you'll see in the editor when you open the challenge. The f
 # Challenge 4: Corner Detection (90° turn)
 # --------------------------------------------------------------------
 # Adds a front-sensor priority block that brakes, rotates 90° away
-# from the wall, and resumes wall-following. The full algorithm is
-# already written for you. Every numeric setting starts at 0.
+# from the wall with the gyro, and resumes wall-following. The full
+# algorithm is already written for you. Every numeric setting starts
+# at 0.
 #
 # Tuning guides:
 #     docs.html?doc=PID_Front_Distance_Tuning_Quickstart   (FRONT_*, FRONT_Kp)
-#     docs.html?doc=PID_Turn_Tuning_Quickstart             (TURN_SPEED, TURN_TIME_90)
+#     docs.html?doc=PID_Turn_Tuning_Quickstart             (turn_Kp / turn_Kd)
 #
 # Values to set:
 #     all carried-forward C3 PID + base values
 #     FRONT_SLOW_DISTANCE, FRONT_STOP_DISTANCE     when to slow / brake (mm)
 #     FRONT_Kp                                      front-approach gain
-#     TURN_SPEED                                    rotation wheel speed
-#     TURN_TIME_90                                  seconds for ~90° rotation
+#
+# The 90° turn is handled by the gyroscope (my_robot.turn_90).
 #
 # Goal: turn the L-corner at speed without clipping either wall.
 # --------------------------------------------------------------------
@@ -268,8 +264,6 @@ side_INTEGRAL_MAX = 0
 FRONT_SLOW_DISTANCE = 0
 FRONT_STOP_DISTANCE = 0
 FRONT_Kp = 0.0
-TURN_SPEED = 0
-TURN_TIME_90 = 0.0
 
 side_previous_error = 0
 side_integral = 0
@@ -286,10 +280,9 @@ while True:
 
             # Rotate AWAY from the wall (wall_sign tells us which side).
             if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
+                my_robot.turn_90("right")
             else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME_90)
+                my_robot.turn_90("left")
 
             my_robot.brake()
             hold_state(0.3)
@@ -369,8 +362,6 @@ side_INTEGRAL_MAX = 50
 FRONT_SLOW_DISTANCE = 400
 FRONT_STOP_DISTANCE = 150
 FRONT_Kp = 1.0
-TURN_SPEED = 180
-TURN_TIME_90 = 0.35
 
 side_previous_error = 0
 side_integral = 0
@@ -386,10 +377,9 @@ while True:
             hold_state(0.3)
 
             if my_robot.wall_sign == -1:
-                my_robot.rotate_right(TURN_SPEED)
+                my_robot.turn_90("right")
             else:
-                my_robot.rotate_left(TURN_SPEED)
-            hold_state(TURN_TIME_90)
+                my_robot.turn_90("left")
 
             my_robot.brake()
             hold_state(0.3)

@@ -41,6 +41,12 @@ robot.rotate_left(turn_speed)
 robot.rotate_right(turn_speed)
 robot.brake()
 
+# Gyro turns (closed-loop, LSM6DS3 gyroscope)
+robot.turn_90("left")          # or "right" — turns exactly 90°
+robot.turn_180("right")        # or "left" — turns exactly 180°
+robot.turn_degrees(135, "left")  # arbitrary angle
+rate = robot.read_gyro_z_dps()   # yaw rate, deg/s
+
 # Sensors
 distance = robot.read_distance()  # mm, -1 for out of range
 moving = robot.is_moving()  # True/False
