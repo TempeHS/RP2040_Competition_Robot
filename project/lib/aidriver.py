@@ -597,6 +597,16 @@ class AIDriver:
 
         _d("AIDriver initialized - debug logging active")
 
+        # Δt tracking for the side sensor PID loop.
+        # self.dt is updated every call to read_distance_2() and holds the
+        # elapsed seconds since the previous call.  Student PID code can
+        # divide by self.dt to make gains time-invariant:
+        #   side_derivative = (error - side_previous_error) / my_robot.dt
+        #   side_integral   += error * my_robot.dt
+        # Default 0.05 s matches the hold_state(0.05) used in the challenges.
+        self.dt = 0.05
+        self._last_side_read_ms = ticks_ms()
+
         # Start PWM-based heartbeat - runs entirely in hardware
         # with zero CPU interrupts or impact on motor control.
         _start_pwm_heartbeat()
@@ -619,14 +629,29 @@ class AIDriver:
         """
         Read distance from ultrasonic sensor 2 (second sensor on GP4/GP5).
 
+        Also updates self.dt with the elapsed seconds since the previous call.
+        Use this in PID derivative and integral terms to compensate for variable
+        loop timing caused by sensor retries or other blocking calls::
+
+            side_derivative = (error - side_previous_error) / my_robot.dt
+            side_integral  += error * my_robot.dt
+
         Returns:
             Distance in millimeters, or -1 if invalid reading.
         """
+        # Timestamp BEFORE the hardware read so dt reflects the true loop period
+        # regardless of whether the sensor needs its 20 ms retry this iteration.
+        now = ticks_ms()
+        elapsed = ticks_diff(now, self._last_side_read_ms)
+        # Guard against zero (first call) and negative wrap-around.
+        self.dt = max(elapsed, 1) / 1000.0
+        self._last_side_read_ms = now
+
         distance_mm = self.ultrasonic_2.read_distance_mm()
         if distance_mm == -1:
             # Don't print debug here - inline warning handles user feedback
             return -1
-        _d("read_distance_2:", distance_mm, "mm")
+        _d("read_distance_2:", distance_mm, "mm", "dt:", self.dt, "s")
         return int(distance_mm)
 
     def brake(self):
@@ -754,8 +779,11 @@ class AIDriver:
             _explain_error(exc)
             raise
 
-    # Minimum reliable motor speed - motors stutter below this due to undervoltage
-    MIN_MOTOR_SPEED = 100
+    # Minimum reliable motor speed - motors stutter below this due to undervoltage.
+    # 120 is the empirically measured dead-zone threshold for the L298N at typical
+    # operating voltages. DO NOT lower this: values 100-119 pass the guard but
+    # produce erratic behaviour (stall, stutter) that corrupts PID corrections.
+    MIN_MOTOR_SPEED = 120
 
     def drive(self, right_speed, left_speed):
         """
