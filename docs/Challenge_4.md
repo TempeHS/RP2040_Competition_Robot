@@ -1,452 +1,167 @@
-# Challenge 4: Corner Detection
+# Challenge 4: Corner Detection — Your First State Machine
 
-In this challenge you will combine the **front sensor** with your **side PID wall following** to navigate a corridor that has a **single 90° corner**. The robot must detect the wall ahead, turn in the correct direction, and continue following the wall to the exit.
+Until now your robot did **one thing**: hug the side wall with a PID. A real maze needs the robot to
+**switch behaviours** — follow the wall, then stop and turn at a corner, then follow again. The clean
+way to manage "which behaviour am I doing right now?" is a **state machine**.
+
+In this challenge you build a two-state machine and write the **gyro turn** that every later
+challenge reuses.
 
 You will learn:
 
-- How to use **two sensors at once** (sensor fusion).
-- How to use `wall_sign` to automatically pick the correct turn direction.
-- How to reset PID state after a manoeuvre.
+- What a **finite state machine (FSM)** is and why robots use them.
+- How a **trigger** moves the robot from one state to another.
+- How to turn an exact 90° with a **closed-loop gyro PID** you write yourself.
 
 ---
 
 ## Success Criteria
 
-My robot follows the wall, **detects the corner**, **turns 90°**, and reaches the **green exit zone** on the other side.
+My robot follows the wall, **detects the wall ahead**, **turns 90° away from it**, and reaches the
+**green exit zone**.
 
 ---
 
 ## Before You Begin
 
-1. Complete [Challenge 3](docs.html?doc=Challenge_3) — you need a working full PID controller.
+1. Complete [Challenge 3](docs.html?doc=Challenge_3) — you need a working side-wall PID.
 2. Open the **Simulator** and select **Challenge 4**.
-3. Run your Challenge 3 code here — the robot will crash into the corner wall because it only looks sideways, not forward!
+3. Run your Challenge 3 code here first — it drives straight into the corner wall, because it only
+   looks sideways. That is the problem this challenge solves.
 
 ---
 
-## Flowchart Of The Algorithm
+## Concept 1 — What is a state machine?
+
+A **state machine** says: _the robot is always in exactly one named **state**, and a **trigger**
+moves it to another state._ Each state is a small, simple behaviour. You never mix them up, because
+only one runs at a time.
+
+Challenge 4 has **two states**:
+
+| State         | What the robot does                                 |
+| ------------- | --------------------------------------------------- |
+| `FOLLOW_WALL` | hold the side wall at a fixed distance with the PID |
+| `TURN`        | a wall is close ahead → spin 90° away from the wall |
 
 ```mermaid
-flowchart TD
-    A[Start Program] --> B[Setup Robot & Variables]
-    B --> C{Control Loop}
-    C --> D[Read front sensor]
-    D --> E{"Wall ahead?<br>(front < FRONT_SLOW_DISTANCE)"}
-    E -- Yes --> F{"Very close?<br>(front <= FRONT_STOP_DISTANCE)"}
-    F -- Yes --> G["Brake + Turn 90° away from wall + Reset PID"]
-    G --> C
-    F -- No --> H["Slow down: speed = FRONT_Kp × (front - FRONT_STOP_DISTANCE)"]
-    H --> C
-    E -- No --> I[Read side sensor]
-    I --> J{Sensor OK?}
-    J -- No --> K[Drive straight + reset side_integral]
-    K --> C
-    J -- Yes --> L[PID wall follow]
-    L --> C
-
-    style A fill:#e1f5fe,color:#000000
-    style B fill:#000000,color:#ffffff
-    style C fill:#fff3e0,color:#000000
-    style E fill:#ffcdd2,color:#000000
-    style F fill:#ffcdd2,color:#000000
-    style G fill:#ffcdd2,color:#000000
-    style H fill:#ffe0b2,color:#000000
-    style L fill:#e8f5e8,color:#000000
+stateDiagram-v2
+    [*] --> FOLLOW_WALL
+    FOLLOW_WALL --> TURN: front <= FRONT_STOP_DISTANCE
+    TURN --> FOLLOW_WALL: turn finished
 ```
 
----
-
-## Key Concepts
-
-### Sensor Fusion
-
-**Sensor fusion** means using data from multiple sensors to make better decisions. In this challenge:
-
-| Sensor              | Purpose                              | Code                         |
-| ------------------- | ------------------------------------ | ---------------------------- |
-| **Front** (`front`) | Detect walls ahead — triggers a turn | `my_robot.read_distance()`   |
-| **Side** (`side`)   | Follow the wall — PID steering       | `my_robot.read_distance_2()` |
-
-### Priority-Based Decisions
-
-When you have two sensors, you need **rules about which one takes priority**:
-
-1. **Priority 1a: Very close to wall ahead** (`front <= FRONT_STOP_DISTANCE`) → Stop and turn 90°. Most urgent.
-2. **Priority 1b: Approaching wall ahead** (`front < FRONT_SLOW_DISTANCE`) → Slow down proportionally.
-3. **Priority 2: No wall ahead** → Use PID to follow the side wall as normal.
-
-### Using `wall_sign` for Automatic Turn Direction
-
-Instead of hardcoding the turn direction, use `my_robot.wall_sign`:
-
-| `AIDriver(...)` | `wall_sign` | Turn direction at a corner         |
-| --------------- | ----------- | ---------------------------------- |
-| `"left"`        | `-1`        | Turn **right** away from left wall |
-| `"right"`       | `+1`        | Turn **left** away from right wall |
-
-```python
-# Turn away from the wall you are following
-if my_robot.wall_sign == -1:   # following left wall → turn right
-    my_robot.turn_90("right")
-else:                          # following right wall → turn left
-    my_robot.turn_90("left")
-```
-
-This means the same code works whether the robot is set to `"left"` or `"right"` — no hardcoded direction needed. `turn_90` uses the **gyroscope** to rotate exactly 90°, so the turn is accurate no matter the battery voltage or floor friction.
-
-### P Control on the Front Sensor — Smooth Deceleration
-
-Instead of slamming on the brakes, use P control on the front sensor to control **speed**:
-
-```
-approach_speed = FRONT_Kp × (front - FRONT_STOP_DISTANCE)
-```
-
-| Front distance | Kp=1.0, stop=150mm                       | Result speed    |
-| -------------- | ---------------------------------------- | --------------- |
-| 400mm          | 1.0 × (400 − 150) = 250 → clamped to 200 | 200             |
-| 300mm          | 1.0 × (300 − 150) = 150                  | 150             |
-| 200mm          | 1.0 × (200 − 150) = 50 → clamped to 120  | 120             |
-| 150mm          | 1.0 × (150 − 150) = 0                    | **Stop → turn** |
-
-### Resetting PID After a Turn
-
-After turning, the side sensor sees a completely different wall. Reset both variables or the PID will make a large incorrect correction:
-
-```python
-side_integral = 0
-side_previous_error = 0
-```
-
-### Gyro Turns: `turn_90`
-
-`my_robot.turn_90("left")` or `my_robot.turn_90("right")` rotates the robot using a **closed-loop gyroscope PID**. The robot measures its own rotation rate and stops at exactly 90° — there is no timing value to guess. This replaces the old `rotate_* + hold_state(TURN_TIME_90)` pattern entirely.
-
----
-
-## Step 1 — Start from Your Challenge 3 Code
-
-Copy your working PID code. You will add:
-
-1. Front sensor variables: `FRONT_SLOW_DISTANCE`, `FRONT_STOP_DISTANCE`, `FRONT_Kp`.
-2. A front-sensor check at the **top** of the loop (before the PID code) that calls `my_robot.turn_90(...)`.
-
----
-
-## Step 2 — Add New Configuration Variables
-
-```python
-# Front sensor P-controlled approach
-FRONT_SLOW_DISTANCE = 400  # Start decelerating (mm)
-FRONT_STOP_DISTANCE = 150  # Stop and turn (mm)
-FRONT_Kp = 1.0
-```
-
-> [!Note]
-> The 90° turn is handled by the gyroscope (`my_robot.turn_90`), so there is no turn-timing value left to tune.
-
----
-
-## Step 3 — Add the Front Sensor Check
-
-At the **top** of your `while True:` loop, before the PID code, add:
+In code, each state is a **function that returns the name of the next state**, and the main loop
+just runs whichever state is current:
 
 ```python
 while True:
-    front = my_robot.read_distance()
-
-    # Priority 1: Wall ahead — P-controlled deceleration then 90° turn
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            # Close enough — stop and turn 90° away from your wall
-            my_robot.brake()
-            hold_state(0.3)
-            if my_robot.wall_sign == -1:   # following left wall → turn right
-                my_robot.turn_90("right")
-            else:                          # following right wall → turn left
-                my_robot.turn_90("left")
-            my_robot.brake()
-            hold_state(0.3)
-            side_integral = 0
-            side_previous_error = 0
-            continue
-        else:
-            # Approaching — slow down proportionally
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-            hold_state(0.05)
-            continue
+    if state == "FOLLOW_WALL":
+        state = follow_wall()
+    elif state == "TURN":
+        state = turn()
 ```
 
-> [!Important]
-> The `front != -1` check prevents decelerating when the sensor is in error state.
+That is the whole pattern. Every challenge from here adds **states** and **triggers** to this same
+loop — nothing else changes.
 
 ---
 
-## Step 4 — Keep Your PID Code
+## Concept 2 — Triggers: how a state decides to switch
 
-The rest of the loop is your existing Challenge 3 PID wall-following code. It only runs when there is **no wall ahead**:
+A trigger is just a condition a state checks. `FOLLOW_WALL` reads the **front** sensor every loop. If
+a wall is close enough ahead, it returns `"TURN"` instead of steering:
 
 ```python
-    # Priority 2: Side wall following with PID
-    side = my_robot.read_distance_2()
-
-    if side == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0
-        hold_state(0.05)
-        continue
-
-    error = side - TARGET_WALL_DISTANCE
-    # ... rest of PID code ...
+front = my_robot.read_distance()
+if front != -1 and front <= FRONT_STOP_DISTANCE:
+    return "TURN"          # trigger fired — switch state
 ```
 
----
+| Tunable               | Meaning                                               |
+| --------------------- | ----------------------------------------------------- |
+| `FRONT_STOP_DISTANCE` | how close (mm) the wall ahead must be to start a turn |
+| `FRONT_SLOW_DISTANCE` | start slowing down once the wall is within this range |
+| `FRONT_Kp`            | how hard to brake as the wall approaches              |
 
-## Step 5 — Tune
-
-| Observation                           | Fix                                                          |
-| ------------------------------------- | ------------------------------------------------------------ |
-| Robot doesn't slow down before wall   | Increase `FRONT_SLOW_DISTANCE` (try 500)                     |
-| Robot stops too far from wall         | Decrease `FRONT_STOP_DISTANCE` (try 120)                     |
-| Robot crashes before stopping         | Increase `FRONT_STOP_DISTANCE` or `FRONT_Kp`                 |
-| Robot doesn't turn a full 90°         | Raise `turn_Kp` or lower `turn_tolerance` (see tuning guide) |
-| Robot overshoots / oscillates on turn | Raise `turn_Kd` (see PID Turn Tuning guide)                  |
-| Robot jerks badly after turning       | Check `side_integral` and `side_previous_error` are reset    |
+> **Why slow down first?** Slamming from full speed into a turn overshoots. `FOLLOW_WALL` ramps the
+> speed down as `front` shrinks (`speed = FRONT_Kp × (front − FRONT_STOP_DISTANCE)`) so the robot
+> arrives at the corner already slow.
 
 ---
 
-## Starter Scaffold
+## Concept 3 — The gyro turn you write once and reuse forever
 
-This is exactly what you'll see in the editor when you open the challenge. The full algorithm is already written for you — every numeric setting starts at `0`. Your job is to tune the values.
+The `TURN` state spins the robot using the **gyroscope**, not a guessed time. The gyro reports how
+fast the robot is rotating (deg/s); add that up each loop and you know the **angle turned so far**.
+Keep spinning until you reach 90°:
 
 ```python
-# Challenge 4: Corner Detection (90° turn)
-# --------------------------------------------------------------------
-# Adds a front-sensor priority block that brakes, rotates 90° away
-# from the wall with the gyro, and resumes wall-following. The full
-# algorithm is already written for you. Every numeric setting starts
-# at 0.
-#
-# Tuning guides:
-#     docs.html?doc=PID_Front_Distance_Tuning_Quickstart   (FRONT_*, FRONT_Kp)
-#     docs.html?doc=PID_Turn_Tuning_Quickstart             (turn_Kp / turn_Kd)
-#
-# Values to set:
-#     all carried-forward C3 PID + base values
-#     FRONT_SLOW_DISTANCE, FRONT_STOP_DISTANCE     when to slow / brake (mm)
-#     FRONT_Kp                                      front-approach gain
-#
-# The 90° turn is handled by the gyroscope (my_robot.turn_90).
-#
-# Goal: turn the L-corner at speed without clipping either wall.
-# --------------------------------------------------------------------
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")
-
-BASE_SPEED = 0
-TARGET_WALL_DISTANCE = 0
-MAX_STEERING = 0
-
-side_Kp = 0.0
-side_Kd = 0.0
-side_Ki = 0.0
-side_INTEGRAL_MAX = 0
-
-FRONT_SLOW_DISTANCE = 0
-FRONT_STOP_DISTANCE = 0
-FRONT_Kp = 0.0
-
-side_previous_error = 0
-side_integral = 0
-
-
-while True:
-    # --- Front-sensor priority: detect & turn 90° at corners ---
-    front = my_robot.read_distance()
-
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
-
-            # Rotate AWAY from the wall (wall_sign tells us which side).
-            if my_robot.wall_sign == -1:
-                my_robot.turn_90("right")
-            else:
-                my_robot.turn_90("left")
-
-            my_robot.brake()
-            hold_state(0.3)
-
-            side_integral = 0
-            side_previous_error = 0
-            continue
-        else:
-            # Approach the wall on a P-controlled deceleration ramp.
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-            hold_state(0.05)
-            continue
-
-    # --- Side wall-follow PID (carried forward from Challenge 3) ---
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-
-    side_derivative = error - side_previous_error
-
-    steering = (
-        (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-    )
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    hold_state(0.05)
+heading = 0.0
+while (TURN_ANGLE - heading) > turn_tolerance:
+    gz = my_robot.read_gyro_z_dps()      # current spin rate, deg/s
+    heading += abs(gz) * TURN_DT         # add the angle covered this step
+    error = TURN_ANGLE - heading         # how far left to go
+    speed = turn_Kp * error + turn_Kd * (error - prev_error)
+    # ...drive the two wheels in opposite directions to spin on the spot...
 ```
 
-<details>
-<summary><strong>Reference Solution</strong> — click to expand <em>(only after you've genuinely tried)</em></summary>
+This is a **PID on the turn itself**. You tune three gains here and **carry them forward to every
+later challenge**:
 
-The simulator-tuned answer key fills in every value. These are the same numbers used by the automated integration tests.
+| Tunable          | Meaning                                           |
+| ---------------- | ------------------------------------------------- |
+| `turn_Kp`        | how aggressively it spins toward the target angle |
+| `turn_Kd`        | damps the overshoot so it doesn't spin past 90°   |
+| `turn_tolerance` | how close (degrees) to 90° counts as "done"       |
 
-```python
-from aidriver import AIDriver, hold_state
-import aidriver
+The angle (90°) is fixed; the gains decide _how briskly and precisely_ it gets there. See the
+[PID Turn Tuning Quickstart](docs.html?doc=PID_Turn_Tuning_Quickstart).
 
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")
-
-BASE_SPEED = 200
-TARGET_WALL_DISTANCE = 200
-MAX_STEERING = 60
-
-side_Kp = 0.25
-side_Kd = 0.40
-side_Ki = 0.001
-side_INTEGRAL_MAX = 50
-
-FRONT_SLOW_DISTANCE = 400
-FRONT_STOP_DISTANCE = 150
-FRONT_Kp = 1.0
-
-side_previous_error = 0
-side_integral = 0
-
-
-while True:
-    # --- Front-sensor priority: detect & turn 90° at corners ---
-    front = my_robot.read_distance()
-
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
-
-            if my_robot.wall_sign == -1:
-                my_robot.turn_90("right")
-            else:
-                my_robot.turn_90("left")
-
-            my_robot.brake()
-            hold_state(0.3)
-
-            side_integral = 0
-            side_previous_error = 0
-            continue
-        else:
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-            hold_state(0.05)
-            continue
-
-    # --- Side wall-follow PID (carried forward from Challenge 3) ---
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-
-    side_derivative = error - side_previous_error
-
-    steering = (
-        (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-    )
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    hold_state(0.05)
-```
-
-</details>
+> **Which way does it spin?** Away from the wall you follow. `gyro_turn_pid()` takes a `turn_right`
+> flag, and `my_robot.wall_sign` (−1 for a left wall) picks the direction automatically — so the
+> same code works for a left- or right-hand robot.
 
 ---
 
-## Debugging Tips
+## What you tune in this challenge
 
-- Add `print("front:", front)` at the top of the loop to confirm the sensor is reading correctly.
-- If the robot never slows down, check that `FRONT_SLOW_DISTANCE` is large enough to detect the wall in time.
-- If the robot turns the wrong way, check that `AIDriver("left")` or `AIDriver("right")` matches your physical setup.
-- If the PID oscillates badly after a turn, confirm `side_integral = 0` and `side_previous_error = 0` are being reset.
+Everything is already wired up in the editor; the numbers start at `0`. Fill them in:
+
+| Group          | Tunables                                                       |
+| -------------- | -------------------------------------------------------------- |
+| Wall follow    | `BASE_SPEED`, `TARGET_WALL_DISTANCE`, `MAX_STEERING`           |
+| Side PID       | `side_Kp`, `side_Ki`, `side_Kd`, `side_INTEGRAL_MAX` (from C3) |
+| Front approach | `FRONT_SLOW_DISTANCE`, `FRONT_STOP_DISTANCE`, `FRONT_Kp`       |
+| Gyro turn      | `turn_Kp`, `turn_Kd`, `turn_tolerance`                         |
+
+> The turn **mechanics** (`TURN_ANGLE = 90`, step time, speed limits, a safety step-cap) are filled
+> in for you — they are physics, not tuning.
+
+---
+
+## Tuning guide
+
+| Observation                           | Fix                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------ |
+| Doesn't slow before the wall          | Raise `FRONT_SLOW_DISTANCE` (try 500)                                          |
+| Stops too far from the wall           | Lower `FRONT_STOP_DISTANCE` (try 120)                                          |
+| Crashes before stopping               | Raise `FRONT_STOP_DISTANCE` or `FRONT_Kp`                                      |
+| Doesn't complete a full 90°           | Raise `turn_Kp` or lower `turn_tolerance`                                      |
+| Overshoots / wobbles on the turn      | Raise `turn_Kd`                                                                |
+| Lurches sideways right after the turn | The side PID state is reset for you on entering `TURN` — check your side gains |
+
+---
+
+## Try it
+
+1. Open **Challenge 4** in the editor — the two-state machine and the gyro turn are already written.
+2. Fill in the tunables above and run.
+3. Stuck? The tuned answer lives in `app/answers/challenge-4.py`, but try your own numbers first.
 
 ---
 
 ## What's Next
 
-In [Challenge 5](docs.html?doc=Challenge_5) you will handle the opposite case — an **outside (convex) corner** where the wall ends abruptly — by adding gentle "lost-wall" recovery so the robot wraps the corner instead of driving off.
+[Challenge 5](docs.html?doc=Challenge_5) adds a **third state** for outside corners, where the side
+wall suddenly _ends_ and the robot has to wrap around it.

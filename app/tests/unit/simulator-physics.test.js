@@ -381,7 +381,7 @@ describe("§5 Turning arcs", () => {
 //  §6  Turn timing with acceleration ramp
 // ═══════════════════════════════════════════════════════════════════
 describe("§6 Turn timing with ramp", () => {
-  test("90° in ~0.35s at TURN_SPEED=180", () => {
+  test("90° in ~0.35s at wheel speed 180", () => {
     var r = makeRobot({
       x: 1000,
       y: 1000,
@@ -396,7 +396,7 @@ describe("§6 Turn timing with ramp", () => {
     expect(Math.abs(r.heading - 90)).toBeLessThan(8);
   });
 
-  test("180° in ~0.60s at TURN_SPEED=180", () => {
+  test("180° in ~0.60s at wheel speed 180", () => {
     var r = makeRobot({
       x: 1000,
       y: 1000,

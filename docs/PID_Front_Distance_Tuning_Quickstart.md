@@ -74,8 +74,8 @@ This is **how early** the robot starts slowing down. It must be far enough to gi
 
 Typical real-robot value: **350 – 500 mm**. Default in the starter: `400 mm`.
 
-> [!Important]
-> `FRONT_SLOW_DISTANCE` is also the **threshold for the side-sensor check** in the dead-end decision (Challenge 6+). If you raise it, also re-check that corners are still classified as 90° not 180°.
+> [!Note]
+> `FRONT_SLOW_DISTANCE` only controls **when the robot starts slowing down** before a wall ahead. The decision to wrap an outside corner uses a separate threshold (`NIB_LOST_DISTANCE`), so changing this value does not affect nib detection.
 
 ---
 
@@ -114,4 +114,4 @@ FRONT_STOP_DISTANCE = 150   # mm — stop and turn
 FRONT_Kp            = 1.0   # deceleration gain
 ```
 
-When this is solid, move on to the [Turn Tuning Quickstart](pid-tuning.html#turnGuide) to dial in the gyro turn gains (`turn_Kp`, `turn_Kd`) used by `turn_90` and `turn_180`.
+When this is solid, move on to the [Turn Tuning Quickstart](docs.html?doc=PID_Turn_Tuning_Quickstart) to dial in the gyro turn gains (`turn_Kp`, `turn_Kd`) used by the `TURN` and `NIB_WALL` states.

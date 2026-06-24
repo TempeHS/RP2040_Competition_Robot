@@ -515,6 +515,7 @@ class AIDriver:
     def __init__(
         self,
         wall_side,  # Required: "left" or "right" — which wall the robot follows
+        min_approach_speed=130,  # Floor PWM for the front-approach ramp
         right_speed_pin=3,  # GP3 (PWM capable)
         left_speed_pin=11,  # GP11 (PWM capable)
         right_dir_pin=12,  # GP12
@@ -564,6 +565,10 @@ class AIDriver:
         # wall_sign: 1 = right wall, -1 = left wall
         # Used in the unified steering formula so direction is always correct.
         self.wall_sign = -1 if str(wall_side).upper() == "LEFT" else 1
+
+        # Floor PWM applied while ramping toward a front wall so the robot keeps
+        # creeping instead of stalling below the motor dead zone.
+        self.min_approach_speed = min_approach_speed
 
         # Library-side preflight: log pin config and attempt a quick sensor ping
         _d(

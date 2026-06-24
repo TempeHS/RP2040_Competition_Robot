@@ -77,7 +77,11 @@ const AIDriverStub = {
            * Initialize the stub and register the robot instance.
            * @returns {null}
            */
-          $loc.__init__ = new Sk.builtin.func(function (self, wallSide) {
+          $loc.__init__ = new Sk.builtin.func(function (
+            self,
+            wallSide,
+            minApproachSpeed,
+          ) {
             // Resolve the wall_side argument (defaults to "left" if omitted).
             let sideStr = "left";
             if (
@@ -103,6 +107,24 @@ const AIDriverStub = {
             self.tp$setattr(
               new Sk.builtin.str("wall_sign"),
               new Sk.builtin.int_(sideStr === "left" ? -1 : 1),
+            );
+
+            // Floor PWM for the front-approach ramp (default 130). Exposed so
+            // challenge code can read `my_robot.min_approach_speed`.
+            let minAppr = 130;
+            if (
+              minApproachSpeed !== undefined &&
+              !(minApproachSpeed instanceof Sk.builtin.none)
+            ) {
+              try {
+                minAppr = Sk.ffi.remapToJs(minApproachSpeed);
+              } catch (e) {
+                minAppr = 130;
+              }
+            }
+            self.tp$setattr(
+              new Sk.builtin.str("min_approach_speed"),
+              new Sk.builtin.int_(minAppr),
             );
 
             self.rightSpeed = 0;

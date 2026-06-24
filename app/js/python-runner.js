@@ -192,13 +192,14 @@ def _get_commands():
 class AIDriver:
     """AIDriver robot controller for the simulator"""
     
-    def __init__(self, wall_side):
+    def __init__(self, wall_side, min_approach_speed=130):
         """Initialize the robot. wall_side must be "left" or "right" (case-insensitive)."""
         global DEBUG_AIDRIVER
         side = str(wall_side).lower()
         if side not in ("left", "right"):
             side = "left"
         self.wall_sign = -1 if side == "left" else 1
+        self.min_approach_speed = min_approach_speed
         self._right_speed = 0
         self._left_speed = 0
         self._is_moving = False

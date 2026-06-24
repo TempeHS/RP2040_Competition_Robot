@@ -109,26 +109,28 @@ If the robot suddenly veers when re-acquiring the wall, lower `side_INTEGRAL_MAX
 
 ---
 
-## 7. Tune `LOST_WALL_DRIFT` (Challenge 5+)
+## 7. Tune the Nib Wrap (Challenge 5+)
 
-`LOST_WALL_DRIFT` is the fraction of `BASE_SPEED` subtracted from the **inside** wheel whenever the side sensor returns `-1` (an outside corner or a free-standing wall ending). It curls the robot back toward where the wall used to be so it wraps the corner instead of driving off into open space.
+From Challenge 5 the robot has a dedicated `NIB_WALL` state for outside corners (where the side wall ends). When the side reading stays lost — beyond `NIB_LOST_DISTANCE`, or `-1` — for `NIB_CONFIRM_TIME` seconds, the machine drives past the corner, spins 90° toward the wall, and drives alongside the new wall. You tune the two forward times:
 
 ```python
-LOST_WALL_DRIFT = 0.20   # answer-key value, range 0.0 – 0.30
+NIB_FORWARD_BEFORE = 0.30   # seconds forward before the turn (answer-key value)
+NIB_FORWARD_AFTER  = 0.45   # seconds forward after the turn  (answer-key value)
 ```
 
-Tune against a single outside corner — the **Challenge 5 maze** is purpose-built for this. Run three times per value, in `0.05` steps:
+Tune against a single outside corner — the **Challenge 5 maze** is purpose-built for this. Run three times per value, in `0.05` s steps:
 
-| Symptom at the outside corner                                  | Adjustment                                                                    |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Robot drives straight off the corner — never finds wall        | `+0.05` to `LOST_WALL_DRIFT`                                                  |
-| Robot wraps too tight — pivots in place / spins past wall      | `-0.05` to `LOST_WALL_DRIFT`                                                  |
-| Inside wheel stalls audibly / robot rotates instead of curving | Inside wheel below `MIN_MOTOR_SPEED` (100). Lower drift OR raise `BASE_SPEED` |
-| Big PID jolt the moment the wall reappears                     | Make sure `side_integral = 0` is reset inside the `side == -1` branch         |
+| Symptom at the outside corner                               | Adjustment                                                                                    |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Robot clips the corner as it starts to wrap                 | `+0.05` to `NIB_FORWARD_BEFORE`                                                               |
+| Robot swings out wide and loses the next wall               | `-0.05` to `NIB_FORWARD_BEFORE`                                                               |
+| Robot finishes the wrap too early / not yet beside the wall | `+0.05` to `NIB_FORWARD_AFTER`                                                                |
+| Robot drifts past the new wall before re-locking            | `-0.05` to `NIB_FORWARD_AFTER`                                                                |
+| Robot spins at random mid-corridor                          | `NIB_LOST_DISTANCE` is too low for your `TARGET_WALL_DISTANCE` — keep it at the pre-set `400` |
 
-**Stall guard:** keep `BASE_SPEED * (1 - LOST_WALL_DRIFT) >= 100`. With `BASE_SPEED = 200` any drift up to `0.50` is theoretically safe; in practice keep it `<= 0.30` so the curl is gentle. With `BASE_SPEED = 140`, cap drift at `0.28`.
+> `NIB_LOST_DISTANCE` (400 mm) and `NIB_CONFIRM_TIME` (0.5 s) are pre-set because they depend on the maze, not your driving. Leave them unless a real maze has unusually wide corridors. See [Challenge 5](docs.html?doc=Challenge_5).
 
-Typical final `LOST_WALL_DRIFT` on the real robot: **0.15 – 0.25**. Simulator-tuned answer key: `0.20`.
+Typical final wrap times on the real robot: `NIB_FORWARD_BEFORE` **0.25 – 0.40 s**, `NIB_FORWARD_AFTER` **0.35 – 0.55 s**. Simulator-tuned answer key: `0.30` and `0.45`.
 
 ---
 
@@ -151,8 +153,8 @@ Typical final `LOST_WALL_DRIFT` on the real robot: **0.15 – 0.25**. Simulator-
 
 1. Three straight-corridor passes
 2. Three L-corner passes (Challenge 3 maze)
-3. Three outside-corner wraps (Challenge 5 maze) — confirms `LOST_WALL_DRIFT`
-4. Three zig-zag passes (Challenge 7 maze)
+3. Three outside-corner wraps (Challenge 5 maze) — confirms the nib wrap times
+4. Three full-maze passes (Challenge 7 maze)
 5. Change **one gain at a time**; record values + behaviour after each run
 
 ---

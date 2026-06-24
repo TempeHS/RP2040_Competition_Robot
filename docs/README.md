@@ -15,16 +15,21 @@ All components can be purchased from [AliExpress](https://www.aliexpress.com/) a
 
 1. [Laser cut chassis](manufacturing_files/LC_Faculty_AIDriverGluelessv2_PP.pdf) using [(3mm Ply)](https://www.bunnings.com.au/2440-x-1220mm-3mm-plywood-pine-premium-bc-grade_p0340267)
 2. [3D Printed components](docs/manufacturing_files)
-3. [Ultrasonic Sensor](https://www.aliexpress.com/item/1005005636789307.html)
-4. [RP2040 Uno Development Board](https://www.aliexpress.com/item/1005009315359179.html)
-5. [Omni Wheel](https://www.aliexpress.com/item/32954940078.html)
-6. [L298NH Motor Shield](https://www.aliexpress.com/item/32801279582.html)
-7. 4x [Dupont Cables](https://www.aliexpress.com/item/4000053353555.html)
-8. 2x [TT Tyre](https://www.aliexpress.com/item/1005005767062155.html)
-9. 2x [TT DC plastic geared motor](https://www.aliexpress.com/item/1005004854068015.html)
-10. [5x2.1 Barrel Jack](https://www.aliexpress.com/item/33024967273.html)
-11. [6x AA Battery Holder with Switch](https://www.aliexpress.com/item/4001266904978.html)
-12. 6x AA Batteries
+3. [RP2040 Uno Development Board](https://www.aliexpress.com/item/1005009315359179.html)
+4. [Seeed Studio Grove - Base Shield V2.0 (Arduino UNO form factor)](https://wiki.seeedstudio.com/Base_Shield_V2/) — carries the Grove sensors
+5. 2x [Seeed Studio Grove - Ultrasonic Distance Sensor](https://wiki.seeedstudio.com/Grove-Ultrasonic_Ranger/) (front + side, single-pin SIG)
+6. [Seeed Studio Grove - 6-Axis Accelerometer & Gyroscope (LSM6DS3)](https://wiki.seeedstudio.com/Grove-6-Axis_Accelerometer&Gyroscope/) — required for closed-loop gyro turns
+7. [Omni Wheel](https://www.aliexpress.com/item/32954940078.html)
+8. [L298NH Motor Shield](https://www.aliexpress.com/item/32801279582.html)
+9. 4x [Seeed Studio Grove - Universal 4 Pin Cables](https://wiki.seeedstudio.com/Grove-Universal_4_Pin_Buckled_Cable/)
+10. 2x [TT Tyre](https://www.aliexpress.com/item/1005005767062155.html)
+11. 2x [TT DC plastic geared motor](https://www.aliexpress.com/item/1005004854068015.html)
+12. [5x2.1 Barrel Jack](https://www.aliexpress.com/item/33024967273.html)
+13. [6x AA Battery Holder with Switch](https://www.aliexpress.com/item/4001266904978.html)
+14. 6x AA Batteries
+
+> [!Note]
+> This build now uses **Seeed Studio Grove sensors** plugged into a **Grove Base Shield** instead of bare ultrasonic modules. The Grove ultrasonic rangers handle front/side distance, and the Grove LSM6DS3 gyroscope provides the yaw rate used for the closed-loop 90°/180° gyro turns.
 
 ### Preparation
 

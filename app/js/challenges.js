@@ -137,14 +137,14 @@ const Challenges = (function () {
       menuGroup: "advanced",
       difficulty: DIFFICULTY.MEDIUM,
       description:
-        "Use the front sensor to detect a corner, turn 90° in the correct direction, and continue wall following.",
-      goal: "Follow the wall, detect the corner, turn 90°, and reach the exit.",
+        "Use the front sensor to detect a corner, then run your own gyro turn PID — its error is the gyroscope heading, not the wall distance — to spin 90° in the correct direction before resuming wall following.",
+      goal: "Follow the wall, detect the corner, turn 90° with your gyro turn PID, and reach the exit.",
       hints: [
         "Use read_distance() for the front sensor — detects the wall ahead",
-        "If front <= FRONT_STOP_DISTANCE → stop and turn 90° away from your wall",
-        "Use wall_sign to pick the correct turn direction automatically",
+        "If front <= FRONT_STOP_DISTANCE → brake, then run your gyro turn PID",
+        "The turn's error is the gyro heading (read_gyro_z_dps), not the wall — tune turn_Kp / turn_Kd / turn_tolerance",
+        "wall_sign picks the turn direction automatically (left wall → spin right)",
         "Reset side_integral and side_previous_error after turning",
-        "Call my_robot.turn_90('left'/'right') — the gyro turns exactly 90°",
       ],
       startPosition: { x: 200, y: 1700, heading: 0 },
       successCriteria: {
@@ -156,23 +156,23 @@ const Challenges = (function () {
       maze: "corner",
     },
 
-    // Challenge 5: Outside Corners — Lost-Wall Recovery
+    // Challenge 5: Outside Corners — Turn Left at a Nib
     5: {
       id: 5,
       title: "Outside Corners",
-      subtitle: "Lost-Wall Recovery",
+      subtitle: "Turn Left at a Nib",
       icon: "bi-bounding-box",
       menuGroup: "advanced",
       difficulty: DIFFICULTY.MEDIUM,
       description:
-        "When the wall ends abruptly (an outside / convex corner), the side sensor returns -1. Add a gentle curl toward where the wall was so the robot wraps around the corner instead of driving off into open space.",
-      goal: "Follow the inside edge of the nib, then wrap around its top corner to reach the pocket behind it.",
+        "When the wall you're following ends abruptly (an outside / convex corner, or a free-standing nib), the side sensor returns -1. Following the left-hand rule, turn LEFT to wrap the corner — reusing the SAME gyro turn PID you wrote in Challenge 4.",
+      goal: "Detect the nib, turn left with your held gyro turn PID, and reach the pocket behind it.",
       hints: [
-        "side == -1 means the wall has ended — that's the outside corner",
-        "When lost, slow the inside wheel slightly (LOST_WALL_DRIFT)",
-        "Keep the inside wheel ≥ MIN_MOTOR_SPEED (100) or it will stall",
-        "Reset side_integral when the wall blanks so the PID re-locks cleanly",
-        "Use wall_sign so the same code wraps in either AIDriver mode",
+        "side == -1 means the wall has ended — that's the outside corner / nib",
+        "Left-hand rule: turn LEFT to wrap a nib (wall_sign == 1 → spin left)",
+        "Reuse the SAME gyro turn PID from C4 — only the direction differs",
+        "Keep turn_Kp / turn_Kd / turn_tolerance at your tuned C4 values",
+        "Reset side_integral and side_previous_error after the turn",
       ],
       startPosition: { x: 1000, y: 1700, heading: 0 },
       successCriteria: {
@@ -186,22 +186,22 @@ const Challenges = (function () {
       maze: "outside_corners",
     },
 
-    // Challenge 6: Dead End Detection — 90° corner OR 180° dead end
+    // Challenge 6: Full Maze — Right at Dead Ends, Left at Nibs
     6: {
       id: 6,
       title: "Dead End Detection",
-      subtitle: "Sensor Fusion",
+      subtitle: "Dead Ends + Nibs",
       icon: "bi-arrow-counterclockwise",
       menuGroup: "advanced",
       difficulty: DIFFICULTY.MEDIUM,
       description:
-        "Extend corner logic to handle dead ends: check the side sensor to decide between a 90° corner turn or a 180° reversal.",
-      goal: "Follow the wall, detect the dead end, turn 180°, and reach the exit.",
+        "Combine both turn behaviours into one solver: a wall ahead (dead end) → turn RIGHT, the side wall ending (nib) → turn LEFT. Both reuse the SAME held gyro turn PID from Challenge 4.",
+      goal: "Follow the wall, turn right at the dead end and left at nibs, and reach the exit.",
       hints: [
-        "Stop at the front wall — then check the side sensor",
-        "Side sensor open (== -1 or very far) → corner → turn_90",
-        "Side sensor blocked → dead end → turn_180 (gyro reverses 180°)",
-        "Use wall_sign to pick the correct rotation direction",
+        "Front wall (front <= FRONT_STOP_DISTANCE) → dead end → turn RIGHT",
+        "Side sensor open (side == -1) → nib → turn LEFT",
+        "Both turns reuse the SAME gyro turn PID — keep your tuned C4 gains",
+        "wall_sign picks the rotation direction for each case",
         "Reset side_integral and side_previous_error after every turn",
       ],
       startPosition: { x: 200, y: 1700, heading: 0 },
@@ -225,15 +225,14 @@ const Challenges = (function () {
       menuGroup: "advanced",
       difficulty: DIFFICULTY.HARD,
       description:
-        "Navigate the full maze using PID wall following and the hand-on-wall algorithm.",
+        "Navigate the full maze using your tuned PID wall following and the left-hand rule: turn RIGHT at dead ends and LEFT at nibs — every turn using the held gyro turn PID from Challenge 4.",
       goal: "Reach the exit zone without hitting walls. Time limit: 60 seconds.",
       hints: [
-        "Hand-on-wall: keep one hand touching the wall at all times",
-        "Priority 1: Wall ahead → stop and turn away",
-        "Priority 2: Lost the wall (side = -1) → gentle turn toward it",
-        "Priority 3: Wall visible → PID follow as before",
-        "Choose right-hand or left-hand rule and be consistent",
-        "Use the maze selector to try different difficulty levels",
+        "Left-hand rule: keep the wall on your left the whole way",
+        "Priority 1: wall ahead (dead end) → brake and turn RIGHT",
+        "Priority 2: side == -1 (nib) → turn LEFT",
+        "Priority 3: wall visible → PID wall-follow as before",
+        "Every turn reuses your held C4 gyro turn PID (turn_Kp / turn_Kd / turn_tolerance)",
       ],
       startPosition: { x: 300, y: 1700, heading: 0 },
       spawnXRange: { min: 110, max: 410 },

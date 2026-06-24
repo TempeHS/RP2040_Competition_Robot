@@ -1,397 +1,122 @@
-# Challenge 6: Dead End Detection
+# Challenge 6: Dead Ends and Nibs — One Machine, Both Turns
 
-In this challenge you will extend your corner-detection code to also handle a **180° dead end**. After stopping at a front wall, the robot checks the **side sensor** to decide whether it is at a corner (turn 90°) or a dead end (turn 180°).
+Challenge 6 introduces **no new state**. Instead you take the exact three-state machine from
+Challenge 5 and run it on a maze that has **both** kinds of corner: walls that block you from the
+**front** (dead ends / inside corners) and walls that **end** beside you (outside corners / nibs).
+
+The lesson is that a well-designed state machine **scales**: the same `FOLLOW_WALL` / `TURN` /
+`NIB_WALL` states that solved one corner type also solve a maze full of mixed corners, with only
+tuning to adjust.
 
 You will learn:
 
-- How to use sensor data to **choose between two behaviours** at runtime.
-- Why the same code must handle **multiple manoeuvre types** in a real maze.
-- How to tune separate turn times for 90° and 180° turns.
+- How a single state machine handles **multiple corner types** with no new logic.
+- The **left-hand rule** and why it guarantees a wall is always nearby to follow.
+- How the same `gyro_turn_pid` serves both turn directions.
 
 ---
 
 ## Success Criteria
 
-My robot follows the wall, **correctly identifies the dead end**, **turns 180°**, and reaches the **green exit zone**.
+My robot follows the wall through a maze of **dead ends and outside corners**, turning the correct
+way at each, and reaches the **green exit zone**.
 
 ---
 
 ## Before You Begin
 
-1. Complete [Challenge 4](docs.html?doc=Challenge_4) — you need working corner detection.
+1. Complete [Challenge 5](docs.html?doc=Challenge_5) — carry forward every tuned value.
 2. Open the **Simulator** and select **Challenge 6**.
-3. Run your Challenge 4 code here — the robot will attempt a 90° turn instead of 180° and fail to reach the exit.
+3. Your Challenge 5 code already has all three states — this challenge is about **trusting the same
+   machine** on a harder maze and tuning it.
 
 ---
 
-## Flowchart Of The Algorithm
+## Concept 1 — The left-hand rule
+
+Keep one hand (say the **left**) always on the wall and you will eventually walk every corridor of a
+simply-connected maze and find the exit. The robot does the same with its **side sensor** as that
+hand. The two states that turn map directly onto the two things the "hand" meets:
+
+| Situation             | Sensor evidence                  | State      | Turn direction         |
+| --------------------- | -------------------------------- | ---------- | ---------------------- |
+| Wall blocks the front | `front <= FRONT_STOP_DISTANCE`   | `TURN`     | **away** from the wall |
+| Side wall ends        | side lost for `NIB_CONFIRM_TIME` | `NIB_WALL` | **toward** the wall    |
+
+For a **left**-hand robot that reads as "turn **right** at a dead end, **left** at a nib." The
+`my_robot.wall_sign` value flips both automatically for a right-hand robot — your code never
+hard-codes a direction.
 
 ```mermaid
-flowchart TD
-    A[Start Program] --> B[Setup Robot & Variables]
-    B --> C{Control Loop}
-    C --> D[Read front sensor]
-    D --> E{"Wall ahead?<br>(front < FRONT_SLOW_DISTANCE)"}
-    E -- Yes --> F{"Very close?<br>(front <= FRONT_STOP_DISTANCE)"}
-    F -- Yes --> G[Brake + Check side sensor]
-    G --> H{"Side open?<br>(side == -1 or side > FRONT_SLOW_DISTANCE)"}
-    H -- Yes --> I["Turn 90° away from wall"]
-    H -- No --> J["Turn 180° (reverse direction)"]
-    I --> K[Reset PID + continue]
-    J --> K
-    K --> C
-    F -- No --> L["Slow down proportionally"]
-    L --> C
-    E -- No --> M[Read side sensor]
-    M --> N{Sensor OK?}
-    N -- No --> O[Drive straight + reset side_integral]
-    O --> C
-    N -- Yes --> P[PID wall follow]
-    P --> C
-
-    style A fill:#e1f5fe,color:#000000
-    style B fill:#000000,color:#ffffff
-    style C fill:#fff3e0,color:#000000
-    style E fill:#ffcdd2,color:#000000
-    style F fill:#ffcdd2,color:#000000
-    style G fill:#ffcdd2,color:#000000
-    style H fill:#ffe0b2,color:#000000
-    style I fill:#e8f5e8,color:#000000
-    style J fill:#e8f5e8,color:#000000
-    style P fill:#e8f5e8,color:#000000
+stateDiagram-v2
+    [*] --> FOLLOW_WALL
+    FOLLOW_WALL --> TURN: front blocked (dead end / inside corner)
+    FOLLOW_WALL --> NIB_WALL: side wall ended (outside corner)
+    TURN --> FOLLOW_WALL: turn finished
+    NIB_WALL --> FOLLOW_WALL: wrap finished
 ```
 
 ---
 
-## Key Concepts
+## Concept 2 — Why no new code is needed
 
-### Distinguishing Corner from Dead End
-
-After stopping at a front wall, read the **side sensor** to identify the situation:
-
-| Side sensor reading             | Situation                               | Turn needed        |
-| ------------------------------- | --------------------------------------- | ------------------ |
-| `-1` or `> FRONT_SLOW_DISTANCE` | **Corner** — corridor opens to the side | 90° away from wall |
-| Small value (wall nearby)       | **Dead end** — walls on front AND side  | 180° reversal      |
+Each loop, `FOLLOW_WALL` checks the **front** trigger first, then the **side-lost** trigger, then
+otherwise steers with the PID. That ordering already covers every case in this maze:
 
 ```python
-my_robot.brake()
-hold_state(0.3)
-side_check = my_robot.read_distance_2()
-dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
-
-turn_dir = "right" if my_robot.wall_sign == -1 else "left"
-if dead_end:
-    my_robot.turn_180(turn_dir)   # walls front AND side
-else:
-    my_robot.turn_90(turn_dir)    # corner
-```
-
-### `turn_180` — a Gyro 180° Reversal
-
-Just like `turn_90`, `my_robot.turn_180("left"/"right")` uses the **gyroscope** to rotate the robot exactly 180° and stop. There is no timing to guess and no `1.7×` rule to derive — the same closed-loop controller simply targets a larger angle. Because the robot measures its own rotation, a 180° reversal is just as accurate as a 90° corner.
-
-> [!Tip]
-> The turn accuracy is set once by the gyro PID gains (`turn_Kp`, `turn_Kd`) — see the [PID Turn Tuning Quickstart](docs.html?doc=PID_Turn_Tuning_Quickstart). You do not tune anything per-challenge.
-
----
-
-## Step 1 — Start from Your Challenge 4 Code
-
-Copy your working Challenge 4 code. The only change is inside the `if front <= FRONT_STOP_DISTANCE:` block — replace the fixed `turn_90` with a side-sensor check that chooses between `turn_90` and `turn_180`.
-
----
-
-## Step 2 — Replace the Turn Block
-
-Find this block from Challenge 4:
-
-```python
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
-            if my_robot.wall_sign == -1:
-                my_robot.turn_90("right")
-            else:
-                my_robot.turn_90("left")
-            my_robot.brake()
-            hold_state(0.3)
-            side_integral = 0
-            side_previous_error = 0
-            continue
-```
-
-Replace it with:
-
-```python
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
-            # Check side sensor to decide corner (90°) vs dead end (180°)
-            side_check = my_robot.read_distance_2()
-            dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
-            turn_dir = "right" if my_robot.wall_sign == -1 else "left"
-            if dead_end:
-                my_robot.turn_180(turn_dir)  # walls on front and side
-            else:
-                my_robot.turn_90(turn_dir)   # corridor is open to the side
-            my_robot.brake()
-            hold_state(0.3)
-            side_integral = 0
-            side_previous_error = 0
-            continue
-```
-
----
-
-## Step 3 — Tune
-
-| Observation                     | Fix                                                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Robot turns 90° at the dead end | Side check too strict — the side reading is being treated as "open"; lower the threshold it compares against              |
-| Robot turns 180° at a corner    | Side check too loose — raise `FRONT_SLOW_DISTANCE`, or verify the side sensor reads -1 at corners                         |
-| Turn under- or over-rotates     | Adjust the gyro PID gains (`turn_Kp`, `turn_Kd`) in the [PID Turn Tuning guide](docs.html?doc=PID_Turn_Tuning_Quickstart) |
-
----
-
-## Starter Scaffold
-
-This is exactly what you'll see in the editor when you open the challenge. The full algorithm — including the side-sensor decision — is already written for you. Every numeric setting starts at `0`. Your job is to tune the values.
-
-```python
-# Challenge 6: Dead-End Detection (90° vs 180°)
-# --------------------------------------------------------------------
-# After braking at a wall ahead, the robot reads its side sensor to
-# decide between a gyro 90° turn (corner) or a gyro 180° turn (dead
-# end). The full algorithm is already written for you. Every numeric
-# setting starts at 0.
-#
-# Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
-#
-# Values to set:
-#     all carried-forward C4 values
-#
-# Both turn sizes are handled by the gyroscope (my_robot.turn_90 /
-# my_robot.turn_180).
-#
-# Goal: navigate the corner AND the dead-end maze without help.
-# --------------------------------------------------------------------
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")
-
-BASE_SPEED = 0
-TARGET_WALL_DISTANCE = 0
-MAX_STEERING = 0
-
-side_Kp = 0.0
-side_Kd = 0.0
-side_Ki = 0.0
-side_INTEGRAL_MAX = 0
-
-FRONT_SLOW_DISTANCE = 0
-FRONT_STOP_DISTANCE = 0
-FRONT_Kp = 0.0
-
-side_previous_error = 0
-side_integral = 0
-
-
-while True:
+def follow_wall():
     front = my_robot.read_distance()
+    if front != -1 and front <= FRONT_STOP_DISTANCE:
+        return "TURN"            # dead end / inside corner
 
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
+    side = my_robot.read_distance_2()
+    if side is lost for long enough:
+        return "NIB_WALL"        # outside corner
 
-            # Decide turn size from the side sensor:
-            #   wall on side as well as in front  → dead end  → 180°
-            #   side is open / out of range        → corner    → 90°
-            side_check = my_robot.read_distance_2()
-            dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
-
-            turn_dir = "right" if my_robot.wall_sign == -1 else "left"
-            if dead_end:
-                my_robot.turn_180(turn_dir)
-            else:
-                my_robot.turn_90(turn_dir)
-
-            my_robot.brake()
-            hold_state(0.3)
-
-            side_integral = 0
-            side_previous_error = 0
-            continue
-        else:
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-            hold_state(0.05)
-            continue
-
-    # --- Side wall-follow PID ---
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-
-    side_derivative = error - side_previous_error
-
-    steering = (
-        (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-    )
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    hold_state(0.05)
+    ...run the side PID...        # normal wall following
+    return "FOLLOW_WALL"
 ```
 
-<details>
-<summary><strong>Reference Solution</strong> — click to expand <em>(only after you've genuinely tried)</em></summary>
-
-The simulator-tuned answer key fills in every value. These are the same numbers used by the automated integration tests.
-
-```python
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")
-
-BASE_SPEED = 200
-TARGET_WALL_DISTANCE = 200
-MAX_STEERING = 60
-
-side_Kp = 0.25
-side_Kd = 0.40
-side_Ki = 0.001
-side_INTEGRAL_MAX = 50
-
-FRONT_SLOW_DISTANCE = 400
-FRONT_STOP_DISTANCE = 150
-FRONT_Kp = 1.0
-
-side_previous_error = 0
-side_integral = 0
-
-
-while True:
-    front = my_robot.read_distance()
-
-    if front != -1 and front < FRONT_SLOW_DISTANCE:
-        if front <= FRONT_STOP_DISTANCE:
-            my_robot.brake()
-            hold_state(0.3)
-
-            side_check = my_robot.read_distance_2()
-            dead_end = not (side_check == -1 or side_check > FRONT_SLOW_DISTANCE)
-
-            turn_dir = "right" if my_robot.wall_sign == -1 else "left"
-            if dead_end:
-                my_robot.turn_180(turn_dir)
-            else:
-                my_robot.turn_90(turn_dir)
-
-            my_robot.brake()
-            hold_state(0.3)
-
-            side_integral = 0
-            side_previous_error = 0
-            continue
-        else:
-            approach_speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
-            if approach_speed < 120:
-                approach_speed = 120
-            if approach_speed > BASE_SPEED:
-                approach_speed = BASE_SPEED
-            my_robot.drive(approach_speed, approach_speed)
-            hold_state(0.05)
-            continue
-
-    # --- Side wall-follow PID ---
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-
-    side_derivative = error - side_previous_error
-
-    steering = (
-        (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-    )
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    hold_state(0.05)
-```
-
-</details>
+A dead end and an outside corner can never both be true at the same instant, so a single pass of the
+machine always picks the right one. This is the payoff of the state-machine design: **new corner
+types are new states, not tangled `if`/`else` branches.**
 
 ---
 
-## Debugging Tips
+## What you tune in this challenge
 
-- Add `print("side_check:", side_check, "dead_end:", dead_end)` inside the stop block to verify the correct turn is chosen.
-- If the robot always picks 90°, the side sensor may be reading -1 even at the dead end — check the sensor range and `FRONT_SLOW_DISTANCE` threshold value.
-- If the robot always picks 180°, the side sensor may not be returning -1 at the corner — the wall may still be partially visible. Try using a larger threshold (e.g. `side_check > 600`).
+There are **no new parameters**. You re-use everything from Challenges 4 and 5 and adjust for this
+maze's geometry:
+
+| Group    | What to revisit for this maze                                                |
+| -------- | ---------------------------------------------------------------------------- |
+| Front    | `FRONT_STOP_DISTANCE` / `FRONT_SLOW_DISTANCE` — corridors may be tighter     |
+| Nib wrap | `NIB_FORWARD_BEFORE` / `NIB_FORWARD_AFTER` — corners may be a different size |
+| Speed    | `BASE_SPEED` — slower is steadier through mixed corners                      |
+
+---
+
+## Tuning guide
+
+| Observation                             | Fix                                                                  |
+| --------------------------------------- | -------------------------------------------------------------------- |
+| Turns the wrong way at a corner         | Check `AIDriver("left"/"right")` matches your wall side              |
+| Clips an inside corner on the way round | Raise `FRONT_STOP_DISTANCE` so it turns a little earlier             |
+| Misses the wrap at an outside corner    | Re-tune `NIB_FORWARD_BEFORE` / `NIB_FORWARD_AFTER`                   |
+| Spins randomly mid-corridor             | Leave `NIB_LOST_DISTANCE` / `NIB_CONFIRM_TIME` at the pre-set values |
+| Generally twitchy                       | Lower `BASE_SPEED` and re-check the side PID gains                   |
+
+---
+
+## Try it
+
+1. Open **Challenge 6** — same three states as Challenge 5.
+2. Carry your numbers forward and adjust for the new maze.
+3. The tuned answer is in `app/answers/challenge-6.py`.
 
 ---
 
 ## What's Next
 
-In [Challenge 7](docs.html?doc=Challenge_7) you will combine everything into a **full maze solver** that handles open junctions, multiple turns, and lost-wall recovery.
-
-You will learn:
-
-- How to combine all previous algorithms into a robust maze solver.
-- How to handle open spaces (no wall detected).
-- How to tune all PID and threshold variables for best performance.
-
----
+[Challenge 7](docs.html?doc=Challenge_7) is the capstone: the full maze, solved end-to-end by the
+same unchanged state machine.
