@@ -607,6 +607,13 @@ class AIDriver:
         self.dt = 0.05
         self._last_side_read_ms = ticks_ms()
 
+        # Rotation ramp state — used by rotate_right/left (ramp-up) and
+        # brake() (ramp-down) to produce a trapezoidal speed profile without
+        # any change to the public interface.
+        self._is_rotating = False
+        self._last_rotate_speed = 0
+        self._last_rotate_is_right = True
+
         # Start PWM-based heartbeat - runs entirely in hardware
         # with zero CPU interrupts or impact on motor control.
         _start_pwm_heartbeat()
@@ -655,8 +662,34 @@ class AIDriver:
         return int(distance_mm)
 
     def brake(self):
-        """Stop both motors"""
+        """Stop both motors.
+
+        When called after ``rotate_right`` or ``rotate_left`` this method
+        automatically ramps the speed down over ``ROTATE_RAMP_MS`` milliseconds
+        before applying the hard stop, eliminating inertia-driven overshoot that
+        would otherwise make timed turns inconsistent.
+        """
         _d("AIDriver.brake()")
+        if self._is_rotating:
+            # Controlled ramp-down to absorb rotational inertia.
+            speed = self._last_rotate_speed
+            is_right = self._last_rotate_is_right
+            self._is_rotating = False  # clear before any early return
+            steps = max(self.ROTATE_RAMP_MS // 10, 1)
+            speed_range = speed - self.MIN_MOTOR_SPEED
+            for i in range(steps):
+                t = (steps - i - 1) / steps  # 1 → 0
+                s = self.MIN_MOTOR_SPEED + int(speed_range * t)
+                self.motor_right.set_speed(s)
+                self.motor_left.set_speed(s)
+                if is_right:
+                    self.motor_right.forward()
+                    self.motor_left.forward()
+                else:
+                    self.motor_right.backward()
+                    self.motor_left.backward()
+                sleep_ms(10)
+            _d("AIDriver.brake(): rotation ramp-down complete")
         if eventlog is not None:
             try:
                 eventlog.log_event("Brake applied; motors stopping")
@@ -749,10 +782,27 @@ class AIDriver:
             except Exception:
                 pass
         try:
+            # Ramp up from MIN_MOTOR_SPEED to turn_speed over ROTATE_RAMP_MS.
+            # This makes spin-up time deterministic regardless of battery
+            # voltage, so hold_state(TURN_TIME_90) always sees the same
+            # constant-speed window.
+            steps = max(self.ROTATE_RAMP_MS // 10, 1)
+            speed_range = turn_speed - self.MIN_MOTOR_SPEED
+            for i in range(steps):
+                t = (i + 1) / steps
+                s = self.MIN_MOTOR_SPEED + int(speed_range * t)
+                self.motor_right.set_speed(s)
+                self.motor_left.set_speed(s)
+                self.motor_right.forward()
+                self.motor_left.forward()
+                sleep_ms(10)
             self.motor_right.set_speed(turn_speed)
             self.motor_left.set_speed(turn_speed)
             self.motor_right.forward()
             self.motor_left.forward()
+            self._is_rotating = True
+            self._last_rotate_speed = turn_speed
+            self._last_rotate_is_right = True
         except Exception as exc:
             _explain_error(exc)
             raise
@@ -771,10 +821,23 @@ class AIDriver:
             except Exception:
                 pass
         try:
+            steps = max(self.ROTATE_RAMP_MS // 10, 1)
+            speed_range = turn_speed - self.MIN_MOTOR_SPEED
+            for i in range(steps):
+                t = (i + 1) / steps
+                s = self.MIN_MOTOR_SPEED + int(speed_range * t)
+                self.motor_right.set_speed(s)
+                self.motor_left.set_speed(s)
+                self.motor_right.backward()
+                self.motor_left.backward()
+                sleep_ms(10)
             self.motor_right.set_speed(turn_speed)
             self.motor_left.set_speed(turn_speed)
             self.motor_right.backward()
             self.motor_left.backward()
+            self._is_rotating = True
+            self._last_rotate_speed = turn_speed
+            self._last_rotate_is_right = False
         except Exception as exc:
             _explain_error(exc)
             raise
@@ -784,6 +847,14 @@ class AIDriver:
     # operating voltages. DO NOT lower this: values 100-119 pass the guard but
     # produce erratic behaviour (stall, stutter) that corrupts PID corrections.
     MIN_MOTOR_SPEED = 120
+
+    # Duration (ms) of the acceleration/deceleration ramp applied inside
+    # rotate_right() and rotate_left() (ramp-up) and brake() after a rotation
+    # (ramp-down).  80 ms = 8 × 10 ms steps.  Increase for heavier robots or
+    # lower supply voltages; decrease if turns feel sluggish to start.
+    # NOTE: because rotate_right/left now block for ROTATE_RAMP_MS before
+    # returning, re-tune TURN_TIME_90 after changing this value.
+    ROTATE_RAMP_MS = 80
 
     def drive(self, right_speed, left_speed):
         """
