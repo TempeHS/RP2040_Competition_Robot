@@ -6,7 +6,7 @@ A browser-based robot simulator for the AIDriver MicroPython Challenges. This we
 
 - **ACE Python Editor** - Syntax highlighting, auto-indentation, and error marking
 - **8 Progressive Challenges** - From basic motor control to maze navigation
-- **Real-time Simulation** - See your robot move in a 2000×2000mm virtual arena
+- **Real-time Simulation** - See your robot move in a 2030×2030mm virtual arena
 - **Strict Validation** - Ensures code uses only the AIDriver library
 - **Ultrasonic Sensor Simulation** - Distance readings update in real-time
 - **Gamepad Control** - Challenge 7 uses on-screen/keyboard controls

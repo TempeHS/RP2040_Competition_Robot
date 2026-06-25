@@ -165,6 +165,33 @@ const Validator = (function () {
   }
 
   /**
+   * Remove an inline `#` comment from a single line, respecting string
+   * literals so a `#` inside quotes is not treated as a comment. Returns the
+   * code portion of the line only.
+   *
+   * @param {string} line Single source line.
+   * @returns {string} The line with any trailing inline comment removed.
+   */
+  function stripInlineComment(line) {
+    let quote = null;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (quote) {
+        if (ch === "\\") {
+          i++; // skip escaped character
+        } else if (ch === quote) {
+          quote = null;
+        }
+      } else if (ch === "'" || ch === '"') {
+        quote = ch;
+      } else if (ch === "#") {
+        return line.slice(0, i);
+      }
+    }
+    return line;
+  }
+
+  /**
    * Run static validation over learner Python code, enforcing allowed imports
    * and APIs while flagging obvious syntax issues and usage omissions. Combines
    * hard errors for forbidden behaviour with softer warnings that highlight
@@ -362,8 +389,9 @@ const Validator = (function () {
       }
 
       // Check for unbalanced parentheses on single line
-      const openParens = (line.match(/\(/g) || []).length;
-      const closeParens = (line.match(/\)/g) || []).length;
+      const codeOnly = stripInlineComment(line);
+      const openParens = (codeOnly.match(/\(/g) || []).length;
+      const closeParens = (codeOnly.match(/\)/g) || []).length;
       if (
         openParens !== closeParens &&
         !line.includes("'''") &&
@@ -489,10 +517,13 @@ const Validator = (function () {
         continue;
       if (trimmed.startsWith("def ")) continue;
 
+      // Scan only the code portion so words like "speed (" inside an inline
+      // comment aren't mistaken for function calls.
+      const scanLine = stripInlineComment(line);
       standaloneFuncPattern.lastIndex = 0;
       let match;
 
-      while ((match = standaloneFuncPattern.exec(line)) !== null) {
+      while ((match = standaloneFuncPattern.exec(scanLine)) !== null) {
         const funcName = match[1];
 
         // Skip if it's a valid function

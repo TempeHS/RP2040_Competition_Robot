@@ -139,6 +139,14 @@ function init() {
   // Cache DOM elements
   cacheElements();
 
+  // Label the arena with its real dimensions from RobotConfig
+  if (typeof RobotConfig !== "undefined") {
+    const arenaLabel = document.getElementById("arenaSizeLabel");
+    if (arenaLabel) {
+      arenaLabel.textContent = `Arena (${RobotConfig.arenaWidth_mm}×${RobotConfig.arenaHeight_mm}mm)`;
+    }
+  }
+
   // Populate challenge menus from single source of truth
   if (typeof Challenges !== "undefined" && Challenges.populateMenu) {
     Challenges.populateMenu("#challengeSimulatorMenu", "simulator");
