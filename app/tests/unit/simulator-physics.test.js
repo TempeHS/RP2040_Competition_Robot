@@ -5,9 +5,12 @@
  * values.  If any test fails, the simulator does NOT match the real robot.
  *
  * Key physics facts (from RobotConfig):
- *   wheelBase      = 120 mm
- *   robotLength    = 150 mm   →  REAR_OFFSET = 75 mm (centre → rear axle)
+ *   wheelTrack     = 100 mm   (left↔right, sets turn rate)
+ *   robotLength    = 200 mm   →  half-length = 100 mm
+ *   rearAxleOffset = 65 mm    (centre → rear axle / pivot)
  *   robotWidth     = 120 mm
+ *   frontSensor    = 90 mm ahead of centre
+ *   sideSensor     = 65 mm from centre
  *   deadZonePWM    = 64
  *   maxPWM         = 255     →  activePWM = 191
  *   topSpeed       = 650 mm/s
@@ -50,6 +53,13 @@ function loadSimulator() {
 
 const sandbox = loadSimulator();
 const S = sandbox.Simulator;
+
+// ── Dimensions derived from RobotConfig (physical measurements) ──
+const TRACK = sandbox.RobotConfig.wheelTrack_mm; // 100 mm (left↔right)
+const REAR = sandbox.RobotConfig.rearAxleOffset_mm; // 65 mm centre → rear axle
+const HALF_LEN = sandbox.RobotConfig.robotLength_mm / 2; // 100 mm
+const FRONT_SENSOR = sandbox.RobotConfig.frontSensorOffset_mm; // 90 mm
+const SIDE_SENSOR = sandbox.RobotConfig.sideSensorOffset_mm; // 65 mm
 
 // ── Helpers ──
 function makeRobot(overrides) {
@@ -256,7 +266,7 @@ describe("§4 RWD in-place pivot", () => {
 
   test("Rear axle stays fixed during 90° pivot", () => {
     var vL = expectedVelocity(180);
-    var omega = (vL - -vL) / 120;
+    var omega = (vL - -vL) / TRACK;
     var t90 = Math.PI / 2 / omega;
 
     var r = makeRobot({
@@ -270,23 +280,23 @@ describe("§4 RWD in-place pivot", () => {
       isMoving: true,
     });
 
-    var rearBefore = { x: 1000, y: 1075 };
+    var rearBefore = { x: 1000, y: 1000 + REAR };
     var nSteps = Math.round(t90 / 0.001);
     r = stepN(r, nSteps, 0.001);
 
     var thetaN = (r.heading * Math.PI) / 180;
     var rearAfter = {
-      x: r.x - 75 * Math.sin(thetaN),
-      y: r.y + 75 * Math.cos(thetaN),
+      x: r.x - REAR * Math.sin(thetaN),
+      y: r.y + REAR * Math.cos(thetaN),
     };
 
     expect(rearAfter.x).toBeCloseTo(rearBefore.x, 0);
     expect(rearAfter.y).toBeCloseTo(rearBefore.y, 0);
   });
 
-  test("Centre at (1075, 1075) after 90° CW pivot from (1000,1000,0°)", () => {
+  test("Centre offset by rear-axle radius after 90° CW pivot from (1000,1000,0°)", () => {
     var vL = expectedVelocity(180);
-    var omega = (vL - -vL) / 120;
+    var omega = (vL - -vL) / TRACK;
     var t90 = Math.PI / 2 / omega;
 
     var r = makeRobot({
@@ -304,8 +314,8 @@ describe("§4 RWD in-place pivot", () => {
     r = stepN(r, nSteps, 0.001);
 
     expect(r.heading).toBeCloseTo(90, 0);
-    expect(r.x).toBeCloseTo(1075, 0);
-    expect(r.y).toBeCloseTo(1075, 0);
+    expect(r.x).toBeCloseTo(1000 + REAR, 0);
+    expect(r.y).toBeCloseTo(1000 + REAR, 0);
   });
 });
 
@@ -381,7 +391,7 @@ describe("§5 Turning arcs", () => {
 //  §6  Turn timing with acceleration ramp
 // ═══════════════════════════════════════════════════════════════════
 describe("§6 Turn timing with ramp", () => {
-  test("90° in ~0.35s at wheel speed 180", () => {
+  test("90° in ~0.31s at wheel speed 180", () => {
     var r = makeRobot({
       x: 1000,
       y: 1000,
@@ -392,11 +402,11 @@ describe("§6 Turn timing with ramp", () => {
       actualRightV: 0,
       isMoving: true,
     });
-    r = stepN(r, 350, 0.001);
+    r = stepN(r, 312, 0.001);
     expect(Math.abs(r.heading - 90)).toBeLessThan(8);
   });
 
-  test("180° in ~0.60s at wheel speed 180", () => {
+  test("180° in ~0.51s at wheel speed 180", () => {
     var r = makeRobot({
       x: 1000,
       y: 1000,
@@ -407,7 +417,7 @@ describe("§6 Turn timing with ramp", () => {
       actualRightV: 0,
       isMoving: true,
     });
-    r = stepN(r, 600, 0.001);
+    r = stepN(r, 511, 0.001);
     expect(Math.abs(r.heading - 180)).toBeLessThan(15);
   });
 });
@@ -488,41 +498,41 @@ describe("§8 Ultrasonic", () => {
     S.setSideSensorSide("left");
   });
 
-  test("Front: centre facing up → ~925 to top wall", () => {
+  test("Front: centre facing up → ~910 to top wall", () => {
     var r = makeRobot({ x: 1000, y: 1000, heading: 0 });
     var d = S.simulateUltrasonic(r);
-    expect(d).toBeGreaterThanOrEqual(923);
-    expect(d).toBeLessThanOrEqual(927);
+    expect(d).toBeGreaterThanOrEqual(908);
+    expect(d).toBeLessThanOrEqual(912);
   });
 
-  test("Front: facing right → ~925 to right wall", () => {
+  test("Front: facing right → ~910 to right wall", () => {
     var r = makeRobot({ x: 1000, y: 1000, heading: 90 });
     var d = S.simulateUltrasonic(r);
-    expect(d).toBeGreaterThanOrEqual(923);
-    expect(d).toBeLessThanOrEqual(927);
+    expect(d).toBeGreaterThanOrEqual(908);
+    expect(d).toBeLessThanOrEqual(912);
   });
 
-  test("Side left: heading 0 → ~940 to left wall", () => {
+  test("Side left: heading 0 → ~935 to left wall", () => {
     var r = makeRobot({ x: 1000, y: 1000, heading: 0 });
     var d = S.simulateUltrasonicSide(r);
-    expect(d).toBeGreaterThanOrEqual(938);
-    expect(d).toBeLessThanOrEqual(942);
+    expect(d).toBeGreaterThanOrEqual(933);
+    expect(d).toBeLessThanOrEqual(937);
   });
 
-  test("Side right: heading 0 → ~940 to right wall", () => {
+  test("Side right: heading 0 → ~935 to right wall", () => {
     S.setSideSensorSide("right");
     var r = makeRobot({ x: 1000, y: 1000, heading: 0 });
     var d = S.simulateUltrasonicSide(r);
-    expect(d).toBeGreaterThanOrEqual(938);
-    expect(d).toBeLessThanOrEqual(942);
+    expect(d).toBeGreaterThanOrEqual(933);
+    expect(d).toBeLessThanOrEqual(937);
   });
 
   test("Side detects maze wall", () => {
     S.setMazeWalls([{ x: 500, y: 0, width: 30, height: 2000 }]);
     var r = makeRobot({ x: 300, y: 1000, heading: 0 });
     var d = S.simulateUltrasonicSide(r);
-    expect(d).toBeGreaterThanOrEqual(238);
-    expect(d).toBeLessThanOrEqual(242);
+    expect(d).toBeGreaterThanOrEqual(233);
+    expect(d).toBeLessThanOrEqual(237);
   });
 
   test("Returns −1 when < ULTRASONIC_MIN", () => {
@@ -551,9 +561,9 @@ describe("§9 Collision", () => {
     var r = makeRobot({ x: 1000, y: 1000, heading: 0 });
     var c = S.getRobotCorners(r);
     expect(c[0].x).toBeCloseTo(940, 1); // front-left
-    expect(c[0].y).toBeCloseTo(925, 1);
+    expect(c[0].y).toBeCloseTo(900, 1);
     expect(c[2].x).toBeCloseTo(1060, 1); // rear-right
-    expect(c[2].y).toBeCloseTo(1075, 1);
+    expect(c[2].y).toBeCloseTo(1100, 1);
   });
 
   // ── Regression: robot must not drive THROUGH walls ──
@@ -654,10 +664,10 @@ describe("§9 Collision", () => {
 //  §10  Boundary constraints
 // ═══════════════════════════════════════════════════════════════════
 describe("§10 Boundary", () => {
-  test("Clamps with 75mm margin", () => {
+  test("Clamps with 100mm margin", () => {
     var r = S.applyBoundaryConstraints(makeRobot({ x: 10, y: 10 }));
-    expect(r.x).toBe(75);
-    expect(r.y).toBe(75);
+    expect(r.x).toBe(100);
+    expect(r.y).toBe(100);
   });
   test("No change when inside", () => {
     var r = makeRobot({ x: 500, y: 500 });
@@ -775,7 +785,7 @@ describe("§15 Dead-end U-turn in 400 mm channel", () => {
     return [{ x: 400, y: 0, width: 1200, height: 2000 }];
   }
 
-  test("CONTROL: spin in open arena (no walls) reaches ~180° in 0.6 s", () => {
+  test("CONTROL: spin in open arena (no walls) reaches ~180° in 0.5 s", () => {
     S.clearObstacles();
     S.setMazeWalls([]);
     var r = makeRobot({
@@ -786,7 +796,7 @@ describe("§15 Dead-end U-turn in 400 mm channel", () => {
       rightSpeed: -180,
       isMoving: true,
     });
-    for (var i = 0; i < 24; i++) r = S.step(r, 0.025);
+    for (var i = 0; i < 20; i++) r = S.step(r, 0.025);
     var change = (((r.heading - 0) % 360) + 360) % 360;
     var offBy180 = Math.abs(change - 180);
     // Free space: this MUST reach close to 180°.
@@ -825,8 +835,8 @@ describe("§15 Dead-end U-turn in 400 mm channel", () => {
     S.clearObstacles();
     S.setMazeWalls(deadEndWalls());
     // Place robot near the dead end, centred in the channel.
-    // NOTE: rotation pivots about the rear axle (75 mm behind centre),
-    // so during a 180° spin the centre legitimately swings ~150 mm.
+    // NOTE: rotation pivots about the rear axle (65 mm behind centre),
+    // so during a 180° spin the centre legitimately swings ~130 mm.
     var r = makeRobot({
       x: 200,
       y: 200,
@@ -836,7 +846,7 @@ describe("§15 Dead-end U-turn in 400 mm channel", () => {
       isMoving: true,
     });
     var startHeading = r.heading;
-    for (var i = 0; i < 24; i++) {
+    for (var i = 0; i < 20; i++) {
       r = S.step(r, 0.025);
     }
     var change = (((r.heading - startHeading) % 360) + 360) % 360;
@@ -870,7 +880,7 @@ describe("§15 Dead-end U-turn in 400 mm channel", () => {
     // Phase 5: drive forward in the new heading.
     var phase = "drive_up";
     var phaseFrames = 0;
-    var TURN_FRAMES = 28;
+    var TURN_FRAMES = 20;
     var BRAKE_FRAMES = 24; // ~0.6 s — enough for ±395 mm/s to ramp to 0
     var done = false;
     for (var i = 0; i < 1500 && !done; i++) {

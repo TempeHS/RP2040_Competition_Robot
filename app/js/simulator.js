@@ -12,15 +12,15 @@
  *   heading 0°  =  facing UP (−Y direction)
  *   heading increases clockwise
  *
- * robot.x, robot.y  =  geometric CENTRE of the 150 × 120 mm body.
- * The rear axle is 75 mm behind the centre along the heading axis.
+ * robot.x, robot.y  =  geometric CENTRE of the 200 × 120 mm body.
+ * The rear axle is 65 mm behind the centre along the heading axis.
  *
  * Kinematic update every frame:
  *   1. Derive rear-axle position from centre + heading
  *   2. Apply diff-drive equations at the rear axle
  *   3. Derive new centre from updated rear axle + new heading
  *
- * ω = (vL − vR) / wheelBase   →  positive = clockwise (screen-space)
+ * ω = (vL − vR) / wheelTrack   →  positive = clockwise (screen-space)
  *
  * Left wheel faster  → ω > 0 → turns RIGHT   ✓
  * Right wheel faster → ω < 0 → turns LEFT    ✓
@@ -31,9 +31,9 @@ const Simulator = (function () {
   // ═══════════════════════════════════════════════════════════════════
   //  Constants — every value derived from RobotConfig, zero magic
   // ═══════════════════════════════════════════════════════════════════
-  var WHEEL_BASE = RobotConfig.wheelBase_mm; // 120 mm
+  var WHEEL_TRACK = RobotConfig.wheelTrack_mm; // 100 mm (left↔right)
   var ROBOT_WIDTH = RobotConfig.robotWidth_mm; // 120 mm
-  var ROBOT_LENGTH = RobotConfig.robotLength_mm; // 150 mm
+  var ROBOT_LENGTH = RobotConfig.robotLength_mm; // 200 mm
   var MAX_PWM = RobotConfig.maxPWM; // 255
   var DEAD_ZONE = RobotConfig.deadZonePWM; // 64
   var TOP_SPEED = RobotConfig.topSpeed_ms * 1000; // 650 mm/s
@@ -49,7 +49,9 @@ const Simulator = (function () {
   var RAD2DEG = 180 / Math.PI;
 
   var ACTIVE_PWM = MAX_PWM - DEAD_ZONE; // 191 usable steps
-  var REAR_OFFSET = ROBOT_LENGTH / 2; // 75 mm centre → rear axle
+  var REAR_OFFSET = RobotConfig.rearAxleOffset_mm; // 65 mm centre → rear axle
+  var FRONT_SENSOR_OFFSET = RobotConfig.frontSensorOffset_mm; // 90 mm ahead of centre
+  var SIDE_SENSOR_OFFSET = RobotConfig.sideSensorOffset_mm; // 65 mm from centre
 
   // ═══════════════════════════════════════════════════════════════════
   //  Mutable state
@@ -92,7 +94,7 @@ const Simulator = (function () {
   // ═══════════════════════════════════════════════════════════════════
   //  Core kinematics — REAR-WHEEL-DRIVE differential drive
   //
-  //  The two drive wheels sit on the rear axle, 75 mm behind the
+  //  The two drive wheels sit on the rear axle, 65 mm behind the
   //  body centre.  All translational motion is computed at the rear
   //  axle, then the body centre is derived from the new rear-axle
   //  position and the new heading.
@@ -123,7 +125,7 @@ const Simulator = (function () {
 
     // Diff-drive at rear axle
     var v = (actL + actR) / 2; // rear-axle linear velocity (mm/s)
-    var omega = (actL - actR) / WHEEL_BASE; // angular velocity  (rad/s, +cw)
+    var omega = (actL - actR) / WHEEL_TRACK; // angular velocity  (rad/s, +cw)
 
     var theta = robot.heading * DEG2RAD;
     var sinT = Math.sin(theta);
@@ -386,21 +388,21 @@ const Simulator = (function () {
   }
 
   /**
-   * Front sensor — centre of front edge, 75 mm ahead of body centre,
-   * pointing forward along the heading axis.
+   * Front sensor — 90 mm ahead of body centre, pointing forward along
+   * the heading axis.
    */
   function simulateUltrasonic(robot) {
     var theta = robot.heading * DEG2RAD;
     var dx = Math.sin(theta);
     var dy = -Math.cos(theta);
-    var sx = robot.x + dx * (ROBOT_LENGTH / 2);
-    var sy = robot.y + dy * (ROBOT_LENGTH / 2);
+    var sx = robot.x + dx * FRONT_SENSOR_OFFSET;
+    var sy = robot.y + dy * FRONT_SENSOR_OFFSET;
     return applyUltrasonicLimits(castRay(sx, sy, dx, dy));
   }
 
   /**
-   * Side sensor — centre of left or right edge, 60 mm from body
-   * centre, pointing perpendicular to heading.
+   * Side sensor — 65 mm from body centre, pointing perpendicular to
+   * heading.
    *
    * Left  direction at heading θ:  (−cos θ, −sin θ)
    * Right direction at heading θ:  ( cos θ,  sin θ)
@@ -415,8 +417,8 @@ const Simulator = (function () {
       dx = Math.cos(theta);
       dy = Math.sin(theta);
     }
-    var sx = robot.x + dx * (ROBOT_WIDTH / 2);
-    var sy = robot.y + dy * (ROBOT_WIDTH / 2);
+    var sx = robot.x + dx * SIDE_SENSOR_OFFSET;
+    var sy = robot.y + dy * SIDE_SENSOR_OFFSET;
     return applyUltrasonicLimits(castRay(sx, sy, dx, dy));
   }
 
@@ -437,7 +439,7 @@ const Simulator = (function () {
   function simulateGyroZ(robot) {
     var actL = robot.actualLeftV || 0;
     var actR = robot.actualRightV || 0;
-    var omega = (actL - actR) / WHEEL_BASE; // rad/s, +clockwise
+    var omega = (actL - actR) / WHEEL_TRACK; // rad/s, +clockwise
     return omega * RAD2DEG;
   }
 
@@ -458,7 +460,7 @@ const Simulator = (function () {
    */
   function getRobotCorners(robot) {
     var hw = ROBOT_WIDTH / 2; // 60
-    var hl = ROBOT_LENGTH / 2; // 75
+    var hl = ROBOT_LENGTH / 2; // 100
     var theta = robot.heading * DEG2RAD;
     var s = Math.sin(theta);
     var c = Math.cos(theta);
@@ -555,7 +557,7 @@ const Simulator = (function () {
   //  Boundary constraints — keep centre inside arena with margin
   // ═══════════════════════════════════════════════════════════════════
   function applyBoundaryConstraints(robot) {
-    var margin = Math.max(ROBOT_WIDTH / 2, ROBOT_LENGTH / 2); // 75
+    var margin = Math.max(ROBOT_WIDTH / 2, ROBOT_LENGTH / 2); // 100
     var x = Math.max(margin, Math.min(ARENA_WIDTH - margin, robot.x));
     var y = Math.max(margin, Math.min(ARENA_HEIGHT - margin, robot.y));
     if (x !== robot.x || y !== robot.y) {

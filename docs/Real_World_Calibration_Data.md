@@ -28,15 +28,15 @@ simulator's physics can be set to match. You measure, you send the numbers back,
 | 2   | Body width (widest point)                              | 120 mm    | `120 mm`             | Across the chassis at its widest                |
 | 3   | Body length (front ↔ back)                             | 150 mm    | `200 mm`             | Front bumper to rear bumper                     |
 | 4   | Drive-wheel outer diameter                             | 65 mm     | `125 mm`             | Outer Ø of the rubber tyre                      |
-| 5   | Centre → drive-axle offset                             | 75 mm     | `____ mm`            | Body centre to the line of the two drive wheels |
+| 5   | Centre → drive-axle offset                             | 75 mm     | `65 mm`              | Body centre to the line of the two drive wheels |
 
 ### A2. Sensor mounting — where each sensor sits and which way it points
 
-| #   | Sensor           | Sim mount                             | **Your offset** | **Your direction** | How to measure                              |
-| --- | ---------------- | ------------------------------------- | --------------- | ------------------ | ------------------------------------------- |
-| 6   | Front ultrasonic | 75 mm ahead of centre, faces forward  | `90 mm`         | `Forward`          | Centre of chassis to the sensor face        |
-| 7   | Side ultrasonic  | 60 mm from centre, faces 90° sideways | `65 mm`         | `90° (90?)`        | Is it exactly sideways, or angled fwd/back? |
-| 8   | Gyro (LSM6DS3)   | at body centre                        | n/a             | yaw about vertical | Confirm it is roughly central               |
+| #   | Sensor           | Sim mount                             | **Your offset**                  | **Your direction** | How to measure                              |
+| --- | ---------------- | ------------------------------------- | -------------------------------- | ------------------ | ------------------------------------------- |
+| 6   | Front ultrasonic | 75 mm ahead of centre, faces forward  | `90 mm`                          | `Forward`          | Centre of chassis to the sensor face        |
+| 7   | Side ultrasonic  | 60 mm from centre, faces 90° sideways | `65 mm`                          | `90° (90?)`        | Is it exactly sideways, or angled fwd/back? |
+| 8   | Gyro (LSM6DS3)   | at body centre                        | `65mm` over centre of rear axels | yaw about vertical | Confirm it is roughly central               |
 
 ### A3. Arena & maze — overall size, then **section sizes**
 

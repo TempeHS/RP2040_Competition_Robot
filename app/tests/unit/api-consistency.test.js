@@ -31,7 +31,7 @@ describe("AIDriver API Consistency", () => {
     // Match class definition and its methods
     const classPattern = new RegExp(
       `class ${className}[^:]*:[\\s\\S]*?(?=\\nclass |\\ndef [a-z]|$)`,
-      "g"
+      "g",
     );
     const classMatch = source.match(classPattern);
 
@@ -107,31 +107,40 @@ describe("AIDriver API Consistency", () => {
       realMethods = extractPythonMethods(realAidriverSource, "AIDriver");
       simulatorMethods = extractPythonMethods(
         simulatorAidriverSource,
-        "AIDriver"
+        "AIDriver",
       );
     });
 
     test("should have the same methods in both implementations", () => {
-      const realMethodNames = realMethods.map((m) => m.name).sort();
-      const simMethodNames = simulatorMethods.map((m) => m.name).sort();
+      // Only compare public methods — private helpers (leading underscore)
+      // are implementation details and need not exist in both, matching the
+      // module-level function comparison.
+      const realMethodNames = realMethods
+        .map((m) => m.name)
+        .filter((m) => !m.startsWith("_"))
+        .sort();
+      const simMethodNames = simulatorMethods
+        .map((m) => m.name)
+        .filter((m) => !m.startsWith("_"))
+        .sort();
 
       const missingInSimulator = realMethodNames.filter(
-        (m) => !simMethodNames.includes(m)
+        (m) => !simMethodNames.includes(m),
       );
       const extraInSimulator = simMethodNames.filter(
-        (m) => !realMethodNames.includes(m)
+        (m) => !realMethodNames.includes(m),
       );
 
       if (missingInSimulator.length > 0) {
         console.warn(
           "Methods in real aidriver.py but MISSING from simulator:",
-          missingInSimulator
+          missingInSimulator,
         );
       }
       if (extraInSimulator.length > 0) {
         console.warn(
           "Methods in simulator but NOT in real aidriver.py:",
-          extraInSimulator
+          extraInSimulator,
         );
       }
 
@@ -142,7 +151,7 @@ describe("AIDriver API Consistency", () => {
     test("drive_forward should have matching parameters", () => {
       const realMethod = realMethods.find((m) => m.name === "drive_forward");
       const simMethod = simulatorMethods.find(
-        (m) => m.name === "drive_forward"
+        (m) => m.name === "drive_forward",
       );
 
       expect(realMethod).toBeDefined();
@@ -157,7 +166,7 @@ describe("AIDriver API Consistency", () => {
     test("drive_backward should have matching parameters", () => {
       const realMethod = realMethods.find((m) => m.name === "drive_backward");
       const simMethod = simulatorMethods.find(
-        (m) => m.name === "drive_backward"
+        (m) => m.name === "drive_backward",
       );
 
       expect(realMethod).toBeDefined();
@@ -194,7 +203,7 @@ describe("AIDriver API Consistency", () => {
     test("read_distance should exist in both", () => {
       const realMethod = realMethods.find((m) => m.name === "read_distance");
       const simMethod = simulatorMethods.find(
-        (m) => m.name === "read_distance"
+        (m) => m.name === "read_distance",
       );
 
       expect(realMethod).toBeDefined();
@@ -212,7 +221,7 @@ describe("AIDriver API Consistency", () => {
     test("get_motor_speeds should exist in both", () => {
       const realMethod = realMethods.find((m) => m.name === "get_motor_speeds");
       const simMethod = simulatorMethods.find(
-        (m) => m.name === "get_motor_speeds"
+        (m) => m.name === "get_motor_speeds",
       );
 
       expect(realMethod).toBeDefined();
@@ -232,7 +241,7 @@ describe("AIDriver API Consistency", () => {
       // Note: hold_state might be defined differently in real vs simulator
       if (!realHoldState) {
         console.warn(
-          "hold_state not found as module function in real aidriver.py - may be defined elsewhere"
+          "hold_state not found as module function in real aidriver.py - may be defined elsewhere",
         );
       }
     });
@@ -276,17 +285,17 @@ describe("AIDriver API Consistency", () => {
       // Real implementation: _d("read_distance:", distance_mm, "mm")
       // Check if simulator also logs distance readings when DEBUG_AIDRIVER is True
       const realHasDistanceDebug = /read_distance.*mm/i.test(
-        realAidriverSource
+        realAidriverSource,
       );
       const simHasDistanceDebug = /read_distance/i.test(
-        simulatorAidriverSource
+        simulatorAidriverSource,
       );
 
       expect(realHasDistanceDebug).toBe(true);
       // Simulator's read_distance should have debug output capability
       if (!simHasDistanceDebug) {
         console.warn(
-          "⚠️  Simulator read_distance may not have debug output matching real implementation"
+          "⚠️  Simulator read_distance may not have debug output matching real implementation",
         );
       }
     });
@@ -297,7 +306,7 @@ describe("AIDriver API Consistency", () => {
       const realMethods = extractPythonMethods(realAidriverSource, "AIDriver");
       const simMethods = extractPythonMethods(
         simulatorAidriverSource,
-        "AIDriver"
+        "AIDriver",
       );
 
       const realMethodNames = new Set(realMethods.map((m) => m.name));
@@ -305,13 +314,13 @@ describe("AIDriver API Consistency", () => {
 
       const report = {
         realOnlyMethods: [...realMethodNames].filter(
-          (m) => !simMethodNames.has(m)
+          (m) => !simMethodNames.has(m),
         ),
         simulatorOnlyMethods: [...simMethodNames].filter(
-          (m) => !realMethodNames.has(m)
+          (m) => !realMethodNames.has(m),
         ),
         commonMethods: [...realMethodNames].filter((m) =>
-          simMethodNames.has(m)
+          simMethodNames.has(m),
         ),
       };
 
@@ -319,11 +328,11 @@ describe("AIDriver API Consistency", () => {
       console.log("Common methods (in both):", report.commonMethods);
       console.log(
         "Real-only methods (need simulation):",
-        report.realOnlyMethods
+        report.realOnlyMethods,
       );
       console.log(
         "Simulator-only methods (not on real robot):",
-        report.simulatorOnlyMethods
+        report.simulatorOnlyMethods,
       );
 
       // This test always passes but generates the report
@@ -333,13 +342,13 @@ describe("AIDriver API Consistency", () => {
       if (report.realOnlyMethods.length > 0) {
         console.warn(
           "\n⚠️  MISSING IN SIMULATOR:",
-          report.realOnlyMethods.join(", ")
+          report.realOnlyMethods.join(", "),
         );
       }
       if (report.simulatorOnlyMethods.length > 0) {
         console.warn(
           "\n⚠️  EXTRA IN SIMULATOR:",
-          report.simulatorOnlyMethods.join(", ")
+          report.simulatorOnlyMethods.join(", "),
         );
       }
     });

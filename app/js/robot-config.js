@@ -8,10 +8,12 @@
  */
 const RobotConfig = Object.freeze({
   // ── Chassis ──────────────────────────────────────────────────────
-  wheelBase_mm: 120, // centre-to-centre distance between wheels
+  wheelTrack_mm: 100, // left↔right drive-wheel centre distance (sets turn rate)
+  wheelBase_mm: 135, // front↔rear axle distance (informational, rear-wheel drive)
   robotWidth_mm: 120, // overall body width
-  robotLength_mm: 150, // overall body length (front to back)
-  wheelDiameter_mm: 65, // drive wheel outer diameter
+  robotLength_mm: 200, // overall body length (front to back)
+  wheelDiameter_mm: 125, // drive wheel outer diameter
+  rearAxleOffset_mm: 65, // body centre → rear drive axle (the turning pivot line)
 
   // ── Motor / drive-train ──────────────────────────────────────────
   maxPWM: 255, // firmware PWM ceiling
@@ -24,6 +26,8 @@ const RobotConfig = Object.freeze({
   ultrasonicMin_mm: 20, // minimum detectable distance
   ultrasonicMax_mm: 2000, // maximum detectable distance
   sensorNoise_mm: 2, // ± random noise added each reading
+  frontSensorOffset_mm: 90, // front sensor ahead of body centre, faces forward
+  sideSensorOffset_mm: 65, // side sensor from body centre, faces 90° sideways
 
   // ── Arena ────────────────────────────────────────────────────────
   arenaWidth_mm: 2000,
