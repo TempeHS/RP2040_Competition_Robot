@@ -2,12 +2,94 @@
  * AIDriver Simulator - Maze Definitions
  * Pre-defined mazes for Challenge 6: Maze Navigation
  */
+/* global RobotConfig */
 
 const Mazes = (function () {
   "use strict";
 
-  // Wall thickness in mm (reduced for wider corridors)
-  const WALL_THICKNESS = 30;
+  // Wall thickness in mm — real maze timber panels are 3 mm thick.
+  const WALL_THICKNESS = RobotConfig.wallThickness_mm;
+
+  // ── Real-world grid ────────────────────────────────────────────────
+  // The physical arena is a 7 × 7 grid of 290 mm square timber panels
+  // (2030 mm total per side). Walls are built on the grid boundaries so
+  // that every layout maps cleanly onto the real maze. Grid boundary
+  // index b (0..7) sits at b × 290 mm.
+  const CELL = RobotConfig.panelSize_mm; // 290 mm cell pitch
+  const WT = WALL_THICKNESS; // 3 mm panel thickness
+  const GRID = Math.round(RobotConfig.arenaWidth_mm / CELL); // 7 cells
+
+  /**
+   * Vertical wall centred on column boundary `b`, spanning rows `r0`..`r1`.
+   * @param {number} b Column boundary index (0..GRID).
+   * @param {number} r0 Start row boundary index.
+   * @param {number} r1 End row boundary index.
+   * @returns {MazeRect}
+   */
+  function vWall(b, r0, r1) {
+    return {
+      x: b * CELL - WT / 2,
+      y: r0 * CELL,
+      width: WT,
+      height: (r1 - r0) * CELL,
+    };
+  }
+
+  /**
+   * Horizontal wall centred on row boundary `b`, spanning columns `c0`..`c1`.
+   * @param {number} b Row boundary index (0..GRID).
+   * @param {number} c0 Start column boundary index.
+   * @param {number} c1 End column boundary index.
+   * @returns {MazeRect}
+   */
+  function hWall(b, c0, c1) {
+    return {
+      x: c0 * CELL,
+      y: b * CELL - WT / 2,
+      width: (c1 - c0) * CELL,
+      height: WT,
+    };
+  }
+
+  /**
+   * Solid block covering whole cells from column `c0`..`c1` and row `r0`..`r1`.
+   * @param {number} c0 Start column boundary index.
+   * @param {number} r0 Start row boundary index.
+   * @param {number} c1 End column boundary index.
+   * @param {number} r1 End row boundary index.
+   * @returns {MazeRect}
+   */
+  function block(c0, r0, c1, r1) {
+    return {
+      x: c0 * CELL,
+      y: r0 * CELL,
+      width: (c1 - c0) * CELL,
+      height: (r1 - r0) * CELL,
+    };
+  }
+
+  /**
+   * Centre point (mm) of grid cell at column `c`, row `r`.
+   * @param {number} c Column index (0..GRID-1).
+   * @param {number} r Row index (0..GRID-1).
+   * @param {number} [heading] Optional spawn heading in degrees.
+   * @returns {{x:number,y:number,heading:number}}
+   */
+  function cellCentre(c, r, heading = 0) {
+    return { x: c * CELL + CELL / 2, y: r * CELL + CELL / 2, heading };
+  }
+
+  /**
+   * Goal rectangle covering grid cell(s) from column `c0`..`c1`, row `r0`..`r1`.
+   * @param {number} c0 Start column boundary index.
+   * @param {number} r0 Start row boundary index.
+   * @param {number} [c1] End column boundary index (defaults to c0 + 1).
+   * @param {number} [r1] End row boundary index (defaults to r0 + 1).
+   * @returns {MazeRect}
+   */
+  function cellZone(c0, r0, c1 = c0 + 1, r1 = r0 + 1) {
+    return block(c0, r0, c1, r1);
+  }
 
   /**
    * Axis-aligned rectangle measured in millimetres.
@@ -33,10 +115,11 @@ const Mazes = (function () {
   /**
    * Pre-defined maze layouts with walls expressed as millimeter rectangles.
    *
-   * Mazes are designed mirror-symmetric across the vertical centreline
-   * (x = 1000). The recorded `startPosition` and `endZone` describe the
-   * LEFT-wall ("AIDriver(\"left\")") spawn; when the user instantiates
-   * `AIDriver("right")` the simulator auto-mirrors both via
+   * Mazes are built on the real 7 × 7 grid of 290 mm timber panels
+   * (2030 mm arena) and are mirror-symmetric across the vertical
+   * centreline (x = 1015). The recorded `startPosition` and `endZone`
+   * describe the LEFT-wall ("AIDriver(\"left\")") spawn; when the user
+   * instantiates `AIDriver("right")` the simulator auto-mirrors both via
    * `Simulator.mirrorPose` / `Simulator.mirrorRect` (see App.onAIDriverInstantiated).
    *
    * The few mazes that are inherently chiral (spiral, classic) carry
@@ -46,8 +129,9 @@ const Mazes = (function () {
    */
   const mazeDefinitions = {
     // Straight corridor — symmetric pair of outer corridors. Two long
-    // vertical walls split the arena into three vertical strips. Drive
-    // north along whichever outer strip your spawn picked.
+    // vertical walls on grid boundaries 1 and 6 split the arena into
+    // three vertical strips. Drive north along whichever single-cell
+    // outer strip your spawn picked.
     straight_corridor: {
       id: "straight_corridor",
       name: "Straight Corridor",
@@ -55,22 +139,22 @@ const Mazes = (function () {
       symmetric: true,
       description:
         'Drive straight up the outer corridor — perfect for tuning P and PD controllers. Switch AIDriver("left") <> AIDriver("right") to flip sides.',
-      startPosition: { x: 250, y: 1700, heading: 0 },
-      endZone: { x: 50, y: 100, width: 400, height: 200 },
+      startPosition: cellCentre(0, 6),
+      endZone: cellZone(0, 0),
       walls: [
-        // Inner wall of the LEFT corridor
-        { x: 500, y: 0, width: WALL_THICKNESS, height: 2000 },
-        // Inner wall of the RIGHT corridor (mirror)
-        { x: 1470, y: 0, width: WALL_THICKNESS, height: 2000 },
+        // Inner wall of the LEFT corridor (grid boundary 1)
+        vWall(1, 0, GRID),
+        // Inner wall of the RIGHT corridor (mirror, grid boundary 6)
+        vWall(GRID - 1, 0, GRID),
       ],
     },
 
     // Corner — single large central block, mirror-symmetric about
-    // x = 1000 so the same maze works for both left- and right-hand
-    // wall followers. A 400 mm wide corridor wraps the block on the
+    // x = 1015 so the same maze works for both left- and right-hand
+    // wall followers. A single-cell corridor wraps the block on the
     // left, top and right. The block touches the bottom edge so the
     // only path is: drive up the outer corridor, turn 90° at the top,
-    // continue to the opposite top corner.
+    // continue to the central goal.
     corner: {
       id: "corner",
       name: "Corner",
@@ -78,16 +162,17 @@ const Mazes = (function () {
       symmetric: true,
       description:
         "Drive up the outer corridor, detect the front wall, then turn 90° toward the centre to reach the top.",
-      startPosition: { x: 200, y: 1700, heading: 0 },
+      startPosition: cellCentre(0, 6),
+      endZone: cellZone(3, 0),
       walls: [
-        // Central block: x = 400..1600, y = 400..2000.
-        // Symmetric: mirror about x=1000 maps the block to itself.
-        { x: 400, y: 400, width: 1200, height: 1600 },
+        // Central block: columns 1..5, rows 1..6 (touches bottom edge).
+        // Self-mirrors about x = 1015.
+        block(1, 1, GRID - 1, GRID),
       ],
     },
 
     // Outside Corners — two free-standing nib walls, one on each side
-    // of the arena, mirror-symmetric about x = 1000. The robot spawns
+    // of the arena, mirror-symmetric about x = 1015. The robot spawns
     // in the centre of the arena. Each nib presents the inside edge as
     // a wall to follow upward, then ends abruptly (an outside / convex
     // corner) so the side sensor returns -1. The learner must add a
@@ -100,26 +185,25 @@ const Mazes = (function () {
       symmetric: true,
       description:
         "Two free-standing nib walls, one each side. Spawn in the centre, follow the inside edge of your nib up, then wrap around its outside corner to reach the pocket behind it.",
-      // Spawn dead-centre, heading north. Mirror keeps it on x = 1000.
-      startPosition: { x: 1000, y: 1700, heading: 0 },
+      // Spawn dead-centre, heading north. Mirror keeps it on x = 1015.
+      startPosition: cellCentre(3, 6),
       // Goal pocket sits behind the LEFT nib (top-left corner of the
       // arena). For AIDriver("right") the simulator mirrors this to
       // the top-right pocket automatically.
-      endZone: { x: 0, y: 0, width: 400, height: 400 },
+      endZone: cellZone(0, 0, 2, 2),
       walls: [
-        // Left nib: vertical bar from y = 600 to y = 1700 at x = 500..600.
-        // Outside corner at the TOP (y = 600) — that's where the side
+        // Left nib: vertical bar on grid boundary 2, rows 2..7.
+        // Outside corner at the TOP (row 2) — that's where the side
         // sensor blanks out and the lost-wall recovery must kick in.
-        { x: 500, y: 600, width: 100, height: 1100 },
-        // Right nib: mirror of the left nib about x = 1000.
-        { x: 1400, y: 600, width: 100, height: 1100 },
+        vWall(2, 2, GRID),
+        // Right nib: mirror of the left nib about x = 1015 (boundary 5).
+        vWall(GRID - 2, 2, GRID),
       ],
     },
 
-    // Dead end — TWO sealed pockets, one on each side of the arena.
     // Dead End — single full-height central block, mirror-symmetric
-    // about x = 1000. The two 400 mm wide side channels (x < 400 and
-    // x > 1600) are dead-ends capped only by the arena's top boundary,
+    // about x = 1015. The two single-cell side channels (column 0 and
+    // column 6) are dead-ends capped only by the arena's top boundary,
     // so the robot must detect the front wall (arena edge) and turn
     // 180° to head back.
     dead_end: {
@@ -130,13 +214,13 @@ const Mazes = (function () {
       description:
         'U-shaped arena with a dead end on each side. Pick AIDriver("left") or AIDriver("right") and the spawn moves to the matching pocket — drive to the dead end and stop before colliding.',
       walls: [
-        // Central block fills the entire arena height between the two
-        // outer channels. The arena boundary acts as the end wall.
-        { x: 400, y: 0, width: 1200, height: 2000 },
+        // Central block fills the full arena height between the two
+        // outer channels (columns 1..5). The arena boundary is the end.
+        block(1, 0, GRID - 1, GRID),
       ],
       // Spawn near the bottom of the left channel; mirror puts the
-      // right-mode spawn at x = 1800.
-      startPosition: { x: 200, y: 1700, heading: 0 },
+      // right-mode spawn in column 6.
+      startPosition: cellCentre(0, 6),
     },
 
     // Simple — single 90° turn into a wide top room. Symmetric pair
@@ -148,39 +232,38 @@ const Mazes = (function () {
       symmetric: true,
       description:
         "A pair of mirrored L-shaped corridors meeting at the top — practice basic wall-follow plus one 90° turn.",
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 900, y: 100, width: 200, height: 200 },
+      startPosition: cellCentre(0, 6),
+      endZone: cellZone(3, 0),
       walls: [
-        // Lower horizontal walls block direct vertical travel except in
-        // outer corridors. Two pieces, each mirrored across x=1000.
-        { x: 0, y: 1000, width: 700, height: WALL_THICKNESS },
-        { x: 1300, y: 1000, width: 700, height: WALL_THICKNESS },
-        // Vertical walls forming the outer corridors (y=400..1000)
-        { x: 700, y: 400, width: WALL_THICKNESS, height: 600 },
-        { x: 1270, y: 400, width: WALL_THICKNESS, height: 600 },
+        // Central block (columns 1..5, rows 2..7) leaves single-cell
+        // outer corridors and a two-cell-deep room across the top.
+        // Self-mirrors about x = 1015.
+        block(1, 2, GRID - 1, GRID),
       ],
     },
 
-    // Zigzag — symmetric chevron pattern. Three horizontal walls each
-    // built from mirrored pieces with a central gap to weave through.
+    // Zigzag — symmetric chevron pattern. Three horizontal wall rows on
+    // grid boundaries 5, 3 and 1, each leaving a single-cell gap that
+    // alternates between the centre and the sides so the robot weaves.
     zigzag: {
       id: "zigzag",
       name: "Zigzag Path",
       difficulty: "Medium",
       symmetric: true,
       description:
-        "Weave through three rows of walls, each with a central gap. Symmetric across the centreline so left- and right-wall runs feel the same.",
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 900, y: 50, width: 200, height: 150 },
+        "Weave through three rows of walls with alternating gaps. Symmetric across the centreline so left- and right-wall runs feel the same.",
+      startPosition: cellCentre(0, 6),
+      endZone: cellZone(3, 0),
       walls: [
-        // Bottom row: gap in the centre (x=800..1200)
-        { x: 0, y: 1300, width: 800, height: WALL_THICKNESS },
-        { x: 1200, y: 1300, width: 800, height: WALL_THICKNESS },
-        // Middle row: gap on each end (wall in the centre, blocks centreline)
-        { x: 600, y: 800, width: 800, height: WALL_THICKNESS },
-        // Top row: gap in the centre again
-        { x: 0, y: 300, width: 800, height: WALL_THICKNESS },
-        { x: 1200, y: 300, width: 800, height: WALL_THICKNESS },
+        // Bottom row (boundary 5): gap at the centre cell (column 3).
+        hWall(5, 0, 3),
+        hWall(5, 4, GRID),
+        // Middle row (boundary 3): central wall (columns 2..5),
+        // gaps at both sides. Self-mirrors about x = 1015.
+        hWall(3, 2, GRID - 2),
+        // Top row (boundary 1): gap at the centre cell again.
+        hWall(1, 0, 3),
+        hWall(1, 4, GRID),
       ],
     },
 
@@ -194,17 +277,21 @@ const Mazes = (function () {
       symmetric: false,
       description:
         'A spiral inward to the centre. This maze is inherently chiral — only AIDriver("left") is supported.',
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 800, y: 800, width: 200, height: 200 },
+      startPosition: cellCentre(0, 6),
+      endZone: cellZone(3, 3),
       walls: [
-        // Outer spiral - 400mm spacing between walls
-        { x: 0, y: 1400, width: 1600, height: WALL_THICKNESS },
-        { x: 1600, y: 400, width: WALL_THICKNESS, height: 1030 },
-        { x: 400, y: 400, width: 1230, height: WALL_THICKNESS },
-        { x: 400, y: 400, width: WALL_THICKNESS, height: 600 },
-        // Inner spiral - 400mm inward
-        { x: 400, y: 1000, width: 800, height: WALL_THICKNESS },
-        { x: 1200, y: 800, width: WALL_THICKNESS, height: 230 },
+        // Outer ring (one cell in from the arena edge), wound inward.
+        hWall(1, 0, GRID - 1),
+        vWall(GRID - 1, 1, GRID - 1),
+        hWall(GRID - 1, 1, GRID),
+        vWall(1, 2, GRID - 1),
+        // Inner ring.
+        hWall(2, 1, GRID - 2),
+        vWall(GRID - 2, 2, GRID - 2),
+        hWall(GRID - 2, 2, GRID - 1),
+        vWall(2, 3, GRID - 2),
+        // Centre stub.
+        hWall(3, 2, 4),
       ],
     },
 
@@ -216,23 +303,23 @@ const Mazes = (function () {
       symmetric: false,
       description:
         'A traditional maze with dead ends. Inherently chiral — only AIDriver("left") is supported.',
-      startPosition: { x: 250, y: 1750, heading: 0 },
-      endZone: { x: 1700, y: 100, width: 200, height: 200 },
+      startPosition: cellCentre(0, 6),
+      endZone: cellZone(GRID - 1, 0),
       walls: [
-        // Horizontal walls
-        { x: 500, y: 400, width: 500, height: WALL_THICKNESS },
-        { x: 1500, y: 400, width: 500, height: WALL_THICKNESS },
-        { x: 500, y: 1100, width: 1000, height: WALL_THICKNESS },
-        { x: 500, y: 1500, width: 500, height: WALL_THICKNESS },
-        // Vertical walls
-        { x: 500, y: 700, width: WALL_THICKNESS, height: 400 },
-        { x: 500, y: 1500, width: WALL_THICKNESS, height: 500 },
-        { x: 1000, y: 0, width: WALL_THICKNESS, height: 400 },
-        { x: 1500, y: 400, width: WALL_THICKNESS, height: 700 },
+        vWall(2, 0, 3),
+        hWall(2, 0, 2),
+        vWall(4, 1, 4),
+        hWall(3, 2, 5),
+        vWall(1, 4, GRID),
+        hWall(5, 1, 4),
+        vWall(5, 4, GRID),
+        hWall(4, 4, 6),
+        vWall(3, 5, GRID),
       ],
     },
 
-    // Obstacle course — scattered obstacles arranged symmetrically.
+    // Obstacle course — scattered cell-sized obstacles arranged in
+    // mirror pairs about x = 1015.
     obstacles: {
       id: "obstacles",
       name: "Obstacle Course",
@@ -240,117 +327,21 @@ const Mazes = (function () {
       symmetric: true,
       description:
         "Navigate around scattered obstacles. Layout is mirrored across the centreline so either AIDriver side works.",
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      endZone: { x: 900, y: 50, width: 200, height: 150 },
+      startPosition: cellCentre(0, 6),
+      endZone: cellZone(3, 0),
       walls: [
-        // Wall-attached obstacles (each pair mirrored across x=1000)
-        { x: 0, y: 1200, width: 300, height: 200 },
-        { x: 1700, y: 1200, width: 300, height: 200 },
-        { x: 600, y: 0, width: 200, height: 300 },
-        { x: 1200, y: 0, width: 200, height: 300 },
-        { x: 0, y: 600, width: 200, height: 200 },
-        { x: 1800, y: 600, width: 200, height: 200 },
-        // Centre obstacles (mirrored pair)
-        { x: 600, y: 900, width: 200, height: 200 },
-        { x: 1200, y: 900, width: 200, height: 200 },
+        // Outer column obstacles (mirror pair: column 0 / column 6).
+        block(0, 4, 1, 5),
+        block(GRID - 1, 4, GRID, 5),
+        // Upper inner obstacles (mirror pair: column 2 / column 4).
+        block(2, 1, 3, 2),
+        block(GRID - 3, 1, GRID - 2, 2),
+        // Lower inner obstacles (mirror pair: column 2 / column 4).
+        block(2, 4, 3, 5),
+        block(GRID - 3, 4, GRID - 2, 5),
       ],
     },
   };
-
-  /**
-   * Generate a deterministic classic maze layout comprised of cell-aligned walls.
-   * @returns {Array<{x:number,y:number,width:number,height:number}>} Wall definitions.
-   */
-  function generateClassicMaze() {
-    const walls = [];
-    const cellSize = 200;
-    const cols = 10;
-    const rows = 10;
-
-    // Add some predefined walls for a solvable maze
-    const wallPatterns = [
-      // Row 0
-      { r: 0, c: 2, dir: "bottom" },
-      { r: 0, c: 4, dir: "bottom" },
-      { r: 0, c: 6, dir: "bottom" },
-      { r: 0, c: 8, dir: "bottom" },
-
-      // Row 1
-      { r: 1, c: 1, dir: "right" },
-      { r: 1, c: 3, dir: "bottom" },
-      { r: 1, c: 5, dir: "right" },
-      { r: 1, c: 7, dir: "bottom" },
-
-      // Row 2
-      { r: 2, c: 0, dir: "right" },
-      { r: 2, c: 2, dir: "right" },
-      { r: 2, c: 4, dir: "bottom" },
-      { r: 2, c: 6, dir: "right" },
-      { r: 2, c: 8, dir: "bottom" },
-
-      // Row 3
-      { r: 3, c: 1, dir: "bottom" },
-      { r: 3, c: 3, dir: "right" },
-      { r: 3, c: 5, dir: "bottom" },
-      { r: 3, c: 7, dir: "right" },
-
-      // Row 4
-      { r: 4, c: 0, dir: "right" },
-      { r: 4, c: 2, dir: "bottom" },
-      { r: 4, c: 4, dir: "right" },
-      { r: 4, c: 6, dir: "bottom" },
-      { r: 4, c: 8, dir: "right" },
-
-      // Row 5
-      { r: 5, c: 1, dir: "right" },
-      { r: 5, c: 3, dir: "bottom" },
-      { r: 5, c: 5, dir: "right" },
-      { r: 5, c: 7, dir: "bottom" },
-
-      // Row 6
-      { r: 6, c: 0, dir: "bottom" },
-      { r: 6, c: 2, dir: "right" },
-      { r: 6, c: 4, dir: "bottom" },
-      { r: 6, c: 6, dir: "right" },
-      { r: 6, c: 8, dir: "bottom" },
-
-      // Row 7
-      { r: 7, c: 1, dir: "bottom" },
-      { r: 7, c: 3, dir: "right" },
-      { r: 7, c: 5, dir: "bottom" },
-      { r: 7, c: 7, dir: "right" },
-
-      // Row 8
-      { r: 8, c: 0, dir: "right" },
-      { r: 8, c: 2, dir: "bottom" },
-      { r: 8, c: 4, dir: "right" },
-      { r: 8, c: 6, dir: "bottom" },
-      { r: 8, c: 8, dir: "right" },
-    ];
-
-    for (const pattern of wallPatterns) {
-      const x = pattern.c * cellSize;
-      const y = pattern.r * cellSize;
-
-      if (pattern.dir === "right") {
-        walls.push({
-          x: x + cellSize - WALL_THICKNESS / 2,
-          y: y,
-          width: WALL_THICKNESS,
-          height: cellSize,
-        });
-      } else if (pattern.dir === "bottom") {
-        walls.push({
-          x: x,
-          y: y + cellSize - WALL_THICKNESS / 2,
-          width: cellSize,
-          height: WALL_THICKNESS,
-        });
-      }
-    }
-
-    return walls;
-  }
 
   /**
    * Retrieve a maze definition by identifier, defaulting to the simple maze.

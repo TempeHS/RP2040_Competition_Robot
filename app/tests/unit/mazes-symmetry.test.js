@@ -2,7 +2,7 @@
  * Behavioural tests for the REAL Mazes IIFE in app/js/mazes.js.
  *
  * Confirms that every maze flagged `symmetric: true` is mirror-symmetric
- * across the arena vertical centreline (x=1000), that walls are well-formed,
+ * across the arena vertical centreline (x=1015), that walls are well-formed,
  * that spawns sit inside the arena and outside any wall, and that the
  * inherently chiral mazes (spiral, classic) carry `symmetric: false`.
  */
@@ -11,16 +11,20 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const ARENA = 2000;
+const ARENA = 2030; // 7 × 290 mm timber panels
 
 function loadMazes() {
+  const cfg = fs.readFileSync(
+    path.join(__dirname, "../../js/robot-config.js"),
+    "utf8",
+  );
   const src = fs.readFileSync(
     path.join(__dirname, "../../js/mazes.js"),
     "utf8",
   );
-  const sandbox = { Math, console };
+  const sandbox = { Math, console, Object };
   vm.createContext(sandbox);
-  vm.runInContext(src + "\n;this.Mazes = Mazes;", sandbox);
+  vm.runInContext(cfg + "\n" + src + "\n;this.Mazes = Mazes;", sandbox);
   return sandbox.Mazes;
 }
 

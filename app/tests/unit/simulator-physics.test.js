@@ -15,7 +15,7 @@
  *   maxPWM         = 255     →  activePWM = 191
  *   topSpeed       = 650 mm/s
  *   accel / decel  = 1750 mm/s²
- *   arena          = 2000 × 2000 mm
+ *   arena          = 2030 × 2030 mm  (7 × 290 mm panels)
  *   ultrasonic     = 20 – 2000 mm, ±2 mm noise
  */
 
@@ -60,6 +60,7 @@ const REAR = sandbox.RobotConfig.rearAxleOffset_mm; // 65 mm centre → rear axl
 const HALF_LEN = sandbox.RobotConfig.robotLength_mm / 2; // 100 mm
 const FRONT_SENSOR = sandbox.RobotConfig.frontSensorOffset_mm; // 90 mm
 const SIDE_SENSOR = sandbox.RobotConfig.sideSensorOffset_mm; // 65 mm
+const ARENA_W = sandbox.RobotConfig.arenaWidth_mm; // 2030 mm (7 × 290)
 
 // ── Helpers ──
 function makeRobot(overrides) {
@@ -505,11 +506,13 @@ describe("§8 Ultrasonic", () => {
     expect(d).toBeLessThanOrEqual(912);
   });
 
-  test("Front: facing right → ~910 to right wall", () => {
+  test("Front: facing right → right wall", () => {
     var r = makeRobot({ x: 1000, y: 1000, heading: 90 });
     var d = S.simulateUltrasonic(r);
-    expect(d).toBeGreaterThanOrEqual(908);
-    expect(d).toBeLessThanOrEqual(912);
+    // arena right wall at ARENA_W; centre x=1000, front sensor 90mm ahead.
+    var expected = ARENA_W - 1000 - FRONT_SENSOR; // 940 mm
+    expect(d).toBeGreaterThanOrEqual(expected - 2);
+    expect(d).toBeLessThanOrEqual(expected + 2);
   });
 
   test("Side left: heading 0 → ~935 to left wall", () => {
@@ -519,12 +522,14 @@ describe("§8 Ultrasonic", () => {
     expect(d).toBeLessThanOrEqual(937);
   });
 
-  test("Side right: heading 0 → ~935 to right wall", () => {
+  test("Side right: heading 0 → right wall", () => {
     S.setSideSensorSide("right");
     var r = makeRobot({ x: 1000, y: 1000, heading: 0 });
     var d = S.simulateUltrasonicSide(r);
-    expect(d).toBeGreaterThanOrEqual(933);
-    expect(d).toBeLessThanOrEqual(937);
+    // arena right wall at ARENA_W; centre x=1000, side sensor 65mm out.
+    var expected = ARENA_W - 1000 - SIDE_SENSOR; // 965 mm
+    expect(d).toBeGreaterThanOrEqual(expected - 2);
+    expect(d).toBeLessThanOrEqual(expected + 2);
   });
 
   test("Side detects maze wall", () => {
@@ -681,12 +686,12 @@ describe("§10 Boundary", () => {
 describe("§11 Mirror", () => {
   test("mirrorPose", () => {
     var m = S.mirrorPose(makeRobot({ x: 300, heading: 10 }));
-    expect(m.x).toBe(1700);
+    expect(m.x).toBe(ARENA_W - 300); // 1730
     expect(m.heading).toBe(-10);
   });
   test("mirrorRect", () => {
     var m = S.mirrorRect({ x: 100, y: 200, width: 50, height: 100 });
-    expect(m.x).toBe(1850);
+    expect(m.x).toBe(ARENA_W - 100 - 50); // 1880
   });
 });
 
@@ -708,8 +713,8 @@ describe("§12 SideSensorSide", () => {
 describe("§13 Idle", () => {
   test("Initial state", () => {
     var r = S.getInitialRobotState();
-    expect(r.x).toBe(1000);
-    expect(r.y).toBe(1000);
+    expect(r.x).toBe(ARENA_W / 2); // 1015
+    expect(r.y).toBe(ARENA_W / 2); // 1015 (square arena)
     expect(r.heading).toBe(0);
     expect(r.isMoving).toBe(false);
   });

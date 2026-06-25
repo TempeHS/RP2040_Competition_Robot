@@ -2,6 +2,7 @@
  * AIDriver Simulator - Main Application
  * Entry point and module orchestration
  */
+/* global RobotConfig */
 
 // Global application state
 const App = {
@@ -1261,8 +1262,8 @@ function drawGrid(ctx, scale) {
   ctx.strokeStyle = "#2a2a4a";
   ctx.lineWidth = 1;
 
-  // Draw grid every 200mm
-  const gridSize = 200 * scale;
+  // Draw grid every panel (290mm timber section)
+  const gridSize = RobotConfig.panelSize_mm * scale;
 
   for (let x = gridSize; x < ctx.canvas.width; x += gridSize) {
     ctx.beginPath();

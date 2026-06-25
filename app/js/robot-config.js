@@ -30,6 +30,8 @@ const RobotConfig = Object.freeze({
   sideSensorOffset_mm: 65, // side sensor from body centre, faces 90° sideways
 
   // ── Arena ────────────────────────────────────────────────────────
-  arenaWidth_mm: 2000,
-  arenaHeight_mm: 2000,
+  arenaWidth_mm: 2030, // 7 × 290 mm timber panels
+  arenaHeight_mm: 2030, // 7 × 290 mm timber panels
+  panelSize_mm: 290, // maze timber panel width (grid spacing)
+  wallThickness_mm: 3, // maze timber panel thickness
 });

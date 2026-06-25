@@ -15,10 +15,17 @@ const path = require("path");
 const vm = require("vm");
 
 function loadModule(relPath, exportName) {
+  const cfg = fs.readFileSync(
+    path.join(__dirname, "../../js/robot-config.js"),
+    "utf8",
+  );
   const src = fs.readFileSync(path.join(__dirname, relPath), "utf8");
-  const sandbox = { Math, console };
+  const sandbox = { Math, console, Object };
   vm.createContext(sandbox);
-  vm.runInContext(`${src}\n;this.${exportName} = ${exportName};`, sandbox);
+  vm.runInContext(
+    `${cfg}\n${src}\n;this.${exportName} = ${exportName};`,
+    sandbox,
+  );
   return sandbox[exportName];
 }
 
