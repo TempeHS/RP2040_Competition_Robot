@@ -1,24 +1,10 @@
-# === ANSWER KEY — Challenge 5 ===
-# Identical to app/starter-code/challenge-5.py with the tuned values
-# filled in. Used by automated tests and as a teacher reference.
-# Students should NOT see this file.
+# === ANSWER KEY — Challenge 5 (teacher reference; students should NOT see this) ===
+# Same as app/starter-code/challenge-5.py with tuned values filled in.
 
-# Challenge 5: Outside Corners — Turn Left at a Nib
-# --------------------------------------------------------------------
-# When the wall the robot is following ends abruptly (an outside /
-# convex corner, or a free-standing "nib"), the side sensor returns
-# -1. Following the left-hand rule, the robot must TURN LEFT to wrap
-# around the corner. It reuses the SAME gyro turn PID from Challenge 4
-# — only the direction differs (left instead of right).
-#
-# Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
-#
-# Values to set:
-#     all carried-forward C4 values, including turn_Kp / turn_Kd /
-#     turn_tolerance (the gyro turn PID is HELD — keep the C4 values).
-#
-# Goal: wrap around the free-standing block to reach the exit zone.
-# --------------------------------------------------------------------
+# Challenge 5: Outside Corners — adds the NIB_WALL state.
+# When the side wall ends (sensor returns -1), turn LEFT to wrap the corner,
+# reusing the gyro turn PID from Challenge 4 (only the direction differs).
+# Guide: docs.html?doc=Challenge_5
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -26,15 +12,9 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# ============================ STATE MACHINE ============================
-# The robot is always in exactly ONE state. Each pass of the main loop runs
-# the current state, which returns the NEXT state. You tune each state's
-# parameters and the triggers that move between states.
-#
-#   FOLLOW_WALL  hold the side wall with the side PID
-#   TURN         spin 90 deg AWAY from the wall (dead end ahead)
-#   NIB_WALL     wrap a 90 deg outside corner TOWARD the wall
-# =======================================================================
+# Each loop runs the current state, which returns the next state to run.
+# States: FOLLOW_WALL (hold the wall), TURN (wall ahead -> spin away),
+# NIB_WALL (side wall ended -> wrap around the corner).
 
 # --- FOLLOW_WALL parameters ---
 BASE_SPEED = 200  # cruise speed
@@ -113,8 +93,7 @@ def follow_wall():
         return "TURN"
 
     side = my_robot.read_distance_2()
-    # Trigger -> NIB_WALL: the side wall stays lost (past NIB_LOST_DISTANCE, or
-    # -1) long enough that it must be an outside corner, not normal variation.
+    # Trigger -> NIB_WALL: side wall stays lost long enough = outside corner.
     if side != -1 and side <= NIB_LOST_DISTANCE:
         nib_lost_time = 0.0
     else:
@@ -185,7 +164,7 @@ def nib_wall():
     return "FOLLOW_WALL"
 
 
-# ============================== MAIN LINE ==============================
+# --- Main loop ---
 while True:
     if state == "FOLLOW_WALL":
         state = follow_wall()

@@ -1,19 +1,7 @@
-# Challenge 7: Full Maze Navigation
-# --------------------------------------------------------------------
-# The capstone maze. The robot follows the left-hand rule end to end:
-#     wall ahead (dead end)  → turn RIGHT
-#     side wall ends (nib)    → turn LEFT
-# Every turn reuses the SAME gyro turn PID you wrote in Challenge 4 —
-# it is HELD, so keep the C4 gain values.
-#
-# Tuning guide: docs.html?doc=PID_Turn_Tuning_Quickstart
-#
-# Values to set:
-#     all carried-forward C6 values, including turn_Kp / turn_Kd /
-#     turn_tolerance (the gyro turn PID is HELD).
-#
-# Goal: complete the full maze without external help.
-# --------------------------------------------------------------------
+# Challenge 7: The Full Maze — capstone.
+# Same three-state machine, no new code — solve the whole maze with the
+# left-hand rule. Carry forward your C6 values and tune for the full course.
+# Guide: docs.html?doc=Challenge_7
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -21,17 +9,11 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# ============================ STATE MACHINE ============================
-# The robot is always in exactly ONE state. Each pass of the main loop runs
-# the current state, which returns the NEXT state. You tune each state's
-# parameters and the triggers that move between states.
-#
-#   FOLLOW_WALL  hold the side wall with the side PID
-#   TURN         spin 90 deg AWAY from the wall (dead end ahead)
-#   NIB_WALL     wrap a 90 deg outside corner TOWARD the wall
-# =======================================================================
+# Each loop runs the current state, which returns the next state to run.
+# States: FOLLOW_WALL (hold the wall), TURN (wall ahead -> spin away),
+# NIB_WALL (side wall ended -> wrap around the corner).
 
-# --- FOLLOW_WALL parameters (you set) ---
+# --- FOLLOW_WALL parameters ---
 BASE_SPEED = 0  # cruise speed
 TARGET_WALL_DISTANCE = 0  # mm to hold from the side wall
 MAX_STEERING = 0  # steering clamp
@@ -109,8 +91,7 @@ def follow_wall():
         return "TURN"
 
     side = my_robot.read_distance_2()
-    # Trigger -> NIB_WALL: the side wall stays lost (past NIB_LOST_DISTANCE, or
-    # -1) long enough that it must be an outside corner, not normal variation.
+    # Trigger -> NIB_WALL: side wall stays lost long enough = outside corner.
     if side != -1 and side <= NIB_LOST_DISTANCE:
         nib_lost_time = 0.0
     else:
@@ -181,7 +162,7 @@ def nib_wall():
     return "FOLLOW_WALL"
 
 
-# ============================== MAIN LINE ==============================
+# --- Main loop ---
 while True:
     if state == "FOLLOW_WALL":
         state = follow_wall()

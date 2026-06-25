@@ -85,59 +85,72 @@ Runs a short sequence of movements and distance readings.
 Most details are reported via the AIDriver debug logger.
 """
 
+aidriver.DEBUG_AIDRIVER = True
 
-def main():
-    aidriver.DEBUG_AIDRIVER = True
+print("Initialising AIDriver hardware test...")
 
-    print("Initialising AIDriver hardware test...")
+try:
+    robot = AIDriver(
+        "left"
+    )  # wall_side required; change to "right" if following right wall
+except Exception as exc:
+    print("Failed to initialise AIDriver:", exc)
+    print("Check that 'aidriver.py' is in the 'lib' folder on the device.")
+    raise SystemExit
 
-    try:
-        robot = AIDriver("left")
-    except Exception as exc:
-        print("Failed to initialise AIDriver:", exc)
-        print("Check that 'aidriver.py' is in the 'lib' folder on the device.")
-        return
+print("Starting tests in 3 seconds. Ensure clear space around the robot.")
+hold_state(3)
 
-    print("Starting tests in 3 seconds. Ensure clear space around the robot.")
-    hold_state(3)
+# Test 1: Drive Forward
+print("Test 1: drive_forward")
+robot.drive_forward(200, 200)
+hold_state(2)
+robot.brake()
+hold_state(1)
 
-    # Test 1: Drive Forward
-    print("Test 1: drive_forward")
-    robot.drive_forward(200, 200)
-    hold_state(2)
-    robot.brake()
+# Test 2: Drive Backward
+print("Test 2: drive_backward")
+robot.drive_backward(200, 200)
+hold_state(2)
+robot.brake()
+hold_state(1)
+
+# Test 3: Rotate Right
+print("Test 3: rotate_right")
+robot.rotate_right(200)
+hold_state(2)
+robot.brake()
+hold_state(1)
+
+# Test 4: Rotate Left
+print("Test 4: rotate_left")
+robot.rotate_left(200)
+hold_state(2)
+robot.brake()
+hold_state(1)
+
+# Test 5: Gyro closed-loop turns (90 degrees each way)
+if robot.has_gyro:
+    print("Test 5: turn_90 right (gyro PID)")
+    turned = robot.turn_90("right")
+    print("  turned", round(turned, 1), "deg")
     hold_state(1)
-
-    # Test 2: Drive Backward
-    print("Test 2: drive_backward")
-    robot.drive_backward(200, 200)
-    hold_state(2)
-    robot.brake()
+    print("Test 5: turn_90 left (gyro PID)")
+    turned = robot.turn_90("left")
+    print("  turned", round(turned, 1), "deg")
     hold_state(1)
+else:
+    print("Test 5 skipped: no IMU/gyro detected (check GP16/GP17 wiring)")
 
-    # Test 3: Rotate Right
-    print("Test 3: rotate_right")
-    robot.rotate_right(200)
-    hold_state(2)
-    robot.brake()
-    hold_state(1)
+# Test 6: Ultrasonic Sensors
+print("Test 6: ultrasonic distance readings (sensor 1 + sensor 2)")
+for i in range(5):
+    distance_1 = robot.read_distance()
+    distance_2 = robot.read_distance_2()
+    print(
+        "Reading", i + 1, "- Sensor 1:", distance_1, "mm | Sensor 2:", distance_2, "mm"
+    )
+    hold_state(0.5)
 
-    # Test 4: Rotate Left
-    print("Test 4: rotate_left")
-    robot.rotate_left(200)
-    hold_state(2)
-    robot.brake()
-    hold_state(1)
-
-    # Test 5: Ultrasonic Sensor
-    print("Test 5: ultrasonic distance readings")
-    for i in range(5):
-        distance = robot.read_distance()
-        hold_state(0.5)
-
-    print("All hardware tests completed.")
-
-
-if __name__ == "__main__":
-    main()
+print("All hardware tests completed.")
 ```

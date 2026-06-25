@@ -1,25 +1,9 @@
-# === ANSWER KEY — Challenge 1 ===
-# Identical to app/starter-code/challenge-1.py with the tuned values
-# filled in. Used by automated tests and as a teacher reference.
-# Students should NOT see this file.
+# === ANSWER KEY — Challenge 1 (teacher reference; students should NOT see this) ===
+# Same as app/starter-code/challenge-1.py with tuned values filled in.
 
 # Challenge 1: Wall Follow — P Control
-# --------------------------------------------------------------------
-# The full algorithm is already written for you below. Every numeric
-# setting starts at 0 — until you fill them in the robot will not
-# move. Read the tuning guide before you pick numbers:
-#
-#     docs.html?doc=PID_Real_World_Tuning_Quickstart
-#
-# Values to set:
-#     BASE_SPEED              forward speed (must stay > 120, MIN_MOTOR_SPEED)
-#     TARGET_WALL_DISTANCE    distance to maintain from wall (mm)
-#     MAX_STEERING            max wheel-speed difference
-#                             (BASE_SPEED - MAX_STEERING must be > 120)
-#     side_Kp                 Proportional gain for steering
-#
-# Goal: reach the green exit zone without hitting the side wall.
-# --------------------------------------------------------------------
+# Follow the side wall using a Proportional controller.
+# Guide: docs.html?doc=Challenge_1
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -27,11 +11,11 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False  # Set True to print sensor + motor values
 my_robot = AIDriver("left")  # "left" or "right" — match the simulator scene
 
-BASE_SPEED = 200
-TARGET_WALL_DISTANCE = 200
-MAX_STEERING = 60
+BASE_SPEED = 200  # forward speed (keep BASE_SPEED - MAX_STEERING > 120)
+TARGET_WALL_DISTANCE = 200  # distance to hold from the wall (mm)
+MAX_STEERING = 60  # max wheel-speed difference
 
-side_Kp = 0.25
+side_Kp = 0.25  # proportional gain
 
 
 while True:

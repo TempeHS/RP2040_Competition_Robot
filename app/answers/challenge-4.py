@@ -1,28 +1,10 @@
-# === ANSWER KEY — Challenge 4 ===
-# Identical to app/starter-code/challenge-4.py with the tuned values
-# filled in. Used by automated tests and as a teacher reference.
-# Students should NOT see this file.
+# === ANSWER KEY — Challenge 4 (teacher reference; students should NOT see this) ===
+# Same as app/starter-code/challenge-4.py with tuned values filled in.
 
-# Challenge 4: Corner Detection (90° turn)
-# --------------------------------------------------------------------
-# Introduces the STATE MACHINE. The robot is always in one state:
-#     FOLLOW_WALL  hold the side wall with the side PID
-#     TURN         a wall is reached ahead -> spin 90 deg away from it
-# The 90 deg turn is YOUR gyro turn PID (turn_Kp / turn_Kd), written and
-# tuned here and reused by every later challenge.
-#
-# Tuning guides:
-#     docs.html?doc=PID_Front_Distance_Tuning_Quickstart   (FRONT_*, FRONT_Kp)
-#     docs.html?doc=PID_Turn_Tuning_Quickstart             (turn_Kp / turn_Kd)
-#
-# Values to set:
-#     all carried-forward C3 PID + base values
-#     FRONT_SLOW_DISTANCE, FRONT_STOP_DISTANCE     when to slow / brake (mm)
-#     FRONT_Kp                                      front-approach gain
-#     turn_Kp, turn_Kd, turn_tolerance             gyro turn PID — how the spin behaves
-#
-# Goal: turn the L-corner at speed without clipping either wall.
-# --------------------------------------------------------------------
+# Challenge 4: Corner Detection — your first state machine.
+# The robot is always in ONE state: FOLLOW_WALL or TURN.
+# The gyro turn PID written here is reused in every later challenge.
+# Guide: docs.html?doc=Challenge_4
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -30,14 +12,8 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# ============================ STATE MACHINE ============================
-# The robot is always in exactly ONE state. Each pass of the main loop runs
-# the current state, which returns the NEXT state. You tune each state's
-# parameters and the trigger that moves between them.
-#
-#   FOLLOW_WALL  hold the side wall with the side PID
-#   TURN         spin 90 deg AWAY from the wall (dead end ahead)
-# =======================================================================
+# Each loop runs the current state, which returns the next state to run.
+# States: FOLLOW_WALL (hold the wall) and TURN (spin 90° away from a wall ahead).
 
 # --- FOLLOW_WALL parameters ---
 BASE_SPEED = 200  # cruise speed
@@ -156,7 +132,7 @@ def turn():
     return "FOLLOW_WALL"
 
 
-# ============================== MAIN LINE ==============================
+# --- Main loop ---
 while True:
     if state == "FOLLOW_WALL":
         state = follow_wall()

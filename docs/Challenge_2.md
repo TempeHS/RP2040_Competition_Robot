@@ -85,95 +85,70 @@ steering = (side_Kp * error) + (side_Kd * side_derivative)
 
 ---
 
-## Example Starting Values
+## The Code
+
+The full PD algorithm is already in the editor — carry forward your four Challenge 1 values, then tune `side_Kd`:
 
 ```python
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-side_Kp = 0.40
-side_Kd = 0.15
-side_previous_error = 0
-```
+# Challenge 2: Wall Follow — PD Control
+# Add a Derivative term to Challenge 1 to stop the zig-zag.
+# Carry forward your C1 values, then tune side_Kd. Guide: docs.html?doc=Challenge_2
 
-> [!Note]
-> `side_previous_error` starts at 0 because on the first loop iteration, there is no previous reading.
+from aidriver import AIDriver, hold_state
+import aidriver
 
----
+aidriver.DEBUG_AIDRIVER = False
+my_robot = AIDriver("left")
 
-## Step 1 — Start from Your Challenge 1 Code
+BASE_SPEED = 0  # carry forward from C1
+TARGET_WALL_DISTANCE = 0  # carry forward from C1
+MAX_STEERING = 0  # carry forward from C1
 
-Copy your working Challenge 1 code. You will add two things:
-
-1. A new variable `side_Kd` in the configuration section.
-2. A `side_previous_error` variable before the loop.
-3. The derivative calculation inside the loop.
-
----
-
-## Step 2 — Add the New Variables
-
-Add `side_Kd` to your configuration and `side_previous_error` before the loop:
-
-```python
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-side_Kp = 0.40
-side_Kd = 0.15            # Derivative gain — dampens oscillations
-MAX_STEERING = 40
+side_Kp = 0.0  # carry forward from C1
+side_Kd = 0.0  # derivative gain — dampens oscillation
 
 side_previous_error = 0
-```
 
-> [!Note]
-> `side_previous_error` starts at 0 because on the first loop iteration, there is no previous reading.
 
----
+while True:
+    wall_distance = my_robot.read_distance_2()
 
-## Step 3 — Calculate the Derivative
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
+        hold_state(0.05)
+        continue
 
-Inside your loop, after calculating the error, add the derivative calculation:
-
-```python
     error = wall_distance - TARGET_WALL_DISTANCE
-
-    # Derivative: how fast is the error changing?
     side_derivative = error - side_previous_error
 
-    # PD output
     steering = (side_Kp * error) + (side_Kd * side_derivative)
-```
 
----
+    if steering > MAX_STEERING:
+        steering = MAX_STEERING
+    elif steering < -MAX_STEERING:
+        steering = -MAX_STEERING
 
-## Step 4 — Save the Previous Error
+    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
+    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
 
-At the **end** of each loop iteration (after setting motor speeds), save the current error for next time:
-
-```python
     my_robot.drive(int(right_speed), int(left_speed))
 
-    side_previous_error = error
+    side_previous_error = error  # save for next loop (must be last)
     hold_state(0.05)
 ```
 
-> [!Important]
-> If you forget this line, `side_previous_error` will always be 0 and the D term won't work at all.
+## How It Works
+
+Everything from Challenge 1 is the same. Three things are new:
+
+- **`side_previous_error = 0`** — remembers the last error so you can measure change. It starts at 0 because there's no previous reading on the first loop.
+- **`side_derivative = error - side_previous_error`** — how fast the error is changing. It acts like a brake that resists sudden swings.
+- **PD steering** — `steering = (side_Kp * error) + (side_Kd * side_derivative)`. The `side_Kd` term cancels overshoot before it happens.
+- **Save at the end** — `side_previous_error = error` must be the last line before `hold_state`. Forgetting it is the most common bug (the D term stays 0).
 
 ---
 
-## Step 5 — Compare P vs PD
-
-Try running the same maze with two versions of your code:
-
-1. **P only**: Set `Kd = 0` and watch the oscillations.
-2. **PD**: Set `Kd = 0.15` and watch the robot smooth out.
-
-The difference should be obvious, especially at the start where the robot begins off-centre.
-
----
-
-## Tuning Guide
+## Tune Your Robot
 
 | Symptom                         | Cause           | Fix                          |
 | ------------------------------- | --------------- | ---------------------------- |
@@ -187,151 +162,18 @@ The difference should be obvious, especially at the start where the robot begins
 
 ---
 
-## Starter Scaffold
-
-This is what you'll see in the editor when you open the challenge. Comments mark the `TODO` blocks you must complete.
-
-```python
-# Challenge 2: Wall Follow — PD Control
-# ====================================================================
-# GOAL: Add a Derivative (D) term to your Challenge 1 controller to
-#       dampen the oscillations that appear when the robot starts
-#       off-centre and at an angle.
-#
-# WHAT'S ALREADY DONE FOR YOU:
-#   - All of Challenge 1 (P controller + clamp + differential drive).
-#
-# WHAT YOU NEED TO ADD:
-#   1. A new gain  side_Kd  (start small — try 0.10).
-#   2. A variable  side_previous_error  initialised to 0 BEFORE the loop.
-#   3. Inside the loop:  side_derivative = error - side_previous_error
-#   4. A new steering formula:
-#         steering = (side_Kp * error) + (side_Kd * side_derivative)
-#   5. At the END of the loop, save  side_previous_error = error
-#      (forgetting this is the most common bug — the D term will read 0).
-#
-# READ THIS FIRST: docs/Challenge_2.md
-# ====================================================================
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")
-
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-# === BLOCK: CONFIG_BASE END ===
-
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40  # Carry forward your tuned value from Challenge 1
-# === BLOCK: SIDE_KP END ===
-
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.0  # TODO: pick a starting value (try 0.10, then raise in 0.05 steps)
-# === BLOCK: SIDE_KD END ===
-
-# TODO: add a `side_previous_error` variable initialised to 0 here
-
-
-# === MAIN LOOP ===
-while True:
-    # === BLOCK: SIDE_FOLLOW_PD START ===
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    # TODO: calculate side_derivative = error - side_previous_error
-
-    # TODO: replace this P-only formula with a PD formula
-    steering = side_Kp * error
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    # TODO: save side_previous_error = error  (must be LAST thing before hold_state)
-    # === BLOCK: SIDE_FOLLOW_PD END ===
-
-    hold_state(0.05)
-```
-
 <details>
-<summary><strong>Reference Solution</strong> — click to expand <em>(only after you've genuinely tried)</em></summary>
+<summary><strong>Example tuned values</strong> — open after you've tried your own</summary>
 
 ```python
-# Challenge 2: Wall Follow - PD Control
-# Add the derivative term to dampen oscillations.
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
-
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160  # Forward speed (must be > 120)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-MAX_STEERING = 40  # Max wheel speed difference
-# Rule: BASE_SPEED - MAX_STEERING must be >= 120 (motor dead zone)
-# === BLOCK: CONFIG_BASE END ===
-
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40  # Proportional gain — raise in 0.05 steps until zig-zag starts
-# === BLOCK: SIDE_KP END ===
-
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15  # Derivative gain — dampens oscillations
-# === BLOCK: SIDE_KD END ===
-
-side_previous_error = 0
-
-# === MAIN LOOP ===
-while True:
-    # === BLOCK: SIDE_FOLLOW_PD START ===
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    # Derivative: how fast is the error changing?
-    side_derivative = error - side_previous_error
-
-    # PD output
-    steering = (side_Kp * error) + (side_Kd * side_derivative)
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PD END ===
-
-    hold_state(0.05)
+BASE_SPEED = 200
+TARGET_WALL_DISTANCE = 200
+MAX_STEERING = 60
+side_Kp = 0.25
+side_Kd = 0.30
 ```
+
+Full worked solution: `app/answers/challenge-2.py`.
 
 </details>
 

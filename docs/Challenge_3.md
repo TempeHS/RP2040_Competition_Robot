@@ -91,141 +91,14 @@ Keep `side_Ki` very small — even 0.003 is enough. Too high causes a slow, roll
 
 ---
 
-## Example Starting Values
+## The Code
 
-```python
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-side_Kp = 0.40       # Carry over from Challenge 1
-side_Kd = 0.15       # Carry over from Challenge 2
-side_Ki = 0.003      # Start very small
-side_INTEGRAL_MAX = 1200
-side_previous_error = 0
-side_integral = 0
-```
-
----
-
-## Step 1 — Start from Your Challenge 2 Code
-
-Copy your working PD code. You will add three things:
-
-1. `side_Ki` and `side_INTEGRAL_MAX` in the configuration section.
-2. `side_integral = 0` before the loop.
-3. Integral update and clamp inside the loop.
-
----
-
-## Step 2 — Add the New Variables
-
-```python
-side_Ki = 0.003            # Start very small — raise in 0.002 steps
-side_INTEGRAL_MAX = 1200   # Anti-windup clamp
-
-side_previous_error = 0
-side_integral = 0
-```
-
-> [!Note]
-> `side_INTEGRAL_MAX = 1200` means the integral can accumulate at most 1200 mm of total error before it stops growing. This prevents runaway corrections.
-
----
-
-## Step 3 — Update the Integral Each Loop
-
-Inside your loop, after calculating the error, add:
-
-```python
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    # Integral: accumulated error — reset when wall lost (see sensor check above)
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-```
-
----
-
-## Step 4 — Add the Full PID Formula
-
-Replace your PD steering formula with:
-
-```python
-    side_derivative = error - side_previous_error
-
-    steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
-```
-
----
-
-## Step 5 — Reset the Integral When Wall Is Lost
-
-In the sensor-error branch (where `wall_distance == -1`), add a reset:
-
-```python
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0   # ← prevent windup when wall is out of range
-        hold_state(0.05)
-        continue
-```
-
----
-
-## Step 6 — Compare PD vs PID
-
-Try running the L-corner maze with two versions:
-
-1. **PD only**: Set `side_Ki = 0` — the robot will drift on the corner.
-2. **PID**: Set `side_Ki = 0.003` — the robot should track back to the target distance.
-
----
-
-## Tuning Guide
-
-| Symptom                              | Cause                  | Fix                                         |
-| ------------------------------------ | ---------------------- | ------------------------------------------- |
-| Robot drifts on corner (like PD)     | side_Ki too low        | Increase side_Ki (try 0.005, 0.008)         |
-| Slow rolling oscillation builds up   | side_Ki too high       | Decrease side_Ki (try 0.001, 0.002)         |
-| Large overshoot after losing wall    | Integral not resetting | Check `side_integral = 0` in sensor-error branch |
-| Robot overreacts after a long drift  | INTEGRAL_MAX too large | Decrease side_INTEGRAL_MAX (try 600, 800)   |
-
-> [!Tip]
-> Tune in this order: get `side_Kp` working first → add `side_Kd` to kill oscillations → add a tiny `side_Ki` to fix corner drift. Do not increase `side_Ki` aggressively.
-
----
-
-## Starter Scaffold
-
-This is what you'll see in the editor when you open the challenge. Comments mark the `TODO` blocks you must complete.
+The full PID algorithm is already in the editor — carry forward your Challenge 1 and 2 values, then tune `side_Ki` and `side_INTEGRAL_MAX`:
 
 ```python
 # Challenge 3: Wall Follow — Full PID
-# ====================================================================
-# GOAL: Add an Integral (I) term to your PD controller so the robot
-#       no longer drifts away from the wall around the L-shaped corner.
-#
-# WHAT'S ALREADY DONE FOR YOU:
-#   - Challenge 1 (P) and Challenge 2 (PD) — both blocks are pre-filled.
-#
-# WHAT YOU NEED TO ADD:
-#   1. A new gain  side_Ki  (start very small — try 0.003).
-#   2. A clamp constant  side_INTEGRAL_MAX  to prevent integral windup.
-#   3. A variable  side_integral  initialised to 0 BEFORE the loop.
-#   4. Inside the loop: accumulate  side_integral = side_integral + error
-#      THEN clamp it between  -side_INTEGRAL_MAX  and  +side_INTEGRAL_MAX.
-#   5. New steering formula:
-#         steering = (side_Kp * error)
-#                  + (side_Ki * side_integral)
-#                  + (side_Kd * side_derivative)
-#   6. RESET side_integral to 0 in the lost-wall branch
-#      (otherwise it keeps growing and overshoots when the wall reappears).
-#
-# READ THIS FIRST: docs/Challenge_3.md
-# ====================================================================
+# Add an Integral term so the robot holds the wall around the L corner.
+# Carry forward C1/C2 values, then tune side_Ki. Guide: docs.html?doc=Challenge_3
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -233,128 +106,38 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160
-TARGET_WALL_DISTANCE = 150
-MAX_STEERING = 40
-# === BLOCK: CONFIG_BASE END ===
+BASE_SPEED = 0  # carry forward
+TARGET_WALL_DISTANCE = 0  # carry forward
+MAX_STEERING = 0  # carry forward
 
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40
-# === BLOCK: SIDE_KP END ===
-
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.0              # TODO: try 0.003, then raise in 0.002 steps
-side_INTEGRAL_MAX = 1200   # Anti-windup clamp (do NOT change unless tuning)
-# === BLOCK: SIDE_KI END ===
-
-side_previous_error = 0
-# TODO: add a `side_integral` variable initialised to 0 here
-
-
-# === MAIN LOOP ===
-while True:
-    # === BLOCK: SIDE_FOLLOW_PID START ===
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        # TODO: reset side_integral here so windup can't build up while the
-        #       wall is out of range
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    # TODO: update side_integral = side_integral + error
-    # TODO: clamp side_integral between -side_INTEGRAL_MAX and +side_INTEGRAL_MAX
-
-    side_derivative = error - side_previous_error
-
-    # TODO: replace this PD formula with the full PID formula
-    steering = (side_Kp * error) + (side_Kd * side_derivative)
-
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
-
-    side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PID END ===
-
-    hold_state(0.05)
-```
-
-<details>
-<summary><strong>Reference Solution</strong> — click to expand <em>(only after you've genuinely tried)</em></summary>
-
-```python
-# Challenge 3: Wall Follow - Full PID
-# Add the integral term to fix drift around the L corner.
-# This file defines the FROZEN side-follow block reused in C4, C5, C6.
-
-from aidriver import AIDriver, hold_state
-import aidriver
-
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")  # ← "left" or "right" — must match your physical setup!
-
-# === BLOCK: CONFIG_BASE START ===
-BASE_SPEED = 160  # Forward speed (must be > 120)
-TARGET_WALL_DISTANCE = 150  # Distance to maintain from wall (mm)
-MAX_STEERING = 40  # Max wheel speed difference
-# Rule: BASE_SPEED - MAX_STEERING must be >= 120 (motor dead zone)
-# === BLOCK: CONFIG_BASE END ===
-
-# === BLOCK: SIDE_KP START ===
-side_Kp = 0.40  # Proportional gain — raise in 0.05 steps until zig-zag starts
-# === BLOCK: SIDE_KP END ===
-
-# === BLOCK: SIDE_KD START ===
-side_Kd = 0.15  # Derivative gain — dampens oscillations
-# === BLOCK: SIDE_KD END ===
-
-# === BLOCK: SIDE_KI START ===
-side_Ki = 0.003  # Integral gain — start very small, raise in 0.002 steps
-side_INTEGRAL_MAX = 1200  # Anti-windup clamp
-# === BLOCK: SIDE_KI END ===
+side_Kp = 0.0  # carry forward
+side_Kd = 0.0  # carry forward
+side_Ki = 0.0  # integral gain — start very small
+side_INTEGRAL_MAX = 0  # anti-windup clamp
 
 side_previous_error = 0
 side_integral = 0
 
-# === MAIN LOOP ===
+
 while True:
-    # === BLOCK: SIDE_FOLLOW_PID START ===
     wall_distance = my_robot.read_distance_2()
 
     if wall_distance == -1:
         my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0  # Reset when wall lost — prevents windup
+        side_integral = 0  # reset so windup can't build while wall is gone
         hold_state(0.05)
         continue
 
     error = wall_distance - TARGET_WALL_DISTANCE
 
-    # Integral: accumulated error (clamped against windup)
     side_integral = side_integral + error
     if side_integral > side_INTEGRAL_MAX:
         side_integral = side_INTEGRAL_MAX
     elif side_integral < -side_INTEGRAL_MAX:
         side_integral = -side_INTEGRAL_MAX
 
-    # Derivative
     side_derivative = error - side_previous_error
 
-    # Full PID
     steering = (
         (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
     )
@@ -370,14 +153,54 @@ while True:
     my_robot.drive(int(right_speed), int(left_speed))
 
     side_previous_error = error
-    # === BLOCK: SIDE_FOLLOW_PID END ===
-
     hold_state(0.05)
 ```
+
+## How It Works
+
+Everything from Challenge 2 (P and D) is the same. The Integral term is new:
+
+- **`side_integral = 0`** — a running total of all past error, set before the loop.
+- **Accumulate** — `side_integral = side_integral + error` each loop, so small persistent errors (like corner drift) build up until they get corrected.
+- **Clamp** — keep `side_integral` within `±side_INTEGRAL_MAX` so it can't grow out of control (integral windup).
+- **Reset on lost wall** — `side_integral = 0` in the `wall_distance == -1` branch stops windup while the wall is out of range.
+- **Full PID steering** — `(side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)`. Keep `side_Ki` very small.
+
+---
+
+## Tune Your Robot
+
+| Symptom                             | Cause                  | Fix                                              |
+| ----------------------------------- | ---------------------- | ------------------------------------------------ |
+| Robot drifts on corner (like PD)    | side_Ki too low        | Increase side_Ki (try 0.005, 0.008)              |
+| Slow rolling oscillation builds up  | side_Ki too high       | Decrease side_Ki (try 0.001, 0.002)              |
+| Large overshoot after losing wall   | Integral not resetting | Check `side_integral = 0` in sensor-error branch |
+| Robot overreacts after a long drift | INTEGRAL_MAX too large | Decrease side_INTEGRAL_MAX (try 600, 800)        |
+
+> [!Tip]
+> Tune in this order: get `side_Kp` working first → add `side_Kd` to kill oscillations → add a tiny `side_Ki` to fix corner drift. Do not increase `side_Ki` aggressively.
+
+---
+
+<details>
+<summary><strong>Example tuned values</strong> — open after you've tried your own</summary>
+
+```python
+BASE_SPEED = 200
+TARGET_WALL_DISTANCE = 200
+MAX_STEERING = 60
+side_Kp = 0.25
+side_Kd = 0.40
+side_Ki = 0.001
+side_INTEGRAL_MAX = 50
+```
+
+Full worked solution: `app/answers/challenge-3.py`. This tuned side-follow block is the one reused in Challenges 4–7.
 
 </details>
 
 ---
+
 ## Debugging Tips
 
 - Add `print("I:", int(side_integral), "D:", int(side_derivative), "steer:", int(steering))` to watch all three terms.

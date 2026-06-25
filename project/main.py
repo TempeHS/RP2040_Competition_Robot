@@ -13,8 +13,8 @@ print("Initialising AIDriver hardware test...")
 
 try:
     robot = AIDriver(
-        "right"
-    )  # wall_side required; change to "left" if following left wall
+        "left"
+    )  # wall_side required; change to "right" if following right wall
 except Exception as exc:
     print("Failed to initialise AIDriver:", exc)
     print("Check that 'aidriver.py' is in the 'lib' folder on the device.")

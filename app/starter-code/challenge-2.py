@@ -1,18 +1,6 @@
 # Challenge 2: Wall Follow — PD Control
-# --------------------------------------------------------------------
-# Adds a Derivative (D) term to the Challenge 1 controller to dampen
-# the zig-zag oscillation. The full algorithm is already written for
-# you. Every numeric setting starts at 0.
-#
-# Tuning guide: docs.html?doc=PID_Real_World_Tuning_Quickstart
-#
-# Values to set:
-#     BASE_SPEED, TARGET_WALL_DISTANCE, MAX_STEERING   (carry forward C1)
-#     side_Kp                                          (carry forward C1)
-#     side_Kd                                          new — Derivative gain
-#
-# Goal: smooth, oscillation-free wall follow to the green exit zone.
-# --------------------------------------------------------------------
+# Add a Derivative term to Challenge 1 to stop the zig-zag.
+# Carry forward your C1 values, then tune side_Kd. Guide: docs.html?doc=Challenge_2
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -20,12 +8,12 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-BASE_SPEED = 0
-TARGET_WALL_DISTANCE = 0
-MAX_STEERING = 0
+BASE_SPEED = 0  # carry forward from C1
+TARGET_WALL_DISTANCE = 0  # carry forward from C1
+MAX_STEERING = 0  # carry forward from C1
 
-side_Kp = 0.0
-side_Kd = 0.0
+side_Kp = 0.0  # carry forward from C1
+side_Kd = 0.0  # derivative gain — dampens oscillation
 
 side_previous_error = 0
 
@@ -53,5 +41,5 @@ while True:
 
     my_robot.drive(int(right_speed), int(left_speed))
 
-    side_previous_error = error  # MUST be the last update before hold_state
+    side_previous_error = error  # save for next loop (must be last)
     hold_state(0.05)

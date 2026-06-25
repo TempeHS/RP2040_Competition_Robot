@@ -1,24 +1,9 @@
-# === ANSWER KEY — Challenge 3 ===
-# Identical to app/starter-code/challenge-3.py with the tuned values
-# filled in. Used by automated tests and as a teacher reference.
-# Students should NOT see this file.
+# === ANSWER KEY — Challenge 3 (teacher reference; students should NOT see this) ===
+# Same as app/starter-code/challenge-3.py with tuned values filled in.
 
 # Challenge 3: Wall Follow — Full PID
-# --------------------------------------------------------------------
-# Adds the Integral (I) term so the robot no longer drifts away from
-# the wall around the L-shaped corner. The full algorithm is already
-# written for you. Every numeric setting starts at 0.
-#
-# Tuning guide: docs.html?doc=PID_Real_World_Tuning_Quickstart
-#
-# Values to set:
-#     BASE_SPEED, TARGET_WALL_DISTANCE, MAX_STEERING   (carry forward)
-#     side_Kp, side_Kd                                 (carry forward)
-#     side_Ki                                          new — Integral gain
-#     side_INTEGRAL_MAX                                anti-windup clamp
-#
-# Goal: hold TARGET_WALL_DISTANCE through the corner with no drift.
-# --------------------------------------------------------------------
+# Add an Integral term so the robot holds the wall around the L corner.
+# Guide: docs.html?doc=Challenge_3
 
 from aidriver import AIDriver, hold_state
 import aidriver
@@ -26,14 +11,14 @@ import aidriver
 aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
-BASE_SPEED = 200
-TARGET_WALL_DISTANCE = 200
-MAX_STEERING = 60
+BASE_SPEED = 200  # carry forward
+TARGET_WALL_DISTANCE = 200  # carry forward
+MAX_STEERING = 60  # carry forward
 
-side_Kp = 0.25
-side_Kd = 0.40
-side_Ki = 0.001
-side_INTEGRAL_MAX = 50
+side_Kp = 0.25  # carry forward
+side_Kd = 0.40  # carry forward
+side_Ki = 0.001  # integral gain — start very small
+side_INTEGRAL_MAX = 50  # anti-windup clamp
 
 side_previous_error = 0
 side_integral = 0

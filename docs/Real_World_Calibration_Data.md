@@ -21,36 +21,26 @@ simulator's physics can be set to match. You measure, you send the numbers back,
 
 ### A1. Robot dimensions — all in millimetres
 
-| #   | Quantity                                              | Sim value | **Your measurement** | How to measure                                  |
-| --- | ----------------------------------------------------- | --------- | -------------------- | ----------------------------------------------- |
-| 1   | Wheel base (left tyre ↔ right tyre, centre-to-centre) | 120 mm    | `____ mm`            | Tyre contact patch to tyre contact patch        |
-| 2   | Body width (widest point)                             | 120 mm    | `____ mm`            | Across the chassis at its widest                |
-| 3   | Body length (front ↔ back)                            | 150 mm    | `____ mm`            | Front bumper to rear bumper                     |
-| 4   | Drive-wheel outer diameter                            | 65 mm     | `____ mm`            | Outer Ø of the rubber tyre                      |
-| 5   | Centre → drive-axle offset                            | 75 mm     | `____ mm`            | Body centre to the line of the two drive wheels |
+| #   | Quantity                                               | Sim value | **Your measurement** | How to measure                                  |
+| --- | ------------------------------------------------------ | --------- | -------------------- | ----------------------------------------------- |
+| 1   | Wheel base (front tyre ↔ rear tyre, centre-to-centre)  | ??? mm    | `135 mm`             | Tyre contact patch to tyre contact patch        |
+| 1   | Wheel track (left tyre ↔ right tyre, centre-to-centre) | ???       | `100 mm`             | Tyre contact patch to tyre contact patch        |
+| 2   | Body width (widest point)                              | 120 mm    | `120 mm`             | Across the chassis at its widest                |
+| 3   | Body length (front ↔ back)                             | 150 mm    | `200 mm`             | Front bumper to rear bumper                     |
+| 4   | Drive-wheel outer diameter                             | 65 mm     | `125 mm`             | Outer Ø of the rubber tyre                      |
+| 5   | Centre → drive-axle offset                             | 75 mm     | `____ mm`            | Body centre to the line of the two drive wheels |
 
 ### A2. Sensor mounting — where each sensor sits and which way it points
 
 | #   | Sensor           | Sim mount                             | **Your offset** | **Your direction** | How to measure                              |
 | --- | ---------------- | ------------------------------------- | --------------- | ------------------ | ------------------------------------------- |
-| 6   | Front ultrasonic | 75 mm ahead of centre, faces forward  | `____ mm`       | `____`             | Centre of chassis to the sensor face        |
-| 7   | Side ultrasonic  | 60 mm from centre, faces 90° sideways | `____ mm`       | `____° (90?)`      | Is it exactly sideways, or angled fwd/back? |
+| 6   | Front ultrasonic | 75 mm ahead of centre, faces forward  | `90 mm`         | `Forward`          | Centre of chassis to the sensor face        |
+| 7   | Side ultrasonic  | 60 mm from centre, faces 90° sideways | `65 mm`         | `90° (90?)`        | Is it exactly sideways, or angled fwd/back? |
 | 8   | Gyro (LSM6DS3)   | at body centre                        | n/a             | yaw about vertical | Confirm it is roughly central               |
 
 ### A3. Arena & maze — overall size, then **section sizes**
 
-| #   | Quantity                                                | Sim value   | **Your measurement** |
-| --- | ------------------------------------------------------- | ----------- | -------------------- |
-| 9   | Arena width                                             | 2000 mm     | `____ mm`            |
-| 10  | Arena depth                                             | 2000 mm     | `____ mm`            |
-| 11  | Wall thickness                                          | 30 mm       | `____ mm`            |
-| 12  | Wall height (tall enough to block the sensor?)          | n/a         | `____ mm`            |
-| 13  | Corridor **clear width** (wall face ↔ wall face)        | ~300–400 mm | `____ mm`            |
-| 14  | Straight wall **segment length** (one side)             | ~1100 mm    | `____ mm`            |
-| 15  | Dead-end channel **depth** (entrance → back wall)       | varies      | `____ mm`            |
-| 16  | Outside-corner / **nib size** (wall end → next surface) | varies      | `____ mm`            |
-| 17  | **Gap width** to wrap at an outside corner              | varies      | `____ mm`            |
-| 18  | Goal **zone** clear size                                | 200–400 mm  | `____ mm`            |
+Maze is constructed from sections of timber, 290mm wide 3mm thick 190mm tall so the the maze design can be any configuration using that size
 
 > For each real maze also send the wall rectangles as `{x, y, width, height}` in mm from the
 > top-left corner, plus the robot **start** (x, y, heading) and the **goal zone** (x, y, w, h).
