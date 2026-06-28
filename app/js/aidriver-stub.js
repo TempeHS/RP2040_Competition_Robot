@@ -535,6 +535,207 @@ const AIDriverStub = {
           });
 
           /**
+           * Read a tunable colour-threshold attribute off the Python instance,
+           * falling back to a default when the learner has not set it. Mirrors
+           * readTurnGain so `my_robot.color_red_ratio = 0.5` works in the sim.
+           */
+          function readColorAttr(self, name, fallback) {
+            try {
+              const v = self.tp$getattr(new Sk.builtin.str(name));
+              if (v !== undefined && !(v instanceof Sk.builtin.none)) {
+                return Sk.ffi.remapToJs(v);
+              }
+            } catch (e) {
+              /* attribute not set — use fallback */
+            }
+            return fallback;
+          }
+
+          /**
+           * Read the simulated ground colour sensor.
+           * @returns {Sk.builtin.tuple} (red, green, blue, clear) raw counts.
+           */
+          $loc.read_color = new Sk.builtin.func(function (self) {
+            let c = { r: 40, g: 40, b: 40, c: 120, name: "none" };
+            if (
+              typeof Simulator !== "undefined" &&
+              typeof App !== "undefined" &&
+              App.robot
+            ) {
+              c = Simulator.simulateColor(App.robot);
+            }
+            AIDriverStub.queueCommand({
+              type: "read_color",
+              params: { r: c.r, g: c.g, b: c.b, c: c.c, name: c.name },
+            });
+            return new Sk.builtin.tuple([
+              new Sk.builtin.int_(c.r),
+              new Sk.builtin.int_(c.g),
+              new Sk.builtin.int_(c.b),
+              new Sk.builtin.int_(c.c),
+            ]);
+          });
+
+          /**
+           * Classify the floor colour using the learner's tuned thresholds.
+           * Logic mirrors AIDriver.classify_color() on the hardware.
+           * @returns {Sk.builtin.str} "red" | "green" | "silver" | "none".
+           */
+          $loc.classify_color = new Sk.builtin.func(function (self) {
+            let s = { r: 40, g: 40, b: 40, c: 120 };
+            if (
+              typeof Simulator !== "undefined" &&
+              typeof App !== "undefined" &&
+              App.robot
+            ) {
+              s = Simulator.simulateColor(App.robot);
+            }
+            const minClear = readColorAttr(self, "color_min_clear", 0);
+            const blackClear = readColorAttr(self, "color_black_clear", 0);
+            const redRatio = readColorAttr(self, "color_red_ratio", 0);
+            const greenRatio = readColorAttr(self, "color_green_ratio", 0);
+            const silverClear = readColorAttr(self, "color_silver_clear", 0);
+
+            let name = "none";
+            const total = s.r + s.g + s.b;
+            // Darker than the floor → BLACK no-go (disabled while threshold 0).
+            if (blackClear > 0 && s.c < blackClear) {
+              name = "black";
+            } else if (s.c >= minClear && total > 0) {
+              const rf = s.r / total;
+              const gf = s.g / total;
+              if (s.c >= silverClear && rf < redRatio && gf < greenRatio) {
+                name = "silver";
+              } else if (rf >= redRatio) {
+                name = "red";
+              } else if (gf >= greenRatio) {
+                name = "green";
+              }
+            }
+            return new Sk.builtin.str(name);
+          });
+
+          /**
+           * Report whether a marker interrupt is active (robot over a marker).
+           * In the simulator this mirrors the hardware INT line: the TCS34725
+           * fires only on BRIGHT markers, so a dark "black" no-go patch does
+           * NOT trigger it — poll classify_color() to find black.
+           * @returns {Sk.builtin.bool}
+           */
+          $loc.color_detected = new Sk.builtin.func(function (self) {
+            let over = false;
+            if (
+              typeof Simulator !== "undefined" &&
+              typeof App !== "undefined" &&
+              App.robot
+            ) {
+              const n = Simulator.simulateColor(App.robot).name;
+              over = n !== "none" && n !== "black";
+            }
+            return new Sk.builtin.bool(over);
+          });
+
+          /**
+           * No-op in the simulator — provided for hardware API parity.
+           * @returns {null}
+           */
+          $loc.clear_color_interrupt = new Sk.builtin.func(function (self) {
+            return Sk.builtin.none.none$;
+          });
+
+          /**
+           * Show up to four text lines on the (simulated) OLED. The hardware
+           * renders these on the SSD1306; in the simulator the text is queued
+           * for the trace/logger so students can see what the screen would say.
+           * @returns {null}
+           */
+          $loc.show_display = new Sk.builtin.func(function (
+            self,
+            line1,
+            line2,
+            line3,
+            line4,
+          ) {
+            const toStr = (v) =>
+              v === undefined || v instanceof Sk.builtin.none
+                ? ""
+                : Sk.ffi.remapToJs(v);
+            const lines = [
+              toStr(line1),
+              toStr(line2),
+              toStr(line3),
+              toStr(line4),
+            ];
+            self.displayLines = lines;
+            AIDriverStub.queueCommand({
+              type: "show_display",
+              params: { lines },
+            });
+            return Sk.builtin.none.none$;
+          });
+
+          /**
+           * Show the competition state and running score on the OLED. Mirrors
+           * AIDriver.display_status() on the hardware.
+           * @returns {null}
+           */
+          $loc.display_status = new Sk.builtin.func(function (
+            self,
+            state,
+            score,
+            victims,
+          ) {
+            const stateStr =
+              state === undefined || state instanceof Sk.builtin.none
+                ? ""
+                : Sk.ffi.remapToJs(state);
+            const scoreVal =
+              score === undefined || score instanceof Sk.builtin.none
+                ? 0
+                : Sk.ffi.remapToJs(score);
+            const victimVal =
+              victims === undefined || victims instanceof Sk.builtin.none
+                ? 0
+                : Sk.ffi.remapToJs(victims);
+            const lines = [
+              "THS RescueMaze",
+              "State:" + String(stateStr).slice(0, 9),
+              "Score:" + Math.trunc(scoreVal),
+              "Victims:" + Math.trunc(victimVal),
+            ];
+            self.displayLines = lines;
+            AIDriverStub.queueCommand({
+              type: "display_status",
+              params: { lines },
+            });
+            return Sk.builtin.none.none$;
+          });
+
+          /**
+           * Blank the (simulated) OLED. No-op for state, queued for trace.
+           * @returns {null}
+           */
+          $loc.clear_display = new Sk.builtin.func(function (self) {
+            self.displayLines = ["", "", "", ""];
+            AIDriverStub.queueCommand({ type: "clear_display", params: {} });
+            return Sk.builtin.none.none$;
+          });
+
+          /**
+           * Request a rescue-kit drop. The servo is not modelled in the
+           * simulator, so this is a queued no-op returning False (no actuator).
+           * @returns {Sk.builtin.bool}
+           */
+          $loc.deploy_rescue_kit = new Sk.builtin.func(function (self) {
+            self.kitDeployCount = (self.kitDeployCount || 0) + 1;
+            AIDriverStub.queueCommand({
+              type: "deploy_rescue_kit",
+              params: { count: self.kitDeployCount },
+            });
+            return new Sk.builtin.bool(false);
+          });
+
+          /**
            * Report whether motion commands are currently active.
            * @returns {Sk.builtin.bool} True when the robot is moving.
            */

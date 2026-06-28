@@ -26,12 +26,16 @@ export BUILD_DIR="$MICROPYTHON_DIR/ports/rp2"
 export FIRMWARE_DEST="$PROJECT_BASE/_Firmware/THS_Comp_RP2040.uf2"
 
 # Custom module files to copy to frozen modules (centralized list)
-# Note: main.py is excluded from frozen modules - it goes to filesystem instead
+# Mirrors project/lib/*.py so the firmware is self-contained: aidriver and every
+# driver it imports are frozen. main.py is excluded - it goes to the filesystem.
 export CUSTOM_FILES=(
     "$PROJECT_LIB_DIR/aidriver.py"
-    "$PROJECT_LIB_DIR/gamepad_driver_controller.py"
-    "$PROJECT_LIB_DIR/hm10_controller.py"
-    "$PROJECT_LIB_DIR/gamepad_pico.py"
+    "$PROJECT_LIB_DIR/eventlog.py"
+    "$PROJECT_LIB_DIR/grove_ultrasonic.py"
+    "$PROJECT_LIB_DIR/lsm6ds3.py"
+    "$PROJECT_LIB_DIR/tcs34725.py"
+    "$PROJECT_LIB_DIR/ssd1306.py"
+    "$PROJECT_LIB_DIR/maze_controller.py"
 )
 
 # Files to copy to filesystem (not frozen)
@@ -147,7 +151,7 @@ clean_custom_modules() {
     log_info "🧹 Cleaning existing custom modules..."
     
     # Define module filenames to clean from frozen modules
-    local frozen_modules=("aidriver.py" "gamepad_driver_controller.py" "hm10_controller.py" "gamepad_pico.py")
+    local frozen_modules=("aidriver.py" "eventlog.py" "grove_ultrasonic.py" "lsm6ds3.py" "tcs34725.py" "ssd1306.py" "maze_controller.py")
     local filesystem_modules=("main.py")
     
     # Clean frozen modules

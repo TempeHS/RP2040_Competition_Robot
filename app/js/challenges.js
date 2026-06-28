@@ -245,6 +245,182 @@ const Challenges = (function () {
       obstacles: [],
       maze: "zigzag",
     },
+
+    // Challenge 8: Ground Colour Detection — pause on markers
+    8: {
+      id: 8,
+      title: "Colour Markers",
+      subtitle: "Detect & Pause",
+      icon: "bi-palette",
+      menuGroup: "advanced",
+      difficulty: DIFFICULTY.MEDIUM,
+      description:
+        "Drive straight up column 0 and use the TCS34725 ground colour sensor to detect coloured floor markers. Pause for a set time on each RED and GREEN marker, then continue. The silver markers mark the start and finish.",
+      goal: "Tune the colour thresholds so the robot pauses on every red and green marker, then reaches the silver finish zone.",
+      hints: [
+        "Read raw counts with r, g, b, c = my_robot.read_color()",
+        "color_detected() is True whenever the interrupt fires over a marker",
+        "Raise color_min_clear until the plain floor classifies as 'none'",
+        "A red marker has a high red fraction r / (r + g + b); green is similar",
+        "Silver is bright AND balanced — tune color_silver_clear above the floor's clear value",
+        "Pause with hold_state(COLOR_PAUSE_TIME) when you see red or green",
+      ],
+      startPosition: { x: 145, y: 1885, heading: 0 },
+      successCriteria: {
+        type: "reach_zone",
+        zone: { x: 0, y: 0, width: 290, height: 290 },
+        timeLimit: 60,
+      },
+      path: null,
+      obstacles: [],
+      maze: "straight_corridor",
+      // Coloured floor markers (mm rects) the simulated sensor reads.
+      // rgb = [red, green, blue, clear] counts; mirrors the hardware
+      // (plain floor reads [40, 40, 40, 120]). Markers sit in alternate
+      // cells so there is always a strip of plain floor between them.
+      colorZones: [
+        {
+          x: 0,
+          y: 1740,
+          width: 290,
+          height: 290,
+          rgb: [200, 200, 200, 620],
+          color: "silver",
+        },
+        {
+          x: 0,
+          y: 1160,
+          width: 290,
+          height: 290,
+          rgb: [200, 40, 40, 280],
+          color: "red",
+        },
+        {
+          x: 0,
+          y: 580,
+          width: 290,
+          height: 290,
+          rgb: [40, 200, 40, 280],
+          color: "green",
+        },
+        {
+          x: 0,
+          y: 0,
+          width: 290,
+          height: 290,
+          rgb: [200, 200, 200, 620],
+          color: "silver",
+        },
+      ],
+    },
+
+    // Challenge 9: No-Go Zones — detect BLACK and recover.
+    9: {
+      id: 9,
+      title: "No-Go Zones",
+      subtitle: "Detect Black & Recover",
+      icon: "bi-sign-stop",
+      menuGroup: "advanced",
+      difficulty: DIFFICULTY.HARD,
+      description:
+        "BLACK floor patches are no-go areas. Wall-follow up the left wall; the moment the colour sensor reads BLACK, run the recovery: reverse straight out on the gyro, turn 90° toward open space, then drive on the gyro until you find a wall again.",
+      goal: "Detect the black no-go patch, recover with the four-step manoeuvre, and reach the exit zone on the far side.",
+      hints: [
+        "Black absorbs the sensor's light, so its clear value reads BELOW the floor",
+        "Tune my_robot.color_black_clear just under the floor's clear reading",
+        "color_detected() only fires on bright markers — POLL classify_color() for black",
+        "Step 1: reverse with a heading PID (read_gyro_z_dps) so you back out straight",
+        "Step 2: read the side sensor to turn AWAY from the nearest wall (toward open space)",
+        "Step 3/4: drive forward on the gyro until read_distance() finds the next wall",
+      ],
+      startPosition: { x: 200, y: 1885, heading: 0 },
+      successCriteria: {
+        type: "reach_zone",
+        zone: { x: 1450, y: 290, width: 580, height: 1450 },
+        timeLimit: 60,
+      },
+      path: null,
+      obstacles: [],
+      maze: null,
+      // A single BLACK no-go patch across the left channel. Black absorbs the
+      // LED so its clear value (~30) sits well below the plain floor (~120).
+      colorZones: [
+        {
+          x: 0,
+          y: 580,
+          width: 580,
+          height: 290,
+          rgb: [10, 10, 10, 30],
+          color: "black",
+        },
+      ],
+    },
+
+    // Challenge 10: Competition Run — victims, score, and the OLED display.
+    10: {
+      id: 10,
+      title: "Competition Run",
+      subtitle: "Victims, Score & OLED",
+      icon: "bi-trophy",
+      menuGroup: "advanced",
+      difficulty: DIFFICULTY.HARD,
+      description:
+        "The Rescue Maze capstone. Drive up the corridor, identify each GREEN (unharmed) and RED (harmed) victim, and report what you find on the SSD1306 OLED — current state, running score and victim count. Drop a rescue kit on every harmed victim, then show the final report at the silver finish.",
+      goal: "Count every green and red victim, show the live state/score/victims on the OLED, drop a kit on each harmed victim, and reach the silver finish with a RUN COMPLETE report on screen.",
+      hints: [
+        "Show state + score with my_robot.display_status(state, score, victims)",
+        "Green victim = unharmed (10 pts); red victim = harmed (25 pts)",
+        "Call my_robot.deploy_rescue_kit() on each RED victim for the +10 bonus",
+        "Only count a victim the first frame you roll onto it (track previous_color)",
+        "Keep your own score = unharmed*10 + harmed*25 + kits*10",
+        "At the silver finish use show_display(...) to print the final report",
+      ],
+      startPosition: { x: 145, y: 1885, heading: 0 },
+      successCriteria: {
+        type: "reach_zone",
+        zone: { x: 0, y: 0, width: 290, height: 290 },
+        timeLimit: 90,
+      },
+      path: null,
+      obstacles: [],
+      maze: "straight_corridor",
+      // Silver start, two victims (green + red) and a silver finish, with a
+      // plain-floor strip between each so markers are detected one at a time.
+      colorZones: [
+        {
+          x: 0,
+          y: 1740,
+          width: 290,
+          height: 290,
+          rgb: [200, 200, 200, 620],
+          color: "silver",
+        },
+        {
+          x: 0,
+          y: 1160,
+          width: 290,
+          height: 290,
+          rgb: [40, 200, 40, 280],
+          color: "green",
+        },
+        {
+          x: 0,
+          y: 580,
+          width: 290,
+          height: 290,
+          rgb: [200, 40, 40, 280],
+          color: "red",
+        },
+        {
+          x: 0,
+          y: 0,
+          width: 290,
+          height: 290,
+          rgb: [200, 200, 200, 620],
+          color: "silver",
+        },
+      ],
+    },
   };
 
   /**

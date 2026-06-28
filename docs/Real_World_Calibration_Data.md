@@ -1,70 +1,52 @@
-# Real-World Calibration — Measure the Robot, Match the Simulator
+# Real-World Movement Calibration — Match the Simulator to the Robot
 
-**Goal:** capture how the **physical** robot and the **real maze** actually behave, so the
-simulator's physics can be set to match. You measure, you send the numbers back, I update
-[app/js/robot-config.js](app/js/robot-config.js) and the maze geometry.
+**Goal:** capture how the **physical** robot actually _moves_ so the simulator's drive physics can be
+set to match. You run a few short tests, read a tape measure (and a couple of printed numbers), and
+send the results back. I then set the movement values in
+[app/js/robot-config.js](app/js/robot-config.js).
 
-**How it works — three steps:**
+> **The robot has no wheel encoders.** Every test below uses **open-loop** motor commands (no PID) for
+> a fixed time, then you read a tape measure or protractor. Run them on a **charged battery** and a
+> **flat, clear floor** (≥ 3 m straight run for the speed tests).
 
-1. **Part A** — measure the robot and maze with a ruler/tape. Fill in the tables.
-2. **Part B** — copy each code block into `main.py`, run it, and read the numbers it **prints** in
-   the REPL (or measure with a tape where noted).
-3. **Part C** — copy the _Report_ table, paste in every number, and send it back.
-
-> Run every Part B test on a **charged battery** and a **flat floor**. The robot has **no wheel
-> encoders**, so for speed/distance you read a tape measure — the code just runs the motors for an
-> exact time and tells you when to measure.
+Physical dimensions and sensor mounts are already measured and applied — this round is **movement
+only**.
 
 ---
 
-## Part A — Physical measurements (robot powered off, use a ruler/calipers)
+## What the simulator needs (and why)
 
-### A1. Robot dimensions — all in millimetres
+The simulator turns a PWM command into motion with this exact model. Each test below pins down one
+row of this table.
 
-| #   | Quantity                                               | Sim value | **Your measurement** | How to measure                                  |
-| --- | ------------------------------------------------------ | --------- | -------------------- | ----------------------------------------------- |
-| 1   | Wheel base (front tyre ↔ rear tyre, centre-to-centre)  | ??? mm    | `135 mm`             | Tyre contact patch to tyre contact patch        |
-| 1   | Wheel track (left tyre ↔ right tyre, centre-to-centre) | ???       | `100 mm`             | Tyre contact patch to tyre contact patch        |
-| 2   | Body width (widest point)                              | 120 mm    | `120 mm`             | Across the chassis at its widest                |
-| 3   | Body length (front ↔ back)                             | 150 mm    | `200 mm`             | Front bumper to rear bumper                     |
-| 4   | Drive-wheel outer diameter                             | 65 mm     | `125 mm`             | Outer Ø of the rubber tyre                      |
-| 5   | Centre → drive-axle offset                             | 75 mm     | `65 mm`              | Body centre to the line of the two drive wheels |
+| `RobotConfig` field | What it means                                   | How the sim uses it                      | Test |
+| ------------------- | ----------------------------------------------- | ---------------------------------------- | ---- |
+| `maxPWM`            | Firmware PWM ceiling (**fixed at 255**)         | Top of the PWM scale                     | —    |
+| `deadZonePWM`       | Highest PWM that produces **no** motion (stall) | `pwm ≤ deadZone → 0 mm/s`                | M1   |
+| `topSpeed_ms`       | Steady speed at full PWM (255)                  | Linear top of the PWM→speed line         | M3   |
+| `acceleration_ms2`  | How fast it speeds up from rest                 | Wheel-speed ramp **up**                  | M3   |
+| `deceleration_ms2`  | How fast it slows after `brake()`               | Wheel-speed ramp **down**                | M4   |
+| `wheelTrack_mm`     | Left↔right wheel spacing (**measured = 100**)   | `omega = (vL − vR) / wheelTrack`         | M5   |
+| _(gyro scale)_      | deg/s reported vs deg/s actually turned         | Turn-angle integration                   | M5   |
+| _(drive() clamp)_   | Lowest PWM `drive()` will pass (else forces 0)  | **Not modelled yet** — needed for parity | M2   |
 
-### A2. Sensor mounting — where each sensor sits and which way it points
+The sim assumes the PWM→speed line is **straight** between `deadZonePWM` and `maxPWM`. M3 also checks
+whether that assumption holds.
 
-| #   | Sensor           | Sim mount                             | **Your offset**                  | **Your direction** | How to measure                              |
-| --- | ---------------- | ------------------------------------- | -------------------------------- | ------------------ | ------------------------------------------- |
-| 6   | Front ultrasonic | 75 mm ahead of centre, faces forward  | `90 mm`                          | `Forward`          | Centre of chassis to the sensor face        |
-| 7   | Side ultrasonic  | 60 mm from centre, faces 90° sideways | `65 mm`                          | `90° (90?)`        | Is it exactly sideways, or angled fwd/back? |
-| 8   | Gyro (LSM6DS3)   | at body centre                        | `65mm` over centre of rear axels | yaw about vertical | Confirm it is roughly central               |
-
-### A3. Arena & maze — overall size, then **section sizes**
-
-Maze is constructed from sections of timber, 290mm wide 3mm thick 190mm tall so the the maze design can be any configuration using that size
-
-> For each real maze also send the wall rectangles as `{x, y, width, height}` in mm from the
-> top-left corner, plus the robot **start** (x, y, heading) and the **goal zone** (x, y, w, h).
-> A dimensioned photo or sketch is fine — these become the new entries in
-> [app/js/mazes.js](app/js/mazes.js).
-
----
-
-## Part B — Run-and-read tests (copy each block into `main.py`)
-
-Each block is a complete `main.py`. Flash it, open the REPL, and record what it prints (or what the
-tape measure reads). All tests use **open-loop** motor commands — no PID — so we capture raw physics.
-
-> **Two motor commands are used below, and the difference matters:**
+> **Two motor commands — the difference matters:**
 >
-> - `drive_forward(r, l)` sends the **raw PWM** you ask for (0–255). Use it for the dead-zone and
->   speed tests so nothing is clamped.
-> - `drive(r, l)` is the everyday helper — it **forces any wheel below PWM 120 to 0**. Use it only
->   where noted (spins).
+> - `drive_forward(r, l)` sends the **raw PWM** (0–255), no clamp. Use it for M1, M3, M4.
+> - `drive(r, l)` is the everyday helper — it **forces any wheel below ~120 PWM to 0**. M2 measures
+>   that threshold so the sim can reproduce it.
 
-### B1. Sign-convention check — confirm directions match the simulator
+---
+
+## M0 — Direction sanity check (do this first)
+
+Confirms the sim's sign conventions match the robot, otherwise every movement number is mirrored.
 
 ```python
-# main.py — B1: direction check
+# main.py — M0: direction check
 from aidriver import AIDriver, hold_state
 
 robot = AIDriver("left")
@@ -81,7 +63,7 @@ hold_state(1.0)
 robot.brake()
 hold_state(1.5)
 
-print("3) Gyro sign on that spin — value should be POSITIVE while spinning right:")
+print("3) Gyro should read POSITIVE while spinning right:")
 robot.drive(-150, 150)
 for _ in range(20):
     print("gyro z =", robot.read_gyro_z_dps())
@@ -89,38 +71,15 @@ for _ in range(20):
 robot.brake()
 ```
 
-**Record:** did (1) go straight forward? did (2) spin right? was the gyro in (3) positive on a right
-spin? Note any axis that is reversed.
+**Record →** did (1) go straight forward, (2) spin right, (3) read positive on a right spin? Note any
+reversed axis.
 
-### B2. Gyro rest bias & noise — robot must stay perfectly still
+---
 
-```python
-# main.py — B2: gyro bias & noise (do not touch the robot)
-from aidriver import AIDriver, hold_state
-import time
-
-robot = AIDriver("left")
-print("Hold still... sampling for 10 s")
-hold_state(1.0)
-
-samples = []
-start = time.ticks_ms()
-while time.ticks_diff(time.ticks_ms(), start) < 10000:
-    samples.append(robot.read_gyro_z_dps())
-    time.sleep(0.05)
-
-avg = sum(samples) / len(samples)
-print("samples      :", len(samples))
-print("bias  (deg/s):", avg)
-print("spread(deg/s):", max(samples) - min(samples), "(", min(samples), "to", max(samples), ")")
-```
-
-**Record:** `bias` (average) and `spread` (max − min).
-
-### B3. Motor dead-zone — the lowest PWM that actually moves the robot
+## M1 — Dead-zone: the lowest PWM that moves the robot
 
 ```python
-# main.py — B3: dead-zone sweep (raw PWM, no clamp)
+# main.py — M1: dead-zone sweep (raw PWM, no clamp)
 from aidriver import AIDriver, hold_state
 
 robot = AIDriver("left")
@@ -131,47 +90,109 @@ for pwm in (50, 60, 70, 80, 90, 100, 110, 120):
     hold_state(1.5)
     robot.brake()
     hold_state(1.0)
-print("Done. Note the lowest PWM at which the wheels actually turned.")
+print("Done. Note the LOWEST PWM at which the wheels actually turned.")
 ```
 
-**Record:** lowest PWM that moves the robot (the dead-zone is just below it).
+**Record →** lowest PWM that produced motion. `deadZonePWM` is the value **just below** it.
 
-### B4. Speed vs PWM — drive straight for exactly 2.0 s, tape-measure the distance
+---
 
-Run this block once per PWM value (change `PWM` and re-flash), measuring how far the robot travels
-each time. Speed = distance ÷ 2.0.
+## M2 — `drive()` clamp threshold
+
+The student code uses `drive()`, which zeroes any wheel below a cut-off. The sim needs that number.
 
 ```python
-# main.py — B4: timed straight run (set PWM, measure distance)
+# main.py — M2: drive() clamp sweep (uses the clamped helper)
 from aidriver import AIDriver, hold_state
 
 robot = AIDriver("left")
 
-PWM = 150            # <-- run with 120, 150, 180, 210, 255
-
-print("Line the robot up on a start mark. Going in 3 s...")
-hold_state(3.0)
-print("RUN")
-robot.drive_forward(PWM, PWM)
-hold_state(2.0)
-robot.brake()
-print("STOP - measure distance travelled (mm) for PWM", PWM)
+for pwm in (90, 100, 110, 115, 120, 125, 130):
+    print("drive() PWM", pwm)
+    robot.drive(pwm, pwm)
+    hold_state(1.5)
+    robot.brake()
+    hold_state(1.0)
+print("Done. Note the LOWEST PWM at which drive() actually moved the robot.")
 ```
 
-**Record** the distance for each PWM:
+**Record →** lowest PWM that moved the robot via `drive()` (expected ≈ 120).
 
-| PWM | Distance in 2.0 s (mm) | Speed = dist ÷ 2 (mm/s) |
-| --- | ---------------------- | ----------------------- |
-| 120 | `____`                 | `____`                  |
-| 150 | `____`                 | `____`                  |
-| 180 | `____`                 | `____`                  |
-| 210 | `____`                 | `____`                  |
-| 255 | `____`                 | `____`                  |
+---
 
-### B5. Spin rate & wheel base — spin for 2.0 s, compare gyro vs the floor
+## M3 — Top speed, linearity, and acceleration (one set of runs)
+
+Drive **straight at a fixed PWM** for a fixed time and tape-measure the distance. Do it twice per PWM
+(2.0 s and 3.0 s). Differencing the two cancels the start-up ramp, giving the true steady speed; the
+2.0 s run then reveals the ramp itself.
 
 ```python
-# main.py — B5: spin-rate / wheel-base check
+# main.py — M3: timed straight run (set PWM and DURATION, re-flash each run)
+from aidriver import AIDriver, hold_state
+
+robot = AIDriver("left")
+
+PWM = 255            # run each of: 120, 150, 180, 210, 255
+DURATION = 2.0       # run each PWM at 2.0 s, then again at 3.0 s
+
+print("Line the robot on a start mark. Going in 3 s...")
+hold_state(3.0)
+print("RUN  PWM", PWM, "for", DURATION, "s")
+robot.drive_forward(PWM, PWM)
+hold_state(DURATION)
+robot.brake()
+print("STOP - measure distance from the start mark (mm).")
+```
+
+**Record →** distance for each PWM at both durations:
+
+| PWM | dist @2.0 s (mm) | dist @3.0 s (mm) |
+| --- | ---------------- | ---------------- |
+| 120 | `____`           | `____`           |
+| 150 | `____`           | `____`           |
+| 180 | `____`           | `____`           |
+| 210 | `____`           | `____`           |
+| 255 | `____`           | `____`           |
+
+From these I compute, per PWM:
+
+- **Steady speed** = `(dist@3.0 − dist@2.0) / 1.0 s` (mm/s). The 255 row gives **`topSpeed_ms`**.
+- **Linearity**: do the five steady speeds fall on a straight line up from the dead-zone? (Tells me
+  if the linear PWM→speed model is good enough.)
+- **Acceleration** (from the 255 row): `t_accel = 2 × (V_top × 2.0 − dist@2.0) / V_top`, then
+  **`acceleration_ms2` = V_top / t_accel**.
+
+> Only the 2.0 s + 3.0 s pair at **PWM 255** is essential. The other PWMs are just for the linearity
+> check — skip them if short on time.
+
+---
+
+## M4 — Deceleration: coast distance after `brake()`
+
+```python
+# main.py — M4: stopping distance from full speed
+from aidriver import AIDriver, hold_state
+
+robot = AIDriver("left")
+print("Line up on a start mark. Full speed then brake, in 3 s...")
+hold_state(3.0)
+
+robot.drive_forward(255, 255)
+hold_state(1.5)                    # reach full speed
+print("BRAKE")
+robot.brake()
+print("Mark where it finally stops. Measure distance from the BRAKE point (mm).")
+```
+
+**Record →** coast distance past the BRAKE point (mm). I compute
+**`deceleration_ms2` = V_top² / (2 × coast_distance)**.
+
+---
+
+## M5 — Turn rate + gyro scale (validates wheel track and turning)
+
+```python
+# main.py — M5: spin-rate / gyro check
 from aidriver import AIDriver, hold_state
 import time
 
@@ -196,75 +217,41 @@ robot.brake()
 
 print("avg spin rate (deg/s)      :", sum(samples) / len(samples))
 print("gyro-integrated angle (deg):", heading)
-print("Now measure the ACTUAL angle turned (floor marks / protractor).")
+print("Now measure the ACTUAL angle turned on the floor (protractor / marks).")
 ```
 
-**Record:** average spin rate (deg/s), the gyro-integrated angle, and the **physically measured**
-angle. The gap between the last two tells us if the gyro scale or wheel base is off.
-
-### B6. Braking distance — how far it travels after `brake()`
-
-```python
-# main.py — B6: stopping distance
-from aidriver import AIDriver, hold_state
-
-robot = AIDriver("left")
-print("Line up on a start mark. Full speed then brake, in 3 s...")
-hold_state(3.0)
-
-robot.drive_forward(255, 255)
-hold_state(1.5)                    # reach full speed
-print("BRAKE")
-robot.brake()
-print("Measure: total distance from the start mark, AND mark where it finally stopped.")
-```
-
-**Record:** how far past the "BRAKE" point the robot coasted (mm), and roughly how long it took to
-stop (seconds). Decel ≈ top_speed ÷ stop_time.
+**Record →** average spin rate (deg/s), the gyro-integrated angle, and the **physically measured**
+floor angle. The gap between the last two is the gyro-scale / wheel-track correction.
 
 ---
 
-## Part C — Report table (fill in and send back)
+## Report — fill in and send back
 
 ```
-ROBOT DIMENSIONS (mm)
-  1 wheel base ................
-  2 body width ................
-  3 body length ...............
-  4 wheel diameter ............
-  5 centre->axle offset .......
+DIRECTIONS (M0)
+  straight forward OK? ............
+  spins right (clockwise) OK? .....
+  gyro positive on right spin? ....
 
-SENSORS
-  6 front offset / direction ..
-  7 side  offset / angle ......
-  8 gyro central? .............
+DEAD-ZONE
+  M1 raw dead-zone PWM (lowest move) ...
+  M2 drive() clamp PWM (lowest move) ...
 
-DIRECTIONS (B1)
-  straight forward OK? ........
-  spins right OK? .............
-  gyro positive on right? .....
+SPEED CURVE (M3)  distance in mm
+  PWM 120 :  @2.0s ____   @3.0s ____
+  PWM 150 :  @2.0s ____   @3.0s ____
+  PWM 180 :  @2.0s ____   @3.0s ____
+  PWM 210 :  @2.0s ____   @3.0s ____
+  PWM 255 :  @2.0s ____   @3.0s ____   <- required (top speed + accel)
 
-GYRO (B2)
-  bias (deg/s) ...............
-  noise spread (deg/s) .......
+BRAKING (M4)
+  coast distance past brake point (mm) ...
 
-MOTORS
-  B3 dead-zone PWM (lowest move)
-  B4 speed @120 / 150 / 180 / 210 / 255 (mm/s) ......... / / / /
-  B5 spin rate (deg/s) .......
-  B5 gyro angle vs real angle (deg) ......... /
-  B6 stop distance (mm) / stop time (s) ...... /
-
-MAZE (mm)
-  9-12 arena W / D / wall thick / wall height ... / / /
-  13 corridor clear width .....
-  14 wall segment length ......
-  15 dead-end depth ...........
-  16 nib size .................
-  17 corner gap width .........
-  18 goal zone size ...........
-  + wall rectangles {x,y,w,h}, start (x,y,heading), goal (x,y,w,h)
+TURN (M5)
+  avg spin rate (deg/s) ...........
+  gyro-integrated angle (deg) .....
+  measured floor angle (deg) ......
 ```
 
-Once I have these, I set `RobotConfig` (dead-zone PWM, top speed, accel/decel, wheel base, sensor
-offsets, gyro scale) and rebuild the mazes so the simulator matches your real robot and arena.
+From this I set `deadZonePWM`, `topSpeed_ms`, `acceleration_ms2`, `deceleration_ms2`, the `drive()`
+clamp, and the gyro/turn scale so the simulator matches your real robot.

@@ -315,7 +315,78 @@ class AIDriver:
         if DEBUG_AIDRIVER:
             print("[AIDriver] read_distance_2:", distance_mm, "mm")
         return distance_mm
-    
+
+    # Tunable colour-classification thresholds (Challenge 8). Students
+    # override these on the instance, e.g. my_robot.color_red_ratio = 0.5
+    color_black_clear = 0
+    color_min_clear = 0
+    color_red_ratio = 0.0
+    color_green_ratio = 0.0
+    color_silver_clear = 0
+    color_pause_time = 2.0
+
+    def read_color(self):
+        """Read the ground colour sensor as (r, g, b, c) raw counts."""
+        # JS injects real values during normal runs; placeholder for trace mode.
+        _queue_command("read_color")
+        return (0, 0, 0, 0)
+
+    def classify_color(self):
+        """Classify the floor as 'black' / 'red' / 'green' / 'silver' / 'none'."""
+        r, g, b, c = self.read_color()
+        if self.color_black_clear > 0 and c < self.color_black_clear:
+            return "black"
+        if c < self.color_min_clear:
+            return "none"
+        total = r + g + b
+        if total <= 0:
+            return "none"
+        rf = r / total
+        gf = g / total
+        if c >= self.color_silver_clear and rf < self.color_red_ratio and gf < self.color_green_ratio:
+            return "silver"
+        if rf >= self.color_red_ratio:
+            return "red"
+        if gf >= self.color_green_ratio:
+            return "green"
+        return "none"
+
+    def color_detected(self):
+        """True when the colour interrupt is active (over a marker)."""
+        _queue_command("color_detected")
+        return False
+
+    def clear_color_interrupt(self):
+        """Clear a latched colour interrupt (no-op in the simulator)."""
+        _queue_command("clear_color_interrupt")
+
+    # OLED status display (SSD1306). Output-only API; the simulator queues the
+    # text for the trace so it can be inspected, the hardware renders it.
+    def show_display(self, line1="", line2="", line3="", line4=""):
+        """Show up to four text lines on the OLED status display."""
+        self._display_lines = [str(line1), str(line2), str(line3), str(line4)]
+        _queue_command("show_display", {"lines": self._display_lines})
+
+    def display_status(self, state, score=0, victims=0):
+        """Show the competition state and running score on the OLED."""
+        self._display_lines = [
+            "THS RescueMaze",
+            "State:" + str(state)[:9],
+            "Score:" + str(int(score)),
+            "Victims:" + str(int(victims)),
+        ]
+        _queue_command("display_status", {"lines": self._display_lines})
+
+    def clear_display(self):
+        """Blank the OLED status display."""
+        self._display_lines = ["", "", "", ""]
+        _queue_command("clear_display", {"lines": self._display_lines})
+
+    def deploy_rescue_kit(self):
+        """Request a survival-kit drop. No servo in the simulator → False."""
+        _queue_command("deploy_rescue_kit")
+        return False
+
     # Minimum reliable motor speed - motors stutter below this due to undervoltage
     MIN_MOTOR_SPEED = 100
 
@@ -1298,6 +1369,34 @@ def ticks_diff(t1, t2):
         // Sensor reads are handled inline by the stub; no state change needed
         break;
 
+      case "read_color":
+      case "color_detected":
+      case "clear_color_interrupt":
+        // Colour sensor reads are handled inline by the stub; no state change
+        break;
+
+      case "show_display":
+      case "display_status":
+        // Mirror the OLED text onto the simulated SSD1306 panel.
+        if (
+          typeof OLEDPanel !== "undefined" &&
+          cmd.params &&
+          cmd.params.lines
+        ) {
+          OLEDPanel.render(cmd.params.lines);
+        }
+        break;
+
+      case "clear_display":
+        if (typeof OLEDPanel !== "undefined") {
+          OLEDPanel.clear();
+        }
+        break;
+
+      case "deploy_rescue_kit":
+        // The kit servo is not modelled in the simulator; no state change.
+        break;
+
       default:
         console.log("[PythonRunner] Unknown command type:", cmd.type);
     }
@@ -1506,6 +1605,33 @@ def ticks_diff(t1, t2):
           case "read_distance":
           case "read_distance_2":
             // Just logging, no action needed
+            break;
+
+          case "read_color":
+          case "color_detected":
+          case "clear_color_interrupt":
+            // Colour sensor reads are handled inline by the stub
+            break;
+
+          case "show_display":
+          case "display_status":
+            if (
+              typeof OLEDPanel !== "undefined" &&
+              cmd.params &&
+              cmd.params.lines
+            ) {
+              OLEDPanel.render(cmd.params.lines);
+            }
+            break;
+
+          case "clear_display":
+            if (typeof OLEDPanel !== "undefined") {
+              OLEDPanel.clear();
+            }
+            break;
+
+          case "deploy_rescue_kit":
+            // Kit servo not modelled in the simulator
             break;
 
           default:

@@ -60,6 +60,10 @@ const Simulator = (function () {
   var obstacles = [];
   var sideSensorSide = "left";
   var simulationSpeed = 1;
+  // Ground colour markers (Challenge 8). Each: {x,y,width,height,color,rgb:[r,g,b,c]}.
+  var colorZones = [];
+  // Reading returned when the sensor is over plain (dark) floor.
+  var COLOR_FLOOR = [40, 40, 40, 120];
 
   // ═══════════════════════════════════════════════════════════════════
   //  PWM → velocity   (mm / s)
@@ -444,6 +448,49 @@ const Simulator = (function () {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  //  Colour sensor (TCS34725)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /**
+   * Simulated downward-facing colour sensor.
+   *
+   * Returns the marker the robot's body centre is currently over, as
+   * { r, g, b, c, name } where name is "red" | "green" | "silver" | "none".
+   * Off any marker it returns the dark-floor reading (name "none"). Light
+   * channel noise is added so students see realistic, non-constant values.
+   *
+   * @param {object} robot Robot state with x / y in mm.
+   * @returns {{r:number,g:number,b:number,c:number,name:string}}
+   */
+  function simulateColor(robot) {
+    var rgb = COLOR_FLOOR;
+    var name = "none";
+    for (var i = 0; i < colorZones.length; i++) {
+      var z = colorZones[i];
+      if (
+        robot.x >= z.x &&
+        robot.x <= z.x + z.width &&
+        robot.y >= z.y &&
+        robot.y <= z.y + z.height
+      ) {
+        rgb = z.rgb || COLOR_FLOOR;
+        name = z.color || "none";
+        break;
+      }
+    }
+    function jitter(v) {
+      return Math.max(0, Math.round(v + (Math.random() - 0.5) * 6));
+    }
+    return {
+      r: jitter(rgb[0]),
+      g: jitter(rgb[1]),
+      b: jitter(rgb[2]),
+      c: jitter(rgb[3]),
+      name: name,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   //  Collision detection
   // ═══════════════════════════════════════════════════════════════════
 
@@ -647,6 +694,12 @@ const Simulator = (function () {
   function getSideSensorSide() {
     return sideSensorSide;
   }
+  function setColorZones(z) {
+    colorZones = z || [];
+  }
+  function getColorZones() {
+    return colorZones;
+  }
 
   // ═══════════════════════════════════════════════════════════════════
   //  Public API
@@ -663,6 +716,7 @@ const Simulator = (function () {
     simulateUltrasonic: simulateUltrasonic,
     simulateUltrasonicSide: simulateUltrasonicSide,
     simulateGyroZ: simulateGyroZ,
+    simulateColor: simulateColor,
     checkCollision: checkCollision,
     getRobotCorners: getRobotCorners,
     applyBoundaryConstraints: applyBoundaryConstraints,
@@ -674,6 +728,8 @@ const Simulator = (function () {
     clearObstacles: clearObstacles,
     setSideSensorSide: setSideSensorSide,
     getSideSensorSide: getSideSensorSide,
+    setColorZones: setColorZones,
+    getColorZones: getColorZones,
     mirrorPose: mirrorPose,
     mirrorRect: mirrorRect,
 

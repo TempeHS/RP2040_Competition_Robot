@@ -12,6 +12,11 @@ from machine import Pin, PWM, time_pulse_us
 from time import sleep_us, sleep_ms, sleep as _sleep, ticks_ms, ticks_diff
 
 try:
+    from machine import SoftI2C
+except Exception:
+    SoftI2C = None
+
+try:
     from grove_ultrasonic import GroveUltrasonic
 except Exception:
     GroveUltrasonic = None
@@ -21,6 +26,16 @@ try:
 except Exception:
     LSM6DS3 = None
     _recover_i2c_bus = None
+
+try:
+    from tcs34725 import TCS34725
+except Exception:
+    TCS34725 = None
+
+try:
+    from ssd1306 import SSD1306_I2C
+except Exception:
+    SSD1306_I2C = None
 
 try:
     import eventlog
@@ -531,6 +546,18 @@ class AIDriver:
         imu_scl=17,  # GP17 — IMU I2C SCL (SoftI2C)
         imu_addr=0x6A,  # LSM6DS3 I2C address (0x6A or 0x6B)
         imu_freq=50_000,  # SoftI2C bus frequency (Hz)
+        color_sda=16,  # GP16 — colour sensor shares the IMU SoftI2C bus
+        color_scl=17,  # GP17 — colour sensor shares the IMU SoftI2C bus
+        color_addr=0x29,  # TCS34725 fixed I2C address
+        color_int_pin=7,  # GP7 — TCS34725 active-low interrupt line
+        color_pause_time=2.0,  # seconds to pause when a marker colour is seen
+        display_sda=16,  # GP16 — OLED shares the IMU/colour SoftI2C bus
+        display_scl=17,  # GP17 — OLED shares the IMU/colour SoftI2C bus
+        display_addr=0x3C,  # SSD1306 I2C address (0x3C or 0x3D)
+        display_width=128,  # OLED pixel width
+        display_height=64,  # OLED pixel height (use 32 for 128x32 panels)
+        display_freq=400_000,  # OLED SoftI2C bus frequency (Hz)
+        kit_servo_pin=None,  # GP for the rescue-kit servo (None = not wired yet)
     ):
         """Initialize RP2040 based AIDriver differential drive robot.
 
@@ -717,6 +744,139 @@ class AIDriver:
                     "– gyro turns unavailable. Check GP{}/GP{} wiring and address.".format(
                         imu_sda, imu_scl
                     ),
+                )
+
+        # ── Colour sensor (TCS34725) for ground marker detection ──────────
+        # Faces the floor and detects red / green / reflective-silver markers.
+        # Shares the gyro's SoftI2C bus (different address) and raises an
+        # interrupt on GP7 when it rolls onto a bright marker, so the robot
+        # reacts immediately instead of polling.
+        #
+        # Classification is threshold based so students can TUNE it. Defaults
+        # are deliberately permissive; the colour challenge has the student set
+        # these per their floor and lighting:
+        #   my_robot.color_red_ratio = 0.5
+        self.color_pause_time = color_pause_time  # seconds to pause on a marker
+        self.color_black_clear = 0  # below this clear value → "black" (no-go); 0 = off
+        self.color_min_clear = 0  # below this clear value → "none" (floor)
+        self.color_red_ratio = 0.0  # red fraction of R+G+B to call it "red"
+        self.color_green_ratio = 0.0  # green fraction of R+G+B to call it "green"
+        self.color_silver_clear = 0  # clear above this + balanced RGB → "silver"
+
+        self.color = None
+        self.has_color = False
+        self._color_flag = False  # set by the INT handler, cleared on read
+        self._color_int = None
+        if TCS34725 is not None:
+            try:
+                self.color = TCS34725(
+                    sda=color_sda,
+                    scl=color_scl,
+                    address=color_addr,
+                    freq=imu_freq,
+                )
+                self.color.begin()
+                # Fire the interrupt whenever the clear channel leaves the
+                # "dark floor" band. low=0 disables the low-side trip; a small
+                # high threshold means any bright marker asserts INT.
+                self.color.set_persistence(1)
+                self.color.set_interrupt_thresholds(0, 100)
+                self.color.enable_interrupt(True)
+                self.color.clear_interrupt()
+
+                self._color_int = Pin(color_int_pin, Pin.IN, Pin.PULL_UP)
+                self._color_int.irq(
+                    handler=self._on_color_int,
+                    trigger=Pin.IRQ_FALLING,
+                )
+                self.has_color = True
+                _d(
+                    "Colour sensor OK on GP{}/GP{} @ 0x{:02X}, INT=GP{}".format(
+                        color_sda, color_scl, color_addr, color_int_pin
+                    )
+                )
+            except Exception as exc:
+                self.color = None
+                self.has_color = False
+                _d(
+                    "Colour sensor init failed:",
+                    type(exc).__name__,
+                    str(exc),
+                    "– colour detection unavailable. Check GP{}/GP{} wiring.".format(
+                        color_sda, color_scl
+                    ),
+                )
+
+        # ── OLED status display (SSD1306) ─────────────────────────────────
+        # Optional 128x64 (or 128x32) OLED on the shared SoftI2C bus. Used to
+        # communicate the competition state and running score to handlers and
+        # judges. Graceful-degradation: if the panel is not wired the driver is
+        # never constructed and every display_* method becomes a silent no-op,
+        # so the same program runs with or without the screen attached.
+        self._display_lines = ["", "", "", ""]  # last text pushed (any mode)
+        self.display = None
+        self.has_display = False
+        if SSD1306_I2C is not None and SoftI2C is not None:
+            try:
+                if _recover_i2c_bus is not None:
+                    _recover_i2c_bus(display_sda, display_scl)
+                _disp_i2c = SoftI2C(
+                    sda=Pin(display_sda),
+                    scl=Pin(display_scl),
+                    freq=display_freq,
+                )
+                self.display = SSD1306_I2C(
+                    display_width,
+                    display_height,
+                    _disp_i2c,
+                    addr=display_addr,
+                )
+                self.has_display = True
+                _d(
+                    "OLED OK on GP{}/GP{} @ 0x{:02X} ({}x{})".format(
+                        display_sda,
+                        display_scl,
+                        display_addr,
+                        display_width,
+                        display_height,
+                    )
+                )
+            except Exception as exc:
+                self.display = None
+                self.has_display = False
+                _d(
+                    "OLED init failed:",
+                    type(exc).__name__,
+                    str(exc),
+                    "– status display unavailable. Check GP{}/GP{} @ 0x{:02X}.".format(
+                        display_sda, display_scl, display_addr
+                    ),
+                )
+
+        # ── Rescue-kit deployment servo ───────────────────────────────────
+        # Optional servo that drops a survival kit on a HARMED (red) victim
+        # tile for the +10 bonus. Hardware is still on the way, so this stays
+        # unwired by default (kit_servo_pin=None) and deploy_rescue_kit() is a
+        # logged no-op until the pin is supplied. Same graceful pattern as the
+        # display so competition code can call it today without breaking.
+        self._kit_servo = None
+        self.has_kit = False
+        self.kit_deploy_count = 0
+        if kit_servo_pin is not None:
+            try:
+                self._kit_servo = PWM(Pin(kit_servo_pin))
+                self._kit_servo.freq(50)  # standard hobby-servo frame rate
+                self._kit_servo_pin = kit_servo_pin
+                self.has_kit = True
+                _d("Rescue-kit servo ready on GP{}".format(kit_servo_pin))
+            except Exception as exc:
+                self._kit_servo = None
+                self.has_kit = False
+                _d(
+                    "Rescue-kit servo init failed:",
+                    type(exc).__name__,
+                    str(exc),
+                    "– kit deployment unavailable. Check GP{}.".format(kit_servo_pin),
                 )
 
         # Start PWM-based heartbeat - runs entirely in hardware
@@ -1105,6 +1265,104 @@ class AIDriver:
         except Exception:
             return 0.0
 
+    # ── Colour sensor (TCS34725) ──────────────────────────────────────────
+    def _on_color_int(self, pin):
+        """Pin IRQ handler — runs when the colour sensor INT line drops.
+
+        Kept tiny (just sets a flag) as required for MicroPython interrupt
+        handlers. The flag is consumed and the device latch is cleared in
+        ``color_detected()`` from normal (non-interrupt) code.
+        """
+        self._color_flag = True
+
+    def read_color(self):
+        """Return the raw (red, green, blue, clear) colour-sensor counts.
+
+        Each value is a 16-bit channel count. ``clear`` is overall brightness.
+        Returns ``(0, 0, 0, 0)`` when no colour sensor is available so polling
+        code degrades gracefully instead of raising.
+        """
+        if not self.has_color:
+            return (0, 0, 0, 0)
+        try:
+            rgbc = self.color.read_rgbc()
+            _d("read_color: r={} g={} b={} c={}".format(*rgbc))
+            return rgbc
+        except Exception as exc:
+            _d("read_color error:", type(exc).__name__, str(exc))
+            return (0, 0, 0, 0)
+
+    def classify_color(self):
+        """Classify the floor under the sensor as a marker colour.
+
+        Uses the student-tunable thresholds (``color_min_clear``,
+        ``color_red_ratio``, ``color_green_ratio``, ``color_silver_clear``) so
+        the same logic runs in the simulator and on the robot.
+
+        Returns one of ``"black"``, ``"red"``, ``"green"``, ``"silver"`` or
+        ``"none"``.  ``"black"`` marks a no-go area: black absorbs the LED so the
+        clear channel reads *below* the plain floor.  Black is checked first and
+        is disabled while ``color_black_clear`` is 0.
+        """
+        r, g, b, c = self.read_color()
+
+        # Darker than the floor → BLACK no-go area (absorbs the sensor LED).
+        if self.color_black_clear > 0 and c < self.color_black_clear:
+            return "black"
+
+        # Too dark / nothing bright under the sensor → plain floor.
+        if c < self.color_min_clear:
+            return "none"
+
+        total = r + g + b
+        if total <= 0:
+            return "none"
+
+        red_fraction = r / total
+        green_fraction = g / total
+
+        # Reflective silver/white: very bright AND roughly balanced channels
+        # (no single colour dominates).
+        if (
+            c >= self.color_silver_clear
+            and red_fraction < self.color_red_ratio
+            and green_fraction < self.color_green_ratio
+        ):
+            return "silver"
+        if red_fraction >= self.color_red_ratio:
+            return "red"
+        if green_fraction >= self.color_green_ratio:
+            return "green"
+        return "none"
+
+    def color_detected(self):
+        """Return True if the colour interrupt has fired since the last call.
+
+        The TCS34725 asserts its INT line when the robot rolls onto a bright
+        marker; the IRQ handler sets a flag that this method consumes (and then
+        clears the device latch so the next marker can fire). Pair it with
+        ``classify_color()`` to decide which colour was seen.
+        """
+        if not self.has_color:
+            return False
+        flag = self._color_flag
+        self._color_flag = False
+        if flag:
+            try:
+                self.color.clear_interrupt()
+            except Exception:
+                pass
+        return flag
+
+    def clear_color_interrupt(self):
+        """Manually clear a latched colour interrupt (rarely needed)."""
+        self._color_flag = False
+        if self.has_color:
+            try:
+                self.color.clear_interrupt()
+            except Exception:
+                pass
+
     # Minimum reliable motor speed - motors stutter below this due to undervoltage.
     # 120 is the empirically measured dead-zone threshold for the L298N at typical
     # operating voltages. DO NOT lower this: values 100-119 pass the guard but
@@ -1233,3 +1491,90 @@ class AIDriver:
         moving = self.motor_right.is_moving() or self.motor_left.is_moving()
         _d("AIDriver.is_moving:", moving)
         return moving
+
+    # ── OLED status display ───────────────────────────────────────────────
+    # All four methods are safe to call whether or not the OLED is attached.
+    # When self.has_display is False they only cache the text (so unit tests
+    # and the simulator can still inspect what *would* have been shown) and
+    # return without touching any hardware.
+
+    def show_display(self, line1="", line2="", line3="", line4=""):
+        """Show up to four text lines on the OLED.
+
+        Caches the lines on self._display_lines regardless of hardware so the
+        last-shown text can be inspected. No-op on hardware if no OLED.
+
+        Args:
+            line1..line4: Strings to render top-to-bottom (extra text clipped).
+        """
+        lines = [str(line1), str(line2), str(line3), str(line4)]
+        self._display_lines = lines
+        _d("AIDriver.show_display:", lines)
+        if not self.has_display or self.display is None:
+            return
+        try:
+            self.display.fill(0)
+            row = 0
+            for text in lines:
+                if text:
+                    self.display.text(text[:16], 0, row)
+                row += 16
+            self.display.show()
+        except Exception as exc:
+            _d("show_display failed:", type(exc).__name__, str(exc))
+
+    def display_status(self, state, score=0, victims=0):
+        """Show the competition state and running score on the OLED.
+
+        This is the high-level call the maze controller makes every time the
+        state changes so handlers and judges can read what the robot is doing.
+
+        Args:
+            state: Short state label, e.g. "SEARCH" or "AT VICTIM".
+            score: Estimated running score to display.
+            victims: Number of victims found so far.
+        """
+        self.show_display(
+            "THS RescueMaze",
+            "State:{}".format(str(state)[:9]),
+            "Score:{}".format(int(score)),
+            "Victims:{}".format(int(victims)),
+        )
+
+    def clear_display(self):
+        """Blank the OLED. No-op when no panel is attached."""
+        self._display_lines = ["", "", "", ""]
+        _d("AIDriver.clear_display")
+        if not self.has_display or self.display is None:
+            return
+        try:
+            self.display.fill(0)
+            self.display.show()
+        except Exception as exc:
+            _d("clear_display failed:", type(exc).__name__, str(exc))
+
+    def deploy_rescue_kit(self):
+        """Drop one survival kit on a harmed-victim tile (+10 bonus).
+
+        The servo hardware is not fitted yet, so by default this only logs the
+        request and increments the deploy counter. Once kit_servo_pin is wired
+        it sweeps the servo to release a kit and returns it to the rest angle.
+
+        Returns:
+            True if a kit servo actually actuated, False if it was a no-op.
+        """
+        self.kit_deploy_count += 1
+        _d("AIDriver.deploy_rescue_kit #", self.kit_deploy_count)
+        if not self.has_kit or self._kit_servo is None:
+            return False
+        try:
+            # 50 Hz frame = 20 ms period; duty_u16 full scale = 65535.
+            # ~1.0 ms pulse (rest) and ~2.0 ms pulse (release).
+            self._kit_servo.duty_u16(6553)  # ~2.0 ms — release
+            sleep_ms(400)
+            self._kit_servo.duty_u16(3277)  # ~1.0 ms — rest
+            sleep_ms(200)
+            return True
+        except Exception as exc:
+            _d("deploy_rescue_kit failed:", type(exc).__name__, str(exc))
+            return False

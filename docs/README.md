@@ -1,4 +1,4 @@
-# AIDriver
+# Tempe High School RP2040 Competition Robot
 
 A low-cost, easy-to-assemble differential drive robot, specifically designed for students. This platform provides hands-on experience with fundamental mechatronic components, robot construction, and introductory programming for mechatronics applications.
 
@@ -79,6 +79,12 @@ Once students have assembled their robot they are to complete the programming ch
 5. [Challenge 5](Challenge_5.md) - Autonomous obstacle avoidance
 6. [Challenge 6](Challenge_6.md) - Autonomous maze navigation
 7. [Challenge 7](Challenge_7.md) - Remote control
+8. [Challenge 8](Challenge_8.md) - Ground colour detection
+9. [Challenge 9](Challenge_9.md) - No-go zone detection and recovery
+
+### Competition
+
+- [Rescue Maze 2026 — Intermediate Division Summary](Rescue_Maze_Rules_Summary.md) - plain-language guide to the [RoboCup Junior Australia Rescue Maze rules](https://www.robocupjunior.org.au/rescue-maze/)
 
 ## Authors
 

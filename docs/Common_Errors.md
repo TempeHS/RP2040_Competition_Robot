@@ -263,15 +263,15 @@ Python cannot find the `aidriver` library file.
 Upload and run the steering direction test from your Pico:
 
 ```
-project/tests/test_pid_steer_direction.py
+tests/test_pid_steer_direction.py
 ```
 
 Place the robot on the floor with space to move. The test drives the robot in two short bursts and tells you which way the nose **should** turn. Watch the robot:
 
 | Step | What the test does | Robot nose should |
-|------|--------------------|-------------------|
-| 1 | Right wheel faster | turn **LEFT** |
-| 2 | Left wheel faster  | turn **RIGHT** |
+| ---- | ------------------ | ----------------- |
+| 1    | Right wheel faster | turn **LEFT**     |
+| 2    | Left wheel faster  | turn **RIGHT**    |
 
 **How to fix:**
 
@@ -304,7 +304,7 @@ The raw HC-SR04 ultrasonic sensor can jump ±20–50 mm between readings even wh
 Upload and run the sensor noise diagnostic from your Pico:
 
 ```
-project/tests/test_pid_sensor_noise.py
+tests/test_pid_sensor_noise.py
 ```
 
 Keep the robot **still** beside a wall while it runs. It prints 20 readings and tells you:
@@ -312,11 +312,11 @@ Keep the robot **still** beside a wall while it runs. It prints 20 readings and 
 - The **spread** (max − min) of the raw readings
 - What correction swing that produces at your Kp
 
-| Spread | Diagnosis | Fix |
-|--------|-----------|-----|
-| > 30 mm | High noise — the main cause of erratic movement | Average 3 readings per loop (see below) |
-| 15–30 mm | Moderate noise | Average 2 readings, reduce Kp to ≤ 0.4 |
-| < 15 mm | Sensor is clean | Reduce Kp by 30% |
+| Spread   | Diagnosis                                       | Fix                                     |
+| -------- | ----------------------------------------------- | --------------------------------------- |
+| > 30 mm  | High noise — the main cause of erratic movement | Average 3 readings per loop (see below) |
+| 15–30 mm | Moderate noise                                  | Average 2 readings, reduce Kp to ≤ 0.4  |
+| < 15 mm  | Sensor is clean                                 | Reduce Kp by 30%                        |
 
 **How to fix (averaging sensor readings):**
 
@@ -336,6 +336,51 @@ if not valid:
     continue
 wall_distance = sum(valid) // len(valid)
 ```
+
+---
+
+## 11. OLED display stays blank (nothing shows on screen)
+
+**What it looks like:**
+
+- You call `my_robot.display_status(...)` or `my_robot.show_display(...)` but the OLED never lights up.
+- No error is raised — the robot otherwise runs normally.
+
+**Likely cause:**
+
+The OLED methods are **deliberately silent** when no panel is detected. On boot, `AIDriver`
+tries to start the SSD1306; if it is not found, `has_display` stays `False` and every display call
+becomes a no-op so your program never crashes. The usual cause is wiring or the wrong address.
+
+**How to fix:**
+
+1. Check the OLED is on the shared I²C bus: **GP16 (SDA)** and **GP17 (SCL)**, plus 3V3 and GND.
+2. Confirm the address is **`0x3C`** (a few panels use `0x3D` — pass `display_addr=0x3D` to `AIDriver`).
+3. Verify it was found: `print(my_robot.has_display)` should print `True`.
+4. Keep each line to **16 characters** — longer text is clipped, so a "blank" line may just be spaces.
+
+> In the **simulator** the OLED always works — the panel appears in the top-right of the arena and
+> shows your text. If it shows there but not on hardware, the problem is wiring or the address.
+
+---
+
+## 12. Rescue kit never deploys
+
+**What it looks like:**
+
+- `my_robot.deploy_rescue_kit()` returns `False` and the servo never moves.
+
+**Likely cause:**
+
+The kit servo is **unwired by default**. Until you tell `AIDriver` which pin the servo is on, the
+call is a logged no-op (`has_kit` is `False`).
+
+**How to fix:**
+
+1. Wire the servo signal to a free GP pin and pass it in: `AIDriver("left", kit_servo_pin=10)`.
+2. Confirm it was set up: `print(my_robot.has_kit)` should print `True`.
+3. In the simulator the servo is not modelled, so `deploy_rescue_kit()` always returns `False` — that
+   is expected; test the drop on the real robot.
 
 ---
 

@@ -605,6 +605,11 @@ function loadChallenge(challengeId) {
     }
   }
 
+  // Set coloured floor markers (Challenge 8) from the challenge definition.
+  if (typeof Simulator !== "undefined") {
+    Simulator.setColorZones((challenge && challenge.colorZones) || []);
+  }
+
   // Load maze walls if the challenge references a maze. We set walls and
   // App.currentMaze directly here (rather than calling loadMaze) so the
   // challenge's own startPosition / spawnXRange remains the source of
@@ -826,6 +831,11 @@ function runCode() {
 
   // Expand debug panel with animation
   expandDebugPanel();
+
+  // Blank the simulated OLED for a fresh run.
+  if (typeof OLEDPanel !== "undefined") {
+    OLEDPanel.reset();
+  }
 
   // Reset session tracking for fresh run
   if (App.session) {
@@ -1098,6 +1108,11 @@ function resetRobot() {
   // Re-render
   render();
 
+  // Blank the simulated OLED when the robot is reset.
+  if (typeof OLEDPanel !== "undefined") {
+    OLEDPanel.reset();
+  }
+
   // Update ultrasonic display
   updateUltrasonicDisplay(calculateDistance());
 
@@ -1243,6 +1258,9 @@ function render() {
 
   // Draw path (if any for current challenge)
   drawPath(ctx, scale);
+
+  // Draw coloured floor markers (Challenge 8)
+  drawColorZones(ctx, scale);
 
   // Draw walls
   drawWalls(ctx, scale);
@@ -1805,6 +1823,34 @@ function drawWalls(ctx, scale) {
 }
 
 /**
+ * Render the coloured floor markers used by the colour-sensor challenge.
+ * @param {CanvasRenderingContext2D} ctx Drawing context for the canvas.
+ * @param {number} scale Conversion from millimeters to pixels.
+ * @returns {void}
+ */
+function drawColorZones(ctx, scale) {
+  if (typeof Simulator === "undefined" || !Simulator.getColorZones) return;
+  const zones = Simulator.getColorZones();
+  if (!zones || !zones.length) return;
+
+  const fills = {
+    red: "rgba(231, 76, 60, 0.55)",
+    green: "rgba(46, 204, 113, 0.55)",
+    silver: "rgba(200, 200, 210, 0.65)",
+    black: "rgba(15, 15, 20, 0.85)",
+  };
+
+  for (let i = 0; i < zones.length; i++) {
+    const z = zones[i];
+    ctx.fillStyle = fills[z.color] || "rgba(150, 150, 150, 0.4)";
+    ctx.fillRect(z.x * scale, z.y * scale, z.width * scale, z.height * scale);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(z.x * scale, z.y * scale, z.width * scale, z.height * scale);
+  }
+}
+
+/**
  * Plot the historical path of the robot as a translucent polyline.
  * @param {CanvasRenderingContext2D} ctx Drawing context for the canvas.
  * @param {number} scale Conversion from millimeters to pixels.
@@ -2108,6 +2154,10 @@ function getStarterCodePath(challengeId) {
     4: "starter-code/challenge-4.py",
     5: "starter-code/challenge-5.py",
     6: "starter-code/challenge-6.py",
+    7: "starter-code/challenge-7.py",
+    8: "starter-code/challenge-8.py",
+    9: "starter-code/challenge-9.py",
+    10: "starter-code/challenge-10.py",
   };
 
   if (Object.prototype.hasOwnProperty.call(starterCodeFiles, challengeId)) {

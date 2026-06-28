@@ -39,8 +39,6 @@ The script automatically:
 ### **Frozen Modules (Fast Loading):**
 
 - `project/lib/aidriver.py` → Frozen into firmware
-- `project/lib/gamepad_driver_controller.py` → Frozen into firmware
-- `project/lib/gamepad_pico.py` → Frozen into firmware
 
 **Benefits:** Instant loading, memory efficient, cannot be accidentally corrupted
 
@@ -147,7 +145,7 @@ chmod +x /workspaces/RP2040_Competition_Robot/.devcontainer/*.sh
 **Files Not Found:**
 
 - Verify files exist: `project/lib/*.py` and `project/main.py`
-- Check exact filenames: `aidriver.py`, `gamepad_driver_controller.py`, `gamepad_pico.py`
+- Check exact filenames: `aidriver.py`
 
 **Syntax Errors:**
 

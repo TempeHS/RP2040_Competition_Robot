@@ -21,6 +21,7 @@
     "Mazes": "readonly",
     "Gamepad": "readonly",
     "AIDriverStub": "readonly",
+    "OLEDPanel": "readonly",
     "Sk": "readonly",
     "bootstrap": "readonly",
     "ace": "readonly",

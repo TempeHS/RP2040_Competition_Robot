@@ -545,6 +545,13 @@
             <div class="card-body p-2">
               <div id="canvasContainer" class="arena-container">
                 <canvas id="arenaCanvas"></canvas>
+                <!-- Simulated SSD1306 OLED status display. Shows whatever the
+                     student's display_status()/show_display() calls push. -->
+                <div
+                  id="oledPanel"
+                  class="oled-panel"
+                  title="Simulated SSD1306 OLED status display"
+                ></div>
               </div>
             </div>
           </div>
@@ -822,6 +829,7 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
     <!-- Application Scripts (order matters!) -->
     <script src="js/logger.js?v=1"></script>
     <script src="js/debug-panel.js?v=11"></script>
+    <script src="js/oled-panel.js?v=1"></script>
     <script src="js/validator.js?v=13"></script>
     <script src="js/robot-config.js?v=1"></script>
     <script src="js/simulator.js?v=13"></script>

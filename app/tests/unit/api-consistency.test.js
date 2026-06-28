@@ -353,4 +353,52 @@ describe("AIDriver API Consistency", () => {
       }
     });
   });
+
+  describe("OLED + rescue-kit parity across all three paths", () => {
+    let stubSource;
+    let validatorSource;
+
+    beforeAll(() => {
+      stubSource = fs.readFileSync(
+        path.join(__dirname, "../../js/aidriver-stub.js"),
+        "utf8",
+      );
+      validatorSource = fs.readFileSync(
+        path.join(__dirname, "../../js/validator.js"),
+        "utf8",
+      );
+    });
+
+    const NEW_METHODS = [
+      "show_display",
+      "display_status",
+      "clear_display",
+      "deploy_rescue_kit",
+    ];
+
+    test.each(NEW_METHODS)(
+      "%s exists in the real firmware (aidriver.py)",
+      (method) => {
+        expect(realAidriverSource).toContain(`def ${method}(`);
+      },
+    );
+
+    test.each(NEW_METHODS)("%s exists in the python-runner shim", (method) => {
+      expect(simulatorAidriverSource).toContain(`def ${method}(`);
+    });
+
+    test.each(NEW_METHODS)(
+      "%s exists in the Skulpt stub (aidriver-stub.js)",
+      (method) => {
+        expect(stubSource).toContain(`$loc.${method}`);
+      },
+    );
+
+    test.each(NEW_METHODS)(
+      "%s is allow-listed in validator.js so learner code is not rejected",
+      (method) => {
+        expect(validatorSource).toContain(`"${method}"`);
+      },
+    );
+  });
 });

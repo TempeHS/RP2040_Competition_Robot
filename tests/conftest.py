@@ -3,14 +3,18 @@ import types
 from pathlib import Path
 import time as _time
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-LIB_DIR = PROJECT_ROOT / "lib"
+# These host tests live alongside the repo (top-level tests/), while the robot
+# code they exercise lives in project/ and project/lib. Make all of them
+# importable: REPO_ROOT for `import project.main`, PROJECT_DIR/LIB_DIR for the
+# MicroPython-style libraries, and TESTS_DIR for test-only helpers (hcsr04).
+TESTS_DIR = Path(__file__).resolve().parent
+REPO_ROOT = TESTS_DIR.parent
+PROJECT_DIR = REPO_ROOT / "project"
+LIB_DIR = PROJECT_DIR / "lib"
 
-# Ensure the custom MicroPython-style libraries are importable as top-level modules.
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-if str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
+for _path in (REPO_ROOT, PROJECT_DIR, LIB_DIR, TESTS_DIR):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 
 def _ensure_time_helpers():
