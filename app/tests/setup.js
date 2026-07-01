@@ -340,14 +340,6 @@ global.Mazes = {
   getWalls: jest.fn().mockReturnValue([]),
 };
 
-// Mock Gamepad globally
-global.Gamepad = {
-  init: jest.fn(),
-  update: jest.fn(),
-  isEnabled: jest.fn().mockReturnValue(false),
-  getState: jest.fn().mockReturnValue({ left: 0, right: 0 }),
-};
-
 // Mock App globally
 global.App = {
   init: jest.fn(),

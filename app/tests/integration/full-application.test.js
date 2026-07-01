@@ -238,7 +238,7 @@ describe("Full Application Integration", () => {
   });
 
   describe("PID Challenge Mode", () => {
-    test("all challenges should require code (no gamepad mode)", () => {
+    test("all challenges should require code", () => {
       // PID challenges 1-7 all require user code
       for (let i = 1; i <= 7; i++) {
         App.currentChallenge = i;

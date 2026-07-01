@@ -973,9 +973,9 @@ class AIDriver:
         The onboard LED heartbeat is driven entirely by hardware PWM
         (see ``_start_pwm_heartbeat`` called from ``__init__``), so no
         per-loop work is required to keep it blinking. This method is
-        kept as a stable extension point so callers such as the gamepad
-        controller can invoke it every loop without needing to know
-        whether housekeeping is currently required.
+        kept as a stable extension point so a control loop can invoke it
+        every loop without needing to know whether housekeeping is
+        currently required.
         """
         return
 

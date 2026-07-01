@@ -19,7 +19,6 @@
     "Validator": "readonly",
     "Challenges": "readonly",
     "Mazes": "readonly",
-    "Gamepad": "readonly",
     "AIDriverStub": "readonly",
     "OLEDPanel": "readonly",
     "Sk": "readonly",

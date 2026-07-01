@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -219,107 +219,6 @@
             </div>
           </div>
         </div>
-
-        <div class="col-lg-12 mt-4">
-          <div class="card bg-dark border-secondary">
-            <div class="card-header bg-secondary text-white">
-              BLE Gamepad Module Demo
-            </div>
-            <div class="card-body">
-              <div
-                id="gamepadPanel"
-                class="bg-dark text-light border border-secondary rounded-3 p-3"
-              >
-                <div
-                  id="bleUnsupported"
-                  class="alert alert-warning d-none"
-                  role="alert"
-                >
-                  Web Bluetooth is not available in this browser. Use a
-                  supported browser such as Chrome on desktop or Android.
-                </div>
-
-                <div
-                  class="gamepad-status d-flex flex-wrap align-items-center justify-content-between mb-3"
-                >
-                  <div class="d-flex align-items-center gap-2">
-                    <span id="bleStatusText">Disconnected</span>
-                    <span class="badge bg-secondary" id="bleStateBadge"
-                      >Idle</span
-                    >
-                  </div>
-                  <div class="d-flex gap-2">
-                    <button class="btn btn-primary" id="btnBleConnect">
-                      Connect
-                    </button>
-                    <button
-                      class="btn btn-outline-light d-none"
-                      id="btnBleDisconnect"
-                    >
-                      Disconnect
-                    </button>
-                  </div>
-                </div>
-
-                <div class="gamepad-layout">
-                  <div class="joystick-column">
-                    <div class="joystick-wrapper">
-                      <div class="joystick-track" id="joystickTrack">
-                        <div class="joystick-deadzone"></div>
-                        <div class="joystick-handle" id="joystickHandle"></div>
-                      </div>
-                    </div>
-                    <div class="text-center mt-3">
-                      <span class="badge bg-dark text-light" id="joystickDebug"
-                        >0 · 0</span
-                      >
-                    </div>
-                    <p class="text-muted small mt-2 text-center">
-                      Drag the joystick or use arrow / WASD keys to simulate
-                      driving.
-                    </p>
-                  </div>
-
-                  <div class="status-column">
-                    <div class="info-panel">
-                      <div class="info-heading">Telemetry</div>
-                      <div class="info-value" id="gamepadUltrasonic">
-                        --- mm
-                      </div>
-                      <div class="info-subtle" id="telemetryTimestamp">
-                        Waiting for data
-                      </div>
-                    </div>
-
-                    <div class="info-panel mt-3">
-                      <div
-                        class="d-flex align-items-center justify-content-between"
-                      >
-                        <span class="info-heading mb-0">Brake</span>
-                        <span class="badge bg-secondary" id="brakeBadge"
-                          >Released</span
-                        >
-                      </div>
-                      <div
-                        class="d-flex align-items-center justify-content-between mt-2"
-                      >
-                        <span class="info-heading mb-0">Motor Speeds</span>
-                        <span class="info-value small" id="motorSpeeds"
-                          >0 | 0</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="text-muted small mt-3" id="bleHint">
-                  Requires a browser with Web Bluetooth support. Use the buttons
-                  above to pair with an HM-10 module when available.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -332,7 +231,6 @@
     <script src="../js/aidriver-stub.js"></script>
     <script src="../js/python-runner.js"></script>
     <script src="../js/challenges.js"></script>
-    <script src="../js/gamepad.js"></script>
 
     <script>
       // ============================================
@@ -351,7 +249,6 @@
         passed: 0,
         failed: 0,
         startTime: null,
-        gamepadReady: false,
 
         init() {
           this.canvas = document.getElementById("testCanvas");
@@ -479,7 +376,7 @@
           ctx.fillText(
             `Speeds: L=${this.robot.leftSpeed} R=${this.robot.rightSpeed}`,
             10,
-            65
+            65,
           );
           ctx.fillText(`Moving: ${this.robot.isMoving}`, 10, 85);
         },
@@ -496,15 +393,15 @@
               run: async () => {
                 this.assert(
                   typeof Simulator !== "undefined",
-                  "Simulator is undefined"
+                  "Simulator is undefined",
                 );
                 this.assert(
                   typeof Simulator.step === "function",
-                  "Simulator.step is not a function"
+                  "Simulator.step is not a function",
                 );
                 this.assert(
                   typeof Simulator.setSpeed === "function",
-                  "Simulator.setSpeed is not a function"
+                  "Simulator.setSpeed is not a function",
                 );
                 return "Simulator module loaded";
               },
@@ -514,15 +411,15 @@
               run: async () => {
                 this.assert(
                   typeof PythonRunner !== "undefined",
-                  "PythonRunner is undefined"
+                  "PythonRunner is undefined",
                 );
                 this.assert(
                   typeof PythonRunner.run === "function",
-                  "PythonRunner.run is not a function"
+                  "PythonRunner.run is not a function",
                 );
                 this.assert(
                   typeof PythonRunner.collectTrace === "function",
-                  "collectTrace is not a function"
+                  "collectTrace is not a function",
                 );
                 return "PythonRunner module loaded";
               },
@@ -532,7 +429,7 @@
               run: async () => {
                 this.assert(
                   typeof Challenges !== "undefined",
-                  "Challenges is undefined"
+                  "Challenges is undefined",
                 );
                 const all = Challenges.getAll();
                 const count = Object.keys(all).length;
@@ -545,86 +442,13 @@
               run: async () => {
                 this.assert(
                   typeof Sk !== "undefined",
-                  "Skulpt (Sk) is undefined"
+                  "Skulpt (Sk) is undefined",
                 );
                 this.assert(
                   typeof Sk.configure === "function",
-                  "Sk.configure missing"
+                  "Sk.configure missing",
                 );
                 return "Skulpt Python engine loaded";
-              },
-            },
-
-            // ========== BLE GAMEPAD TESTS ==========
-            {
-              name: "BLE: Gamepad module initializes",
-              run: async () => {
-                this.ensureGamepadReady();
-                const panel = document.getElementById("gamepadPanel");
-                this.assert(panel, "Gamepad panel missing");
-                const debugBadge = document.getElementById("joystickDebug");
-                this.assert(debugBadge, "Joystick debug badge missing");
-                return "Gamepad module initialized";
-              },
-            },
-            {
-              name: "BLE: Joystick mapping outputs differential speeds",
-              run: async () => {
-                this.ensureGamepadReady();
-                const speeds = Gamepad.calculateMotorSpeeds(0.45, 0.85);
-                this.assert(
-                  speeds.left > speeds.right,
-                  "Expected left speed to exceed right when steering right"
-                );
-                this.assert(
-                  speeds.left <= 255 && speeds.right <= 255,
-                  "Motor speeds exceed allowable range"
-                );
-                this.assert(
-                  !speeds.brake,
-                  "Brake should be released while moving"
-                );
-                return `Speeds: L=${speeds.left}, R=${speeds.right}`;
-              },
-            },
-            {
-              name: "BLE: Support notice matches capability",
-              run: async () => {
-                this.ensureGamepadReady();
-                const alert = document.getElementById("bleUnsupported");
-                this.assert(alert, "BLE unsupported alert missing");
-                if ("bluetooth" in navigator) {
-                  this.assert(
-                    alert.classList.contains("d-none"),
-                    "Alert should be hidden when Web Bluetooth is available"
-                  );
-                  return "Web Bluetooth available";
-                }
-                this.assert(
-                  !alert.classList.contains("d-none"),
-                  "Alert should be visible when Web Bluetooth is unavailable"
-                );
-                return "Web Bluetooth unavailable";
-              },
-            },
-            {
-              name: "BLE: Disable resets simulator state",
-              run: async () => {
-                this.ensureGamepadReady();
-                this.resetRobot(250, 400, 0);
-                App.robot.leftSpeed = 120;
-                App.robot.rightSpeed = 80;
-                App.robot.isMoving = true;
-                Gamepad.disable();
-                this.assert(
-                  !Gamepad.isActive(),
-                  "Gamepad should be inactive after disable"
-                );
-                this.assert(
-                  App.robot.leftSpeed === 0 && App.robot.rightSpeed === 0,
-                  "Simulator speeds were not reset"
-                );
-                return "Gamepad disable resets robot state";
               },
             },
 
@@ -645,7 +469,7 @@
                 this.log(`  Moved: ${moved.toFixed(1)}mm`, "info");
                 this.assert(
                   moved > 50,
-                  `Robot only moved ${moved.toFixed(1)}mm, expected >50mm`
+                  `Robot only moved ${moved.toFixed(1)}mm, expected >50mm`,
                 );
                 return `Moved ${moved.toFixed(1)}mm forward`;
               },
@@ -670,10 +494,10 @@
                 // Slower left wheel = positive heading change (turn left in our coord system)
                 this.assert(
                   Math.abs(turned) > 5,
-                  `Expected turn (>5°), got ${turned.toFixed(1)}°`
+                  `Expected turn (>5°), got ${turned.toFixed(1)}°`,
                 );
                 return `Turned ${turned.toFixed(
-                  1
+                  1,
                 )}° (differential drive works)`;
               },
             },
@@ -697,10 +521,10 @@
                 // Slower right wheel = opposite direction turn
                 this.assert(
                   Math.abs(turned) > 5,
-                  `Expected turn (>5°), got ${turned.toFixed(1)}°`
+                  `Expected turn (>5°), got ${turned.toFixed(1)}°`,
                 );
                 return `Turned ${turned.toFixed(
-                  1
+                  1,
                 )}° (differential drive works)`;
               },
             },
@@ -738,18 +562,18 @@
 
                 this.log(
                   `  1x: ${dist1x.toFixed(1)}mm, 3x: ${dist3x.toFixed(
-                    1
+                    1,
                   )}mm, diff: ${diff.toFixed(1)}mm`,
-                  "info"
+                  "info",
                 );
                 this.assert(
                   diff < tolerance,
                   `Distance varies too much: diff=${diff.toFixed(
-                    1
-                  )}mm (tolerance: ${(tolerancePercent * 100).toFixed(0)}%)`
+                    1,
+                  )}mm (tolerance: ${(tolerancePercent * 100).toFixed(0)}%)`,
                 );
                 return `Consistent: 1x=${dist1x.toFixed(
-                  1
+                  1,
                 )}mm, 3x=${dist3x.toFixed(1)}mm (${(
                   tolerancePercent * 100
                 ).toFixed(0)}% tolerance)`;
@@ -796,20 +620,20 @@
 
                 this.log(
                   `  1x: ${turn1x.toFixed(1)}°, 3x: ${turn3x.toFixed(
-                    1
+                    1,
                   )}°, diff: ${diff.toFixed(1)}° (${(
                     tolerancePercent * 100
                   ).toFixed(0)}% tolerance)`,
-                  "info"
+                  "info",
                 );
                 this.assert(
                   diff < tolerance, // Use scaled tolerance
                   `Angular motion varies too much: diff=${diff.toFixed(
-                    1
-                  )}° (tolerance: ${tolerance.toFixed(1)}°)`
+                    1,
+                  )}° (tolerance: ${tolerance.toFixed(1)}°)`,
                 );
                 return `Consistent: 1x=${turn1x.toFixed(
-                  1
+                  1,
                 )}°, 3x=${turn3x.toFixed(1)}° (${(
                   tolerancePercent * 100
                 ).toFixed(0)}% tolerance)`;
@@ -830,7 +654,7 @@
                   await this.runPython('print("HELLO_TEST_123")');
                   this.assert(
                     output.includes("HELLO_TEST_123"),
-                    `Expected HELLO_TEST_123, got: "${output}"`
+                    `Expected HELLO_TEST_123, got: "${output}"`,
                   );
                   return `Output: ${output.trim()}`;
                 } finally {
@@ -855,7 +679,7 @@ print("IMPORT_SUCCESS")
 `);
                   this.assert(
                     output.includes("IMPORT_SUCCESS"),
-                    `Import failed: "${output}"`
+                    `Import failed: "${output}"`,
                   );
                   return "AIDriver imports correctly";
                 } finally {
@@ -881,14 +705,14 @@ robot.drive_forward(200, 200)
 hold_state(1.0)
 robot.brake()
 `,
-                  3000
+                  3000,
                 );
 
                 const moved = startY - this.robot.y;
                 this.log(`  Robot moved: ${moved.toFixed(1)}mm`, "info");
                 this.assert(
                   moved > 30,
-                  `Robot only moved ${moved.toFixed(1)}mm, expected >30mm`
+                  `Robot only moved ${moved.toFixed(1)}mm, expected >30mm`,
                 );
                 return `Robot moved ${moved.toFixed(1)}mm`;
               },
@@ -911,7 +735,7 @@ hold_state(0.3)
 robot.brake()
 hold_state(0.3)
 `,
-                  2000
+                  2000,
                 );
 
                 const moved = startY - this.robot.y;
@@ -919,8 +743,8 @@ hold_state(0.3)
                 this.assert(
                   moved > 20,
                   `Robot should have moved before braking: ${moved.toFixed(
-                    1
-                  )}mm`
+                    1,
+                  )}mm`,
                 );
                 return `Robot moved ${moved.toFixed(1)}mm then braked`;
               },
@@ -942,7 +766,7 @@ robot.drive_forward(150, 200)
 hold_state(1.0)
 robot.brake()
 `,
-                  3000
+                  3000,
                 );
 
                 let turned = this.robot.heading - startHeading;
@@ -952,7 +776,7 @@ robot.brake()
                 this.log(`  Turned: ${turned.toFixed(1)}°`, "info");
                 this.assert(
                   Math.abs(turned) > 5,
-                  `Expected turn, got only ${turned.toFixed(1)}°`
+                  `Expected turn, got only ${turned.toFixed(1)}°`,
                 );
                 return `Turned ${turned.toFixed(1)}°`;
               },
@@ -978,22 +802,22 @@ robot.brake()
 
                 this.assert(
                   success === true,
-                  `collectTrace returned: ${success}`
+                  `collectTrace returned: ${success}`,
                 );
 
                 const trace = PythonRunner.executionTrace;
                 this.assert(
                   trace !== null && trace !== undefined,
-                  "executionTrace is null/undefined"
+                  "executionTrace is null/undefined",
                 );
                 this.assert(
                   Array.isArray(trace),
-                  `executionTrace is not an array: ${typeof trace}`
+                  `executionTrace is not an array: ${typeof trace}`,
                 );
                 this.assert(trace.length > 0, "Trace array is empty");
                 this.assert(
                   trace.length >= 3,
-                  `Expected 3+ trace entries, got ${trace.length}`
+                  `Expected 3+ trace entries, got ${trace.length}`,
                 );
                 return `Collected ${trace.length} trace entries`;
               },
@@ -1016,13 +840,13 @@ hold_state(0.1)
 
                 this.assert(
                   success === true,
-                  `collectTrace returned: ${success}`
+                  `collectTrace returned: ${success}`,
                 );
 
                 const trace = PythonRunner.executionTrace;
                 this.assert(
                   Array.isArray(trace),
-                  `executionTrace is not an array: ${typeof trace}`
+                  `executionTrace is not an array: ${typeof trace}`,
                 );
 
                 const allCommands = [];
@@ -1037,7 +861,7 @@ hold_state(0.1)
                 this.assert(types.includes("init"), "Missing init command");
                 this.assert(
                   types.includes("drive_forward"),
-                  "Missing drive_forward command"
+                  "Missing drive_forward command",
                 );
                 return `Commands: ${types.join(", ")}`;
               },
@@ -1062,7 +886,7 @@ my_robot.drive_forward(200, 200)
 hold_state(1.0)
 my_robot.brake()
 `,
-                  3000
+                  3000,
                 );
 
                 const movedY = startY - this.robot.y;
@@ -1070,20 +894,20 @@ my_robot.brake()
 
                 this.log(
                   `  Forward: ${movedY.toFixed(
-                    1
+                    1,
                   )}mm, Deviation: ${deviationX.toFixed(1)}mm`,
-                  "info"
+                  "info",
                 );
                 this.assert(
                   movedY > 50,
-                  `Not enough forward movement: ${movedY.toFixed(1)}mm`
+                  `Not enough forward movement: ${movedY.toFixed(1)}mm`,
                 );
                 this.assert(
                   deviationX < 20,
-                  `Too much deviation: ${deviationX.toFixed(1)}mm`
+                  `Too much deviation: ${deviationX.toFixed(1)}mm`,
                 );
                 return `Forward ${movedY.toFixed(
-                  1
+                  1,
                 )}mm, deviation ${deviationX.toFixed(1)}mm`;
               },
             },
@@ -1104,7 +928,7 @@ my_robot.drive_forward(150, 200)
 hold_state(2.0)
 my_robot.brake()
 `,
-                  4000
+                  4000,
                 );
 
                 let turned = this.robot.heading - startHeading;
@@ -1113,11 +937,11 @@ my_robot.brake()
 
                 this.log(
                   `  Total rotation: ${Math.abs(turned).toFixed(1)}°`,
-                  "info"
+                  "info",
                 );
                 this.assert(
                   Math.abs(turned) > 20,
-                  `Expected significant turn, got ${turned.toFixed(1)}°`
+                  `Expected significant turn, got ${turned.toFixed(1)}°`,
                 );
                 return `Rotated ${Math.abs(turned).toFixed(1)}°`;
               },
@@ -1139,7 +963,7 @@ my_robot.brake()
                     "<stdin>",
                     false,
                     'print("hello"',
-                    true
+                    true,
                   );
                 } catch (e) {
                   errorCaught = true;
@@ -1166,8 +990,8 @@ my_robot.brake()
                       "<stdin>",
                       false,
                       "print(undefined_xyz_var)",
-                      true
-                    )
+                      true,
+                    ),
                   );
                 } catch (e) {
                   errorCaught = true;
@@ -1175,7 +999,7 @@ my_robot.brake()
                 }
                 this.assert(
                   errorCaught,
-                  "Undefined variable error was not caught"
+                  "Undefined variable error was not caught",
                 );
                 return `Runtime errors caught: ${errorMsg.substring(0, 50)}...`;
               },
@@ -1186,20 +1010,6 @@ my_robot.brake()
         // ============================================
         // TEST HELPERS
         // ============================================
-
-        ensureGamepadReady() {
-          this.assert(
-            typeof Gamepad !== "undefined",
-            "Gamepad module is not loaded"
-          );
-          if (!this.gamepadReady) {
-            Gamepad.init();
-            this.gamepadReady = true;
-          }
-          if (!Gamepad.isActive()) {
-            Gamepad.enable();
-          }
-        },
 
         assert(condition, message) {
           if (!condition) {
@@ -1335,12 +1145,12 @@ my_robot.brake()
 
           this.log(
             "════════════════════════════════════════════════",
-            "section"
+            "section",
           );
           this.log("COMPREHENSIVE INTEGRATION TEST SUITE", "section");
           this.log(
             "════════════════════════════════════════════════\n",
-            "section"
+            "section",
           );
 
           const total = this.tests.length;
@@ -1381,22 +1191,22 @@ my_robot.brake()
 
           this.log(
             "\n════════════════════════════════════════════════",
-            "section"
+            "section",
           );
           if (this.failed === 0) {
             this.log(
               `✓ ALL ${this.passed} TESTS PASSED in ${duration}s`,
-              "success"
+              "success",
             );
           } else {
             this.log(
               `✗ ${this.failed} FAILED, ${this.passed} passed in ${duration}s`,
-              "error"
+              "error",
             );
           }
           this.log(
             "════════════════════════════════════════════════\n",
-            "section"
+            "section",
           );
 
           this.running = false;

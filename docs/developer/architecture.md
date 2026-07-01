@@ -18,24 +18,20 @@ Browser globals provide loose coupling between modules. Each JavaScript file reg
 ## Execution Flow
 
 1. **App initialisation** (`app/js/app.js`)
-
    - Configures the ACE editor, simulator canvas, and UI bindings
    - Loads the selected challenge from `challenges.js`
    - Prepares the `PythonRunner` and `Simulator`
 
 2. **Learner code run**
-
    - `PythonRunner.run()` validates code using `Validator.validate()` before invoking Skulpt
    - The AIDriver stub bridges Python commands into the JavaScript simulator queue
    - `Simulator.step()` updates the robot pose while render loops display state
 
 3. **Trace / Step mode**
-
    - `PythonRunner.collectTrace()` swaps in a trace-enabled aidriver implementation
    - `PythonRunner.playTrace()` replays the captured execution one line at a time, calling `Simulator` as commands require
 
-4. **Telemetry and gamepad**
-   - `gamepad.js` synchronises HM-10 BLE input with the simulator robot state
+4. **Telemetry and logging**
    - `logger.js` and `debug-panel.js` surface progress, warnings, and errors
 
 ## Key Dependencies

@@ -18,7 +18,7 @@ def test_main_handles_initialisation_failure(monkeypatch, capsys):
         raise Boom("hardware missing")
 
     monkeypatch.setattr(module, "AIDriver", failing_driver)
-    monkeypatch.setattr(module, "sleep", lambda *_args: None)
+    monkeypatch.setattr(module, "hold_state", lambda *_args: None)
 
     module.main()
 
@@ -31,6 +31,11 @@ def test_main_runs_sequence(monkeypatch, capsys):
     module = load_main_module()
 
     class FakeRobot:
+        # No optional peripherals fitted, so the gyro and colour stages are
+        # skipped and the test focuses on the core movement sequence.
+        has_gyro = False
+        has_color = False
+
         def __init__(self):
             self.calls = []
 
@@ -52,10 +57,17 @@ def test_main_runs_sequence(monkeypatch, capsys):
         def read_distance(self):
             return 500
 
+        def read_distance_2(self):
+            return 500
+
+        def show_display(self, *lines):
+            # The OLED mirror is output-only; ignored by the test.
+            pass
+
     robot = FakeRobot()
 
-    monkeypatch.setattr(module, "AIDriver", lambda: robot)
-    monkeypatch.setattr(module, "sleep", lambda *_args: None)
+    monkeypatch.setattr(module, "AIDriver", lambda *a, **k: robot)
+    monkeypatch.setattr(module, "hold_state", lambda *_args: None)
 
     module.main()
     captured = capsys.readouterr()
@@ -72,4 +84,5 @@ def test_main_runs_sequence(monkeypatch, capsys):
     ]
 
     assert robot.calls[: len(expected_sequence)] == expected_sequence
-    assert "All hardware tests completed" in captured.out
+    assert "All tests" in captured.out
+    assert "COMPLETE" in captured.out

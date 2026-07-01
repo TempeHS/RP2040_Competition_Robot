@@ -335,102 +335,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Gamepad (hidden by default, shown for Challenge 7) -->
-          <div
-            class="card bg-dark border-secondary mt-3 d-none"
-            id="gamepadPanel"
-          >
-            <div class="card-header bg-secondary text-white py-2">
-              <i class="bi bi-controller me-2"></i>BLE Gamepad Control
-            </div>
-            <div class="card-body">
-              <div
-                id="bleUnsupported"
-                class="alert alert-warning d-none"
-                role="alert"
-              >
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                Web Bluetooth is not available in this browser. Use Chrome on
-                desktop or Android.
-              </div>
-
-              <div
-                class="gamepad-status d-flex flex-wrap align-items-center justify-content-between mb-3"
-              >
-                <div class="text-light d-flex align-items-center gap-2">
-                  <i class="bi bi-bluetooth"></i>
-                  <span id="bleStatusText">Disconnected</span>
-                  <span class="badge bg-secondary" id="bleStateBadge"
-                    >Idle</span
-                  >
-                </div>
-                <div class="d-flex gap-2">
-                  <button class="btn btn-primary" id="btnBleConnect">
-                    <i class="bi bi-link-45deg me-1"></i>Connect
-                  </button>
-                  <button
-                    class="btn btn-outline-light d-none"
-                    id="btnBleDisconnect"
-                  >
-                    <i class="bi bi-x-circle me-1"></i>Disconnect
-                  </button>
-                </div>
-              </div>
-
-              <div class="gamepad-layout">
-                <div class="joystick-column">
-                  <div class="joystick-wrapper">
-                    <div class="joystick-track" id="joystickTrack">
-                      <div class="joystick-deadzone"></div>
-                      <div class="joystick-handle" id="joystickHandle"></div>
-                    </div>
-                  </div>
-                  <div class="text-center mt-3">
-                    <span class="badge bg-dark text-light" id="joystickDebug"
-                      >0 · 0</span
-                    >
-                  </div>
-                  <p class="text-muted small mt-2 text-center">
-                    Drag the joystick or use arrow/WASD keys to drive.
-                  </p>
-                </div>
-
-                <div class="status-column">
-                  <div class="info-panel">
-                    <div class="info-heading">Telemetry</div>
-                    <div class="info-value" id="gamepadUltrasonic">--- mm</div>
-                    <div class="info-subtle" id="telemetryTimestamp">
-                      Waiting for data
-                    </div>
-                  </div>
-
-                  <div class="info-panel mt-3">
-                    <div
-                      class="d-flex align-items-center justify-content-between"
-                    >
-                      <span class="info-heading mb-0">Brake</span>
-                      <span class="badge bg-secondary" id="brakeBadge"
-                        >Released</span
-                      >
-                    </div>
-                    <div
-                      class="d-flex align-items-center justify-content-between mt-2"
-                    >
-                      <span class="info-heading mb-0">Motor Speeds</span>
-                      <span class="info-value small" id="motorSpeeds"
-                        >0 | 0</span
-                      >
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="text-muted small mt-3" id="bleHint">
-                Requires Chrome (desktop or Android) with Web Bluetooth enabled.
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Right Column: Arena & Controls -->
@@ -835,7 +739,6 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
     <script src="js/simulator.js?v=13"></script>
     <script src="js/challenges.js?v=22"></script>
     <script src="js/mazes.js?v=29"></script>
-    <script src="js/gamepad.js?v=10"></script>
     <script src="js/aidriver-stub.js?v=21"></script>
     <script src="js/python-runner.js?v=59"></script>
     <script src="js/editor.js?v=13"></script>

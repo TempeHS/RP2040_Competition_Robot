@@ -161,11 +161,6 @@ function init() {
   // Initialize Python Runner
   PythonRunner.init();
 
-  // Initialize Gamepad
-  if (typeof Gamepad !== "undefined") {
-    Gamepad.init();
-  }
-
   // Initialize ACE Editor
   initEditor();
 
@@ -226,7 +221,6 @@ function cacheElements() {
     challengeDropdown: document.getElementById("challengeDropdown"),
 
     // Panels
-    gamepadPanel: document.getElementById("gamepadPanel"),
     mazeSelector: document.getElementById("mazeSelector"),
     canvasContainer: document.getElementById("canvasContainer"),
     loadingOverlay: document.getElementById("loadingOverlay"),
@@ -402,7 +396,6 @@ function setupEventListeners() {
     });
   });
 
-  // Gamepad buttons
   // Window resize
   window.addEventListener("resize", resizeCanvas);
 
@@ -501,35 +494,6 @@ function loadChallenge(challengeId) {
   // Show/hide maze selector when challenge uses a maze
   const hasMaze = challenge && challenge.maze;
   App.elements.mazeSelector.classList.toggle("d-none", !hasMaze);
-
-  // Show/hide gamepad for challenges with gamepadEnabled and adjust editor height
-  const isGamepadChallenge = challenge && challenge.gamepadEnabled === true;
-  App.elements.gamepadPanel.classList.toggle("d-none", !isGamepadChallenge);
-
-  // Explicitly add/remove gamepad-mode class based on challenge type
-  const editorEl = document.getElementById("editor");
-  const editorCardEl = document.getElementById("editorCard");
-  if (isGamepadChallenge) {
-    editorEl.classList.add("gamepad-mode");
-    editorCardEl.classList.add("gamepad-mode");
-  } else {
-    editorEl.classList.remove("gamepad-mode");
-    editorCardEl.classList.remove("gamepad-mode");
-  }
-
-  // Resize ACE editor when toggling gamepad mode
-  if (typeof Editor !== "undefined" && Editor.resize) {
-    setTimeout(() => Editor.resize(), 100);
-  }
-
-  // Enable/disable gamepad control
-  if (typeof Gamepad !== "undefined") {
-    if (isGamepadChallenge) {
-      Gamepad.enable();
-    } else {
-      Gamepad.disable();
-    }
-  }
 
   // Clear any existing error markers
   Editor.clearAllMarkers();

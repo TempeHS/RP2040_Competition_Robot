@@ -6,7 +6,7 @@ All simulator UI wiring originates from `init()` in app/js/app.js. During bootst
 
 - Extend `cacheElements()` with the new control IDs so downstream helpers can reference them.
 - Hook into `setupEventListeners()` to attach behaviour at load time.
-- Update the HTML in app/index.html to place new controls inside the existing layout containers (`#controls`, `#gamepadPanel`, etc.).
+- Update the HTML in app/index.html to place new controls inside the existing layout containers (`#controls`, etc.).
 
 ## Styling Panels
 
@@ -44,7 +44,3 @@ When introducing a new control surface (e.g., telemetry charts):
 2. Define supporting styles in app/css/style.css.
 3. Cache the root element in `cacheElements()` and initialize any required components during `init()`.
 4. If the panel listens to simulator updates, subscribe through existing emitters (e.g., `Logger`, `DebugPanel`, or the `Simulator` render loop) to avoid redundant polling.
-
-## Gamepad Layout Tweaks
-
-The joystick is rendered with absolute positioning inside `#joystickTrack` and sized relative to the container. Update the CSS variables in `.joystick` rules to adjust size or border radii. The logic in `updateJoystickVisual()` automatically accommodates the new geometry, so no JavaScript changes are needed unless the element IDs change.

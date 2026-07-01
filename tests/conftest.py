@@ -16,6 +16,16 @@ for _path in (REPO_ROOT, PROJECT_DIR, LIB_DIR, TESTS_DIR):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
+# These files are on-robot diagnostic scripts (run from the Pico), not host
+# unit tests. They share the ``test_`` prefix for historical reasons but contain
+# no test functions and drive real hardware at import, so keep them out of the
+# host pytest run.
+collect_ignore = [
+    "test_pid_steer_direction.py",
+    "test_pid_sensor_noise.py",
+    "hardware_full_board_test.py",
+]
+
 
 def _ensure_time_helpers():
     """Provide MicroPython-style helpers on CPython's time module for tests."""
@@ -57,10 +67,12 @@ def _install_machine_stub():
         IN = 0
         OUT = 1
         PULL_UP = 2
+        PULL_DOWN = 3
 
-        def __init__(self, pin_id, mode=None):
+        def __init__(self, pin_id, mode=None, pull=None):
             self.id = pin_id
             self.mode = mode
+            self.pull = pull
             self._value = 1
 
         def on(self):

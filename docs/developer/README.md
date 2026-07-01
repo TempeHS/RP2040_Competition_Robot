@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AIDriver simulator is a browser-hosted training environment that mirrors the behaviour of the classroom HM-10 robot kit. This guide introduces the project layout, highlights the key runtime modules, and explains how the simulator wraps the Skulpt Python interpreter to execute learner submissions. Use these pages to navigate the JavaScript codebase, extend features, and diagnose issues.
+The AIDriver simulator is a browser-hosted training environment that mirrors the behaviour of the classroom robot kit. This guide introduces the project layout, highlights the key runtime modules, and explains how the simulator wraps the Skulpt Python interpreter to execute learner submissions. Use these pages to navigate the JavaScript codebase, extend features, and diagnose issues.
 
 ## Quick Start
 
@@ -18,7 +18,7 @@ The AIDriver simulator is a browser-hosted training environment that mirrors the
 - [Simulator Engine](simulator-engine.md) – physics model, collision handling, and sensor simulation
 - [Validation Pipeline](validator.md) – static analysis safeguards applied to learner code
 - [Challenge Data](challenges.md) – challenge metadata fields, success criteria, and maze integration
-- [Hardware Integration](hardware-integration.md) – HM-10 control flow and telemetry handling
+- [Hardware Integration](hardware-integration.md) – I²C peripherals (IMU, colour, OLED) and the rescue-kit servo
 - [Firmware Parity](firmware-parity.md) – MicroPython shim coverage and known differences
 - [UI Customization](ui-customization.md) – extending panels, styling, and editor tweaks
 - [Testing Strategy](testing.md) – automated coverage and manual test workflows
@@ -33,4 +33,4 @@ The AIDriver simulator is a browser-hosted training environment that mirrors the
 
 - Review console output in the browser for `DebugPanel` logs
 - Consult the unit and integration tests in `app/tests/` for usage examples
-- When touching Skulpt execution paths, rerun the Gamepad and Full Application integration suites
+- When touching Skulpt execution paths, rerun the Full Application integration suite

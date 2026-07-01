@@ -3,7 +3,7 @@
 Testing lives inside `app/tests/` and uses Jest with the `jest-environment-jsdom` environment. Suites are organised by type:
 
 - `tests/unit/` – Focused coverage for individual modules like the simulator engine, validator, and editor wiring
-- `tests/integration/` – Cross-module scenarios covering Python execution, BLE gamepad integration, and end-to-end challenge completion
+- `tests/integration/` – Cross-module scenarios covering Python execution and end-to-end challenge completion
 - `tests/lint/` – Static analysis harnesses that ensure every HTML and JavaScript file under `app/` stays standards-compliant
 - Standalone HTML harnesses (e.g. `tests/integration-test.html`) exist for manual verification in the browser
 
@@ -31,7 +31,7 @@ Coverage data is emitted to `app/coverage/` in multiple formats (`lcov`, `json`,
 
 1. Place unit tests under `tests/unit/` and mirror the module name, e.g. `simulator.test.js`
 2. Import modules via the `@/` alias (mapped to `app/js/` in `package.json`)
-3. When simulating Skulpt or BLE behaviour, isolate external dependencies with Jest mocks to avoid brittle async behaviour
+3. When simulating Skulpt behaviour, isolate external dependencies with Jest mocks to avoid brittle async behaviour
 4. Keep test data deterministic; the simulator’s noise functions can be stubbed by overriding `Math.random`
 
 ## Manual Verification

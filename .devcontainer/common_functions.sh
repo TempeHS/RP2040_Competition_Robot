@@ -35,7 +35,6 @@ export CUSTOM_FILES=(
     "$PROJECT_LIB_DIR/lsm6ds3.py"
     "$PROJECT_LIB_DIR/tcs34725.py"
     "$PROJECT_LIB_DIR/ssd1306.py"
-    "$PROJECT_LIB_DIR/maze_controller.py"
 )
 
 # Files to copy to filesystem (not frozen)
@@ -151,7 +150,7 @@ clean_custom_modules() {
     log_info "🧹 Cleaning existing custom modules..."
     
     # Define module filenames to clean from frozen modules
-    local frozen_modules=("aidriver.py" "eventlog.py" "grove_ultrasonic.py" "lsm6ds3.py" "tcs34725.py" "ssd1306.py" "maze_controller.py")
+    local frozen_modules=("aidriver.py" "eventlog.py" "grove_ultrasonic.py" "lsm6ds3.py" "tcs34725.py" "ssd1306.py")
     local filesystem_modules=("main.py")
     
     # Clean frozen modules
@@ -207,7 +206,8 @@ copy_custom_modules() {
             if [[ -f "$file" ]]; then
                 local filename=$(basename "$file")
                 
-                # main.py goes to filesystem, others go to frozen modules
+                # main.py is the run-script and goes to the filesystem;
+                # all other root .py files go to frozen modules.
                 if [[ "$filename" == "main.py" ]]; then
                     echo "Copying $filename to filesystem"
                     cp "$file" "$filesystem_target_dir/"

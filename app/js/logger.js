@@ -20,7 +20,6 @@ const Logger = {
     SIMULATOR: "Simulator",
     EDITOR: "Editor",
     CHALLENGE: "Challenge",
-    GAMEPAD: "Gamepad",
     DEBUG_PANEL: "DebugPanel",
     COMMAND: "Command",
     STATE: "State",
@@ -165,7 +164,7 @@ const Logger = {
       "STATE",
       `${component}.${property} changed`,
       { from: oldValue, to: newValue },
-      "debug"
+      "debug",
     );
   },
 
@@ -326,7 +325,7 @@ const Logger = {
     report += "─".repeat(40) + "\n";
     if (state.robot) {
       report += `  Position: (${state.robot.x.toFixed(
-        1
+        1,
       )}, ${state.robot.y.toFixed(1)}) mm\n`;
       report += `  Heading: ${state.robot.heading.toFixed(1)}°\n`;
       report += `  Motor Speeds: L=${state.robot.leftSpeed}, R=${state.robot.rightSpeed}\n`;
@@ -355,7 +354,7 @@ const Logger = {
       report += `  Goal: ${state.challenge.goal}\n`;
       if (state.challenge.successCriteria) {
         report += `  Success Criteria: ${JSON.stringify(
-          state.challenge.successCriteria
+          state.challenge.successCriteria,
         )}\n`;
       }
     } else {

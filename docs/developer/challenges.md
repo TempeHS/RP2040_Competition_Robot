@@ -22,7 +22,6 @@ Challenge metadata lives in `app/js/challenges.js`. Each entry describes how the
 | `path`            | `null \| object`                                                 | Optional visual guide for the simulator overlay.                   |
 | `obstacles`       | `Array<{ x: number, y: number, width: number, height: number }>` | Static rectangular obstacles injected into the simulator.          |
 | `maze`            | `string`                                                         | Maze id passed to the maze renderer (Challenge 6 only).            |
-| `gamepadEnabled`  | `boolean`                                                        | Enables gamepad telemetry panel (Challenge 7).                     |
 
 ### Success Criteria Variants
 
@@ -33,7 +32,6 @@ Challenge metadata lives in `app/js/challenges.js`. Each entry describes how the
 - `complete_circle`: Validates circular driving via `centerTolerance` and `minRotation` plus path alignment.
 - `stop_at_distance`: Ensures the robot stops within `[min, max]` millimetres of a target wall.
 - `complete_square`, `figure_eight`, `return_to_start`: Use geometric heuristics baked into their respective helpers.
-- `manual`: Marks gamepad activities as unscored (`noAutoCheck`).
 
 ### Path Helpers
 

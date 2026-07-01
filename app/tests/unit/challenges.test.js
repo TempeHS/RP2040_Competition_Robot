@@ -274,12 +274,6 @@ my_robot = AIDriver("left")
         expect(challenge.startCode).toContain("aidriver");
       });
     });
-
-    test("no challenge should reference gamepad", () => {
-      ChallengesImpl.getAll().forEach((challenge) => {
-        expect(challenge.startCode.toLowerCase()).not.toContain("gamepad");
-      });
-    });
   });
 
   describe("PID Progression", () => {
