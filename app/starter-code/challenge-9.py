@@ -34,6 +34,11 @@ FORWARD_DT = 0.05  # seconds per forward step
 WALL_FOUND_DISTANCE = 300  # stop when a wall is this close ahead
 FORWARD_MAX_STEPS = 200  # safety cap
 
+# Grid-based wall estimate (7x7 arena uses 290 mm cell pitch).
+GRID_CELL_MM = 290  # one maze section width
+GRID_WALL_OFFSET_MM = 6  # expected panel/clearance offset used in estimate
+GRID_ERROR_CLAMP_MM = 25  # limit compensation so noise cannot dominate
+
 state = "FOLLOW_WALL"
 
 
@@ -103,12 +108,40 @@ def choose_open_direction():
 
 def drive_forward_to_wall():
     """STEPS 3-4: drive straight on the gyro until a wall is found ahead."""
+
+    def estimate_section_error(distance_mm):
+        """Estimate distance error to nearest theoretical wall line."""
+        if distance_mm == -1:
+            return 0
+
+        sections = int(
+            (distance_mm - GRID_WALL_OFFSET_MM + (GRID_CELL_MM / 2)) / GRID_CELL_MM
+        )
+        if sections < 1:
+            sections = 1
+
+        theoretical = (sections * GRID_CELL_MM) + GRID_WALL_OFFSET_MM
+        error_mm = int(theoretical - distance_mm)
+
+        if error_mm > GRID_ERROR_CLAMP_MM:
+            return GRID_ERROR_CLAMP_MM
+        if error_mm < -GRID_ERROR_CLAMP_MM:
+            return -GRID_ERROR_CLAMP_MM
+        return error_mm
+
     heading = 0.0
     steps = 0
     while steps < FORWARD_MAX_STEPS:
         front = my_robot.read_distance()
-        if front != -1 and front <= WALL_FOUND_DISTANCE:
+
+        # Use side-distance section estimate to compensate the front stop point.
+        side = my_robot.read_distance_2()
+        section_error = estimate_section_error(side)
+        wall_stop_target = WALL_FOUND_DISTANCE + section_error
+
+        if front != -1 and front <= wall_stop_target:
             break  # found a wall to follow again
+
         gz = my_robot.read_gyro_z_dps()
         heading = heading + gz * FORWARD_DT
         correction = HEADING_Kp * heading

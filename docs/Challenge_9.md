@@ -16,7 +16,7 @@ When the robot enters a black zone, it runs the recovery sequence, reacquires a 
 
 ## Maze Situation
 
-- Maze feature: black no-go patch darker than floor.
+- Maze feature: one black no-go patch sized exactly 290 mm x 290 mm.
 - Trigger condition expected in code: polled black classification in the control loop.
 - New behavior introduced: RECOVER state using heading-stabilized reverse and forward motion.
 - Why previous challenge fails: bright-marker interrupt logic does not detect dark black regions.
@@ -37,6 +37,7 @@ Unchanged: follow wall logic remains the primary navigation mode outside recover
 | New     | `REVERSE_SPEED`, `REVERSE_DT`, `REVERSE_CLEAR_STEPS`, `REVERSE_MAX_STEPS` | Reverse phase controls and safety cap.         |
 | New     | `OPEN_SPACE_DISTANCE`                                                     | Open-space decision threshold.                 |
 | New     | `FORWARD_SPEED`, `FORWARD_DT`, `WALL_FOUND_DISTANCE`, `FORWARD_MAX_STEPS` | Forward search controls and safety cap.        |
+| New     | `GRID_CELL_MM`, `GRID_WALL_OFFSET_MM`, `GRID_ERROR_CLAMP_MM` | Section-based wall estimate compensation. |
 | Removed | Interrupt-only marker assumption                                          | Black requires polling classification.         |
 
 ## Algorithm Flow
@@ -92,13 +93,15 @@ Optional debug edits:
 | `OPEN_SPACE_DISTANCE` | mm           | Decide which side is open             | 400                 | Wrong turn choice      | Too conservative turn choice |
 | `FORWARD_SPEED`       | PWM          | Forward search speed                  | 170                 | Slow reacquire         | Overshoot wall               |
 | `WALL_FOUND_DISTANCE` | mm           | Wall reacquire threshold              | 300                 | Missed wall pickup     | Early stop                   |
+| `GRID_WALL_OFFSET_MM` | mm           | Theoretical wall offset in section estimate | 6             | Persistent under-stop  | Persistent over-stop         |
+| `GRID_ERROR_CLAMP_MM` | mm           | Clamp for section compensation        | 25                  | Too little correction  | Overreacts to noisy readings |
 
 ## Tuning Guide
 
 1. Verify black detection first.
 2. Adjust the reverse phase until black is cleared reliably.
 3. Adjust open-space turn selection and forward wall pickup.
-4. Verify reverse and forward safety caps stay in place.
+4. Verify section-based compensation improves wall reacquisition without oscillation.
 
 ## Debug Checklist
 
@@ -115,6 +118,7 @@ Optional debug edits:
 | Recovers but re-enters black  | Reverse clear window too short    | Track black->non-black transition count | Increase `REVERSE_CLEAR_STEPS` |
 | Fails to find wall after turn | Forward stop threshold too strict | Log front distance during search        | Increase `WALL_FOUND_DISTANCE` |
 | Recovery path curves badly    | Heading hold gain too low/high    | Log heading drift during recovery       | Retune `HEADING_Kp`            |
+| Reacquire point jumps around  | Section compensation too aggressive | Log section estimate and stop target  | Lower `GRID_ERROR_CLAMP_MM`    |
 
 ## Exit Check
 
@@ -135,5 +139,5 @@ Use this exact sequence in RECOVER state:
 3. Reverse straight with heading hold until black is cleared for `REVERSE_CLEAR_STEPS` loops.
 4. Read side distance and choose turn direction toward open space.
 5. Turn 90 deg using `my_robot.turn_90(turn_dir)`.
-6. Drive forward with heading hold until front wall is found (`front <= WALL_FOUND_DISTANCE`) or step cap is reached.
+6. Drive forward with heading hold and section-based wall compensation until the front wall stop target is met.
 7. Brake and return to FOLLOW_WALL.

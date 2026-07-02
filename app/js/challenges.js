@@ -62,14 +62,15 @@ const Challenges = (function () {
         "Keep BASE_SPEED - MAX_STEERING > 64 (dead zone)",
         "drive() handles signed speeds and the dead zone automatically",
       ],
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      spawnXRange: { min: 110, max: 410 },
+      startPosition: { x: 145, y: 1885, heading: 0 },
+      spawnXRange: { min: 80, max: 220 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 100, y: 100, width: 300, height: 200 },
       },
       path: null,
       obstacles: [],
+      maze: "straight_corridor",
     },
 
     // Challenge 2: PD Controller — Off-Centre Start
@@ -90,14 +91,16 @@ const Challenges = (function () {
         "Start with Kd = 0.3, then tune",
         "Remember to save previous_error each loop",
       ],
-      startPosition: { x: 150, y: 1700, heading: 0 },
-      spawnXRange: { min: 110, max: 410 },
+      startPosition: { x: 145, y: 1885, heading: 0 },
+      spawnXRange: { min: 70, max: 220 },
+      spawnHeadingRange: { min: -20, max: 20 },
       successCriteria: {
         type: "reach_zone",
         zone: { x: 100, y: 100, width: 300, height: 200 },
       },
       path: null,
       obstacles: [],
+      maze: "straight_corridor",
     },
 
     // Challenge 3: Full PID — L-Shaped Corridor
@@ -118,14 +121,14 @@ const Challenges = (function () {
         "Clamp integral to INTEGRAL_MAX to prevent runaway",
         "Reset integral to 0 when sensor returns -1",
       ],
-      startPosition: { x: 300, y: 1700, heading: 0 },
-      spawnXRange: { min: 110, max: 410 },
+      startPosition: { x: 145, y: 1885, heading: 0 },
       successCriteria: {
         type: "reach_zone",
-        zone: { x: 100, y: 100, width: 200, height: 200 },
+        zone: { x: 870, y: 0, width: 290, height: 290 },
       },
       path: null,
       obstacles: [],
+      maze: "corner",
     },
 
     // Challenge 4: Corner Detection — single 90° turn
@@ -186,22 +189,22 @@ const Challenges = (function () {
       maze: "outside_corners",
     },
 
-    // Challenge 6: Full Maze — Right at Dead Ends, Left at Nibs
+    // Challenge 6: Dead-End Detection — front-triggered turn behaviour
     6: {
       id: 6,
       title: "Dead End Detection",
-      subtitle: "Dead Ends + Nibs",
+      subtitle: "Front Trigger Priority",
       icon: "bi-arrow-counterclockwise",
       menuGroup: "advanced",
       difficulty: DIFFICULTY.MEDIUM,
       description:
-        "Combine both turn behaviours into one solver: a wall ahead (dead end) → turn RIGHT, the side wall ending (nib) → turn LEFT. Both reuse the SAME held gyro turn PID from Challenge 4.",
-      goal: "Follow the wall, turn right at the dead end and left at nibs, and reach the exit.",
+        "Focus on front-triggered turning in a dead-end channel: when a wall is ahead, brake and run the SAME held gyro turn PID from Challenge 4 to rotate away from the blockage and continue.",
+      goal: "Follow the wall, detect the dead end with the front sensor, turn away cleanly, and reach the exit.",
       hints: [
-        "Front wall (front <= FRONT_STOP_DISTANCE) → dead end → turn RIGHT",
-        "Side sensor open (side == -1) → nib → turn LEFT",
-        "Both turns reuse the SAME gyro turn PID — keep your tuned C4 gains",
-        "wall_sign picks the rotation direction for each case",
+        "Front wall (front <= FRONT_STOP_DISTANCE) is the primary trigger in this maze",
+        "Use the SAME held gyro turn PID from C4 — keep your tuned turn gains",
+        "Brake, rotate away from the dead end, then reacquire side-wall control",
+        "wall_sign still determines turn direction for left/right wall mode",
         "Reset side_integral and side_previous_error after every turn",
       ],
       startPosition: { x: 200, y: 1700, heading: 0 },
@@ -342,13 +345,14 @@ const Challenges = (function () {
       path: null,
       obstacles: [],
       maze: null,
-      // A single BLACK no-go patch across the left channel. Black absorbs the
-      // LED so its clear value (~30) sits well below the plain floor (~120).
+      // A single BLACK no-go patch occupying exactly one 290x290 grid cell.
+      // Black absorbs the LED so its clear value (~30) sits well below the
+      // plain floor (~120).
       colorZones: [
         {
           x: 0,
           y: 580,
-          width: 580,
+          width: 290,
           height: 290,
           rgb: [10, 10, 10, 30],
           color: "black",

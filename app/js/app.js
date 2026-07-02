@@ -491,9 +491,14 @@ function loadChallenge(challengeId) {
     item.classList.toggle("active", isActive);
   });
 
-  // Show/hide maze selector when challenge uses a maze
-  const hasMaze = challenge && challenge.maze;
-  App.elements.mazeSelector.classList.toggle("d-none", !hasMaze);
+  // Show maze selector only for challenges that explicitly opt in.
+  // This keeps guided challenges locked to their intended maze layouts.
+  const showMazeSelector = !!(
+    challenge &&
+    challenge.maze &&
+    challenge.allowMazeSelector === true
+  );
+  App.elements.mazeSelector.classList.toggle("d-none", !showMazeSelector);
 
   // Clear any existing error markers
   Editor.clearAllMarkers();

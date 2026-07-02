@@ -1,39 +1,39 @@
-# Challenge 6: Dead Ends and Nibs - One Machine, Both Turns
+# Challenge 6: Dead-End Turns - Front Trigger Priority
 
 ## Purpose
 
-Demonstrate that the same three-state machine handles mixed inside and outside corners without adding new states.
+Validate robust front-trigger dead-end handling using the existing state-machine structure and your held gyro turn PID.
 
 ## Success Criteria
 
-The robot navigates the mixed-corner maze, selecting the correct turn behavior at each corner type, and reaches the green exit zone.
+The robot detects dead ends reliably, turns away cleanly, and reaches the green exit zone.
 
 ## Before You Begin
 
-1. Complete Challenge 5 with reliable nib behavior.
+1. Complete Challenge 5 with reliable turn behavior.
 2. Open simulator Challenge 6.
 3. Carry forward all tuned values.
 
 ## Maze Situation
 
-- Maze feature: both front-blocking dead ends and outside-corner nibs.
-- Trigger condition expected in code: front trigger and side-loss trigger in defined priority.
-- New behavior introduced: none, this is integration and robustness tuning.
-- Why previous challenge may fail: challenge-specific tuning may not generalize to mixed geometry.
+- Maze feature: front-blocking dead-end channel.
+- Trigger condition expected in code: `front <= FRONT_STOP_DISTANCE`.
+- New behavior introduced: none, this is front-trigger reliability tuning.
+- Why previous challenge may fail: turn timing and front threshold may be marginal across repeated dead-end entries.
 
 ## What Is New In This Challenge
 
-New: robustness validation and trigger priority discipline.
+New: robustness validation of front-trigger turn behavior.
 
-Unchanged: same three states (`FOLLOW_WALL`, `TURN`, `NIB_WALL`).
+Unchanged: same core control-loop structure and turn PID from earlier challenges.
 
 ## Carry Forward From Previous Challenge
 
-| Group   | Variable                                | Notes                            |
-| ------- | --------------------------------------- | -------------------------------- |
-| Reused  | All side, front, turn, and nib tunables | Same machine, new maze geometry. |
-| New     | None                                    | No new algorithm blocks.         |
-| Removed | None                                    | All three states remain.         |
+| Group   | Variable                                   | Notes                         |
+| ------- | ------------------------------------------ | ----------------------------- |
+| Reused  | Side PID, front trigger, and turn tunables | Same machine, dead-end focus. |
+| New     | None                                       | No new algorithm blocks.      |
+| Removed | None                                       | Existing structure is reused. |
 
 ## Algorithm Flow
 
@@ -41,26 +41,22 @@ Unchanged: same three states (`FOLLOW_WALL`, `TURN`, `NIB_WALL`).
 stateDiagram-v2
     [*] --> FOLLOW_WALL
     FOLLOW_WALL --> TURN: front blocked
-    FOLLOW_WALL --> NIB_WALL: side wall lost
     TURN --> FOLLOW_WALL: turn complete
-    NIB_WALL --> FOLLOW_WALL: wrap complete
 ```
 
 ### State Table
 
-| State name    | Responsibilities                            | Exit conditions              |
-| ------------- | ------------------------------------------- | ---------------------------- |
-| `FOLLOW_WALL` | Control side distance and evaluate triggers | Exit to `TURN` or `NIB_WALL` |
-| `TURN`        | Handle inside corners and dead ends         | Return to `FOLLOW_WALL`      |
-| `NIB_WALL`    | Handle outside corners                      | Return to `FOLLOW_WALL`      |
+| State name    | Responsibilities                                 | Exit conditions                      |
+| ------------- | ------------------------------------------------ | ------------------------------------ |
+| `FOLLOW_WALL` | Control side distance and evaluate front trigger | Exit to `TURN` when front is blocked |
+| `TURN`        | Handle dead-end turns                            | Return to `FOLLOW_WALL`              |
 
 ### Trigger Table
 
-| Trigger condition              | From state           | To state      | Priority |
-| ------------------------------ | -------------------- | ------------- | -------- |
-| `front <= FRONT_STOP_DISTANCE` | `FOLLOW_WALL`        | `TURN`        | Highest  |
-| side lost for confirm window   | `FOLLOW_WALL`        | `NIB_WALL`    | High     |
-| Completion of turn/wrap        | `TURN` or `NIB_WALL` | `FOLLOW_WALL` | High     |
+| Trigger condition              | From state    | To state      | Priority |
+| ------------------------------ | ------------- | ------------- | -------- |
+| `front <= FRONT_STOP_DISTANCE` | `FOLLOW_WALL` | `TURN`        | Highest  |
+| Completion of turn             | `TURN`        | `FOLLOW_WALL` | High     |
 
 ## Starter Code Contract
 
@@ -81,34 +77,33 @@ Optional debug edits:
 
 ## Tunables
 
-| Name                  | Unit | Purpose                  | Typical start value | Symptoms when too low | Symptoms when too high |
-| --------------------- | ---- | ------------------------ | ------------------- | --------------------- | ---------------------- |
-| `BASE_SPEED`          | PWM  | Global traversal speed   | 190 to 210          | Slow run              | Unstable corners       |
-| `FRONT_STOP_DISTANCE` | mm   | Dead-end trigger         | 120                 | Late turns            | Early turns            |
-| `NIB_FORWARD_BEFORE`  | s    | Outside-corner clearance | 0.25                | Corner clip           | Too wide wrap          |
-| `NIB_FORWARD_AFTER`   | s    | Reacquire alignment      | 0.30                | Missed wall           | Overrun                |
+| Name                  | Unit | Purpose                | Typical start value | Symptoms when too low | Symptoms when too high |
+| --------------------- | ---- | ---------------------- | ------------------- | --------------------- | ---------------------- |
+| `BASE_SPEED`          | PWM  | Global traversal speed | 190 to 210          | Slow run              | Unstable corners       |
+| `FRONT_STOP_DISTANCE` | mm   | Dead-end trigger       | 120                 | Late turns            | Early turns            |
+| `turn_Kp`             | gain | Turn response strength | 4.5                 | Under-rotation        | Overshoot risk         |
+| `turn_Kd`             | gain | Turn damping           | 0.6                 | Wobble                | Sluggish turn          |
 
 ## Tuning Guide
 
 1. Verify dead-end turns first.
-2. Verify nib wraps second.
+2. Adjust front threshold and turn gains for repeatable corner exits.
 3. Adjust speed downward if transitions become unstable.
 
 ## Debug Checklist
 
 - [ ] Dead ends trigger `TURN` consistently.
-- [ ] Nibs trigger `NIB_WALL` consistently.
 - [ ] Trigger precedence does not conflict.
 - [ ] Robot reaches exit across repeated runs.
 
 ## Common Failure Modes
 
-| Symptom                           | Root cause                    | Verification step                | Fix                                |
-| --------------------------------- | ----------------------------- | -------------------------------- | ---------------------------------- |
-| Wrong turn type selected          | Trigger precedence issue      | Log trigger checks per loop      | Enforce front trigger first        |
-| Works on dead ends, fails on nibs | Wrap timing not robust        | Isolate nib sections in run logs | Retune nib timings                 |
-| Works on nibs, fails on dead ends | Front approach too aggressive | Observe pre-turn speed           | Increase slowdown or stop distance |
-| Random instability                | Speed too high                | Compare behavior at lower speed  | Reduce `BASE_SPEED`                |
+| Symptom                  | Root cause               | Verification step                 | Fix                            |
+| ------------------------ | ------------------------ | --------------------------------- | ------------------------------ |
+| Wrong turn type selected | Trigger precedence issue | Log trigger checks per loop       | Enforce front trigger first    |
+| Misses dead-end trigger  | Front threshold too low  | Log front distance at turn point  | Increase `FRONT_STOP_DISTANCE` |
+| Over-rotates at dead end | Turn damping too low     | Log heading error near completion | Increase `turn_Kd`             |
+| Random instability       | Speed too high           | Compare behavior at lower speed   | Reduce `BASE_SPEED`            |
 
 ## Exit Check
 
