@@ -1,167 +1,126 @@
-# Challenge 4: Corner Detection — Your First State Machine
+# Challenge 4: Corner Detection - First State Machine
 
-Until now your robot did **one thing**: hug the side wall with a PID. A real maze needs the robot to
-**switch behaviours** — follow the wall, then stop and turn at a corner, then follow again. The clean
-way to manage "which behaviour am I doing right now?" is a **state machine**.
+## Purpose
 
-In this challenge you build a two-state machine and write the **gyro turn** that every later
-challenge reuses.
-
-You will learn:
-
-- What a **finite state machine (FSM)** is and why robots use them.
-- How a **trigger** moves the robot from one state to another.
-- How to turn an exact 90° with a **closed-loop gyro PID** you write yourself.
-
----
+Move from a single control loop to a two-state machine so the robot can switch between wall following and turning when the front wall blocks the path.
 
 ## Success Criteria
 
-My robot follows the wall, **detects the wall ahead**, **turns 90° away from it**, and reaches the
-**green exit zone**.
-
----
+The robot follows the wall, detects a front wall, performs a 90 deg gyro turn away from the wall, and reaches the green exit zone.
 
 ## Before You Begin
 
-1. Complete [Challenge 3](docs.html?doc=Challenge_3) — you need a working side-wall PID.
-2. Open the **Simulator** and select **Challenge 4**.
-3. Run your Challenge 3 code here first — it drives straight into the corner wall, because it only
-   looks sideways. That is the problem this challenge solves.
+1. Complete Challenge 3 with stable side PID.
+2. Open simulator Challenge 4.
+3. Confirm your wall side selection in `AIDriver("left")` or `AIDriver("right")`.
 
----
+## Maze Situation
 
-## Concept 1 — What is a state machine?
+- Maze feature: inside corner with wall directly ahead.
+- Trigger condition expected in code: `front <= FRONT_STOP_DISTANCE`.
+- New behavior introduced: explicit state transition from Follow wall state to Turn state.
+- Why previous challenge fails: side-only control cannot respond to a front blockage.
 
-A **state machine** says: _the robot is always in exactly one named **state**, and a **trigger**
-moves it to another state._ Each state is a small, simple behaviour. You never mix them up, because
-only one runs at a time.
+## What Is New In This Challenge
 
-Challenge 4 has **two states**:
+New: finite state machine with two states.
 
-| State         | What the robot does                                 |
-| ------------- | --------------------------------------------------- |
-| `FOLLOW_WALL` | hold the side wall at a fixed distance with the PID |
-| `TURN`        | a wall is close ahead → spin 90° away from the wall |
+Unchanged: side PID logic from Challenge 3 in Follow wall state.
+
+State delta:
+
+1. `FOLLOW_WALL` handles normal corridor control.
+2. `TURN` performs gyro-closed-loop 90 deg turn.
+
+## Carry Forward From Previous Challenge
+
+| Group   | Variable                                                 | Notes                                            |
+| ------- | -------------------------------------------------------- | ------------------------------------------------ |
+| Reused  | `BASE_SPEED`, side PID tunables                          | Follow wall behavior stays the same.             |
+| New     | `FRONT_SLOW_DISTANCE`, `FRONT_STOP_DISTANCE`, `FRONT_Kp` | Front approach slowdown and stop trigger.        |
+| New     | `turn_Kp`, `turn_Kd`, `turn_tolerance`                   | Gyro turn tuning.                                |
+| New     | `state`                                                  | Current FSM state label.                         |
+| Removed | None                                                     | Previous PID block is embedded in `FOLLOW_WALL`. |
+
+## Algorithm Flow
 
 ```mermaid
 stateDiagram-v2
     [*] --> FOLLOW_WALL
     FOLLOW_WALL --> TURN: front <= FRONT_STOP_DISTANCE
-    TURN --> FOLLOW_WALL: turn finished
+    TURN --> FOLLOW_WALL: turn complete
 ```
 
-In code, each state is a **function that returns the name of the next state**, and the main loop
-just runs whichever state is current:
+### State Table
 
-```python
-while True:
-    if state == "FOLLOW_WALL":
-        state = follow_wall()
-    elif state == "TURN":
-        state = turn()
-```
+| State name    | Responsibilities                                            | Exit conditions                           |
+| ------------- | ----------------------------------------------------------- | ----------------------------------------- |
+| `FOLLOW_WALL` | Run side PID, check front distance, apply approach slowdown | Exit to `TURN` when front trigger fires   |
+| `TURN`        | Brake, rotate 90 deg using gyro PID, reset side PID history | Exit to `FOLLOW_WALL` when turn completes |
 
-That is the whole pattern. Every challenge from here adds **states** and **triggers** to this same
-loop — nothing else changes.
+### Trigger Table
 
----
+| Trigger condition                              | From state    | To state      | Priority |
+| ---------------------------------------------- | ------------- | ------------- | -------- |
+| `front != -1 and front <= FRONT_STOP_DISTANCE` | `FOLLOW_WALL` | `TURN`        | High     |
+| Turn error <= tolerance                        | `TURN`        | `FOLLOW_WALL` | High     |
 
-## Concept 2 — Triggers: how a state decides to switch
+## Starter Code Contract
 
-A trigger is just a condition a state checks. `FOLLOW_WALL` reads the **front** sensor every loop. If
-a wall is close enough ahead, it returns `"TURN"` instead of steering:
+Safe to edit:
 
-```python
-front = my_robot.read_distance()
-if front != -1 and front <= FRONT_STOP_DISTANCE:
-    return "TURN"          # trigger fired — switch state
-```
+1. Front approach tunables.
+2. Turn tunables.
+3. Carry-forward side PID tunables.
 
-| Tunable               | Meaning                                               |
-| --------------------- | ----------------------------------------------------- |
-| `FRONT_STOP_DISTANCE` | how close (mm) the wall ahead must be to start a turn |
-| `FRONT_SLOW_DISTANCE` | start slowing down once the wall is within this range |
-| `FRONT_Kp`            | how hard to brake as the wall approaches              |
+Do not edit unless instructed:
 
-> **Why slow down first?** Slamming from full speed into a turn overshoots. `FOLLOW_WALL` ramps the
-> speed down as `front` shrinks (`speed = FRONT_Kp × (front − FRONT_STOP_DISTANCE)`) so the robot
-> arrives at the corner already slow.
+1. State loop dispatch.
+2. Trigger ordering.
+3. Gyro integration structure.
+4. Safety timeouts and clamps.
 
----
+Optional debug edits:
 
-## Concept 3 — The gyro turn you write once and reuse forever
+1. Print current `state`, `front`, and turn error.
 
-The `TURN` state spins the robot using the **gyroscope**, not a guessed time. The gyro reports how
-fast the robot is rotating (deg/s); add that up each loop and you know the **angle turned so far**.
-Keep spinning until you reach 90°:
+## Tunables
 
-```python
-heading = 0.0
-while (TURN_ANGLE - heading) > turn_tolerance:
-    gz = my_robot.read_gyro_z_dps()      # current spin rate, deg/s
-    heading += abs(gz) * TURN_DT         # add the angle covered this step
-    error = TURN_ANGLE - heading         # how far left to go
-    speed = turn_Kp * error + turn_Kd * (error - prev_error)
-    # ...drive the two wheels in opposite directions to spin on the spot...
-```
+| Name                  | Unit | Purpose                        | Typical start value | Symptoms when too low     | Symptoms when too high   |
+| --------------------- | ---- | ------------------------------ | ------------------- | ------------------------- | ------------------------ |
+| `FRONT_STOP_DISTANCE` | mm   | Turn trigger distance          | 120                 | Late turn, collision risk | Early turn, awkward path |
+| `FRONT_SLOW_DISTANCE` | mm   | Begin deceleration zone        | 500                 | Harsh corner entry        | Over-slow approach       |
+| `FRONT_Kp`            | gain | Approach deceleration strength | 0.8                 | Weak slowdown             | Over-braking             |
+| `turn_Kp`             | gain | Turn speed toward target angle | 4.5                 | Under-rotation            | Overshoot risk           |
+| `turn_Kd`             | gain | Turn damping                   | 0.6                 | Wobble/overshoot          | Sluggish turn            |
+| `turn_tolerance`      | deg  | Completion threshold           | 2.0                 | Never settles             | Stops too early          |
 
-This is a **PID on the turn itself**. You tune three gains here and **carry them forward to every
-later challenge**:
+## Tuning Guide
 
-| Tunable          | Meaning                                           |
-| ---------------- | ------------------------------------------------- |
-| `turn_Kp`        | how aggressively it spins toward the target angle |
-| `turn_Kd`        | damps the overshoot so it doesn't spin past 90°   |
-| `turn_tolerance` | how close (degrees) to 90° counts as "done"       |
+1. Verify front approach behavior so corner entry is controlled.
+2. Adjust turn gains for reliable 90 deg behavior.
+3. Verify side PID after turn because corner exit speed affects reacquisition.
 
-The angle (90°) is fixed; the gains decide _how briskly and precisely_ it gets there. See the
-[PID Turn Tuning Quickstart](docs.html?doc=PID_Turn_Tuning_Quickstart).
+## Debug Checklist
 
-> **Which way does it spin?** Away from the wall you follow. `gyro_turn_pid()` takes a `turn_right`
-> flag, and `my_robot.wall_sign` (−1 for a left wall) picks the direction automatically — so the
-> same code works for a left- or right-hand robot.
+- [ ] State changes from `FOLLOW_WALL` to `TURN` at expected front distance.
+- [ ] Turn completes near 90 deg without repeated oscillation.
+- [ ] Side PID re-locks after turn.
+- [ ] Robot reaches exit zone in repeated runs.
 
----
+## Common Failure Modes
 
-## What you tune in this challenge
+| Symptom                 | Root cause                               | Verification step                    | Fix                                          |
+| ----------------------- | ---------------------------------------- | ------------------------------------ | -------------------------------------------- |
+| Crashes into front wall | `FRONT_STOP_DISTANCE` too low            | Log front distance at state switch   | Increase stop distance                       |
+| Turns less than 90 deg  | `turn_Kp` too low or tolerance too large | Print final turn error               | Increase `turn_Kp` or tighten tolerance      |
+| Overshoots turn         | `turn_Kd` too low                        | Observe oscillation at end of turn   | Increase `turn_Kd`                           |
+| Jerky corner entry      | Poor front slowdown tuning               | Log approach speed vs front distance | Increase `FRONT_SLOW_DISTANCE` or `FRONT_Kp` |
 
-Everything is already wired up in the editor; the numbers start at `0`. Fill them in:
+## Exit Check
 
-| Group          | Tunables                                                       |
-| -------------- | -------------------------------------------------------------- |
-| Wall follow    | `BASE_SPEED`, `TARGET_WALL_DISTANCE`, `MAX_STEERING`           |
-| Side PID       | `side_Kp`, `side_Ki`, `side_Kd`, `side_INTEGRAL_MAX` (from C3) |
-| Front approach | `FRONT_SLOW_DISTANCE`, `FRONT_STOP_DISTANCE`, `FRONT_Kp`       |
-| Gyro turn      | `turn_Kp`, `turn_Kd`, `turn_tolerance`                         |
+Pass when the Success Criteria are met in at least 3 consecutive simulator runs.
 
-> The turn **mechanics** (`TURN_ANGLE = 90`, step time, speed limits, a safety step-cap) are filled
-> in for you — they are physics, not tuning.
+## What Is Next
 
----
-
-## Tuning guide
-
-| Observation                           | Fix                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------ |
-| Doesn't slow before the wall          | Raise `FRONT_SLOW_DISTANCE` (try 500)                                          |
-| Stops too far from the wall           | Lower `FRONT_STOP_DISTANCE` (try 120)                                          |
-| Crashes before stopping               | Raise `FRONT_STOP_DISTANCE` or `FRONT_Kp`                                      |
-| Doesn't complete a full 90°           | Raise `turn_Kp` or lower `turn_tolerance`                                      |
-| Overshoots / wobbles on the turn      | Raise `turn_Kd`                                                                |
-| Lurches sideways right after the turn | The side PID state is reset for you on entering `TURN` — check your side gains |
-
----
-
-## Try it
-
-1. Open **Challenge 4** in the editor — the two-state machine and the gyro turn are already written.
-2. Fill in the tunables above and run.
-3. Stuck? The tuned answer lives in `app/answers/challenge-4.py`, but try your own numbers first.
-
----
-
-## What's Next
-
-[Challenge 5](docs.html?doc=Challenge_5) adds a **third state** for outside corners, where the side
-wall suddenly _ends_ and the robot has to wrap around it.
+Challenge 5 adds Outside corner or nib handling with a new NIB_WALL state and wall-lost debounce logic.

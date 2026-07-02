@@ -1,122 +1,119 @@
-# Challenge 6: Dead Ends and Nibs — One Machine, Both Turns
+# Challenge 6: Dead Ends and Nibs - One Machine, Both Turns
 
-Challenge 6 introduces **no new state**. Instead you take the exact three-state machine from
-Challenge 5 and run it on a maze that has **both** kinds of corner: walls that block you from the
-**front** (dead ends / inside corners) and walls that **end** beside you (outside corners / nibs).
+## Purpose
 
-The lesson is that a well-designed state machine **scales**: the same `FOLLOW_WALL` / `TURN` /
-`NIB_WALL` states that solved one corner type also solve a maze full of mixed corners, with only
-tuning to adjust.
-
-You will learn:
-
-- How a single state machine handles **multiple corner types** with no new logic.
-- The **left-hand rule** and why it guarantees a wall is always nearby to follow.
-- How the same `gyro_turn_pid` serves both turn directions.
-
----
+Demonstrate that the same three-state machine handles mixed inside and outside corners without adding new states.
 
 ## Success Criteria
 
-My robot follows the wall through a maze of **dead ends and outside corners**, turning the correct
-way at each, and reaches the **green exit zone**.
-
----
+The robot navigates the mixed-corner maze, selecting the correct turn behavior at each corner type, and reaches the green exit zone.
 
 ## Before You Begin
 
-1. Complete [Challenge 5](docs.html?doc=Challenge_5) — carry forward every tuned value.
-2. Open the **Simulator** and select **Challenge 6**.
-3. Your Challenge 5 code already has all three states — this challenge is about **trusting the same
-   machine** on a harder maze and tuning it.
+1. Complete Challenge 5 with reliable nib behavior.
+2. Open simulator Challenge 6.
+3. Carry forward all tuned values.
 
----
+## Maze Situation
 
-## Concept 1 — The left-hand rule
+- Maze feature: both front-blocking dead ends and outside-corner nibs.
+- Trigger condition expected in code: front trigger and side-loss trigger in defined priority.
+- New behavior introduced: none, this is integration and robustness tuning.
+- Why previous challenge may fail: challenge-specific tuning may not generalize to mixed geometry.
 
-Keep one hand (say the **left**) always on the wall and you will eventually walk every corridor of a
-simply-connected maze and find the exit. The robot does the same with its **side sensor** as that
-hand. The two states that turn map directly onto the two things the "hand" meets:
+## What Is New In This Challenge
 
-| Situation             | Sensor evidence                  | State      | Turn direction         |
-| --------------------- | -------------------------------- | ---------- | ---------------------- |
-| Wall blocks the front | `front <= FRONT_STOP_DISTANCE`   | `TURN`     | **away** from the wall |
-| Side wall ends        | side lost for `NIB_CONFIRM_TIME` | `NIB_WALL` | **toward** the wall    |
+New: robustness validation and trigger priority discipline.
 
-For a **left**-hand robot that reads as "turn **right** at a dead end, **left** at a nib." The
-`my_robot.wall_sign` value flips both automatically for a right-hand robot — your code never
-hard-codes a direction.
+Unchanged: same three states (`FOLLOW_WALL`, `TURN`, `NIB_WALL`).
+
+## Carry Forward From Previous Challenge
+
+| Group   | Variable                                | Notes                            |
+| ------- | --------------------------------------- | -------------------------------- |
+| Reused  | All side, front, turn, and nib tunables | Same machine, new maze geometry. |
+| New     | None                                    | No new algorithm blocks.         |
+| Removed | None                                    | All three states remain.         |
+
+## Algorithm Flow
 
 ```mermaid
 stateDiagram-v2
     [*] --> FOLLOW_WALL
-    FOLLOW_WALL --> TURN: front blocked (dead end / inside corner)
-    FOLLOW_WALL --> NIB_WALL: side wall ended (outside corner)
-    TURN --> FOLLOW_WALL: turn finished
-    NIB_WALL --> FOLLOW_WALL: wrap finished
+    FOLLOW_WALL --> TURN: front blocked
+    FOLLOW_WALL --> NIB_WALL: side wall lost
+    TURN --> FOLLOW_WALL: turn complete
+    NIB_WALL --> FOLLOW_WALL: wrap complete
 ```
 
----
+### State Table
 
-## Concept 2 — Why no new code is needed
+| State name    | Responsibilities                            | Exit conditions              |
+| ------------- | ------------------------------------------- | ---------------------------- |
+| `FOLLOW_WALL` | Control side distance and evaluate triggers | Exit to `TURN` or `NIB_WALL` |
+| `TURN`        | Handle inside corners and dead ends         | Return to `FOLLOW_WALL`      |
+| `NIB_WALL`    | Handle outside corners                      | Return to `FOLLOW_WALL`      |
 
-Each loop, `FOLLOW_WALL` checks the **front** trigger first, then the **side-lost** trigger, then
-otherwise steers with the PID. That ordering already covers every case in this maze:
+### Trigger Table
 
-```python
-def follow_wall():
-    front = my_robot.read_distance()
-    if front != -1 and front <= FRONT_STOP_DISTANCE:
-        return "TURN"            # dead end / inside corner
+| Trigger condition              | From state           | To state      | Priority |
+| ------------------------------ | -------------------- | ------------- | -------- |
+| `front <= FRONT_STOP_DISTANCE` | `FOLLOW_WALL`        | `TURN`        | Highest  |
+| side lost for confirm window   | `FOLLOW_WALL`        | `NIB_WALL`    | High     |
+| Completion of turn/wrap        | `TURN` or `NIB_WALL` | `FOLLOW_WALL` | High     |
 
-    side = my_robot.read_distance_2()
-    if side is lost for long enough:
-        return "NIB_WALL"        # outside corner
+## Starter Code Contract
 
-    ...run the side PID...        # normal wall following
-    return "FOLLOW_WALL"
-```
+Safe to edit:
 
-A dead end and an outside corner can never both be true at the same instant, so a single pass of the
-machine always picks the right one. This is the payoff of the state-machine design: **new corner
-types are new states, not tangled `if`/`else` branches.**
+1. Tunables only.
+2. Speed and distance thresholds for this maze.
 
----
+Do not edit unless instructed:
 
-## What you tune in this challenge
+1. State list.
+2. Trigger priority.
+3. Shared control-loop skeleton.
 
-There are **no new parameters**. You re-use everything from Challenges 4 and 5 and adjust for this
-maze's geometry:
+Optional debug edits:
 
-| Group    | What to revisit for this maze                                                |
-| -------- | ---------------------------------------------------------------------------- |
-| Front    | `FRONT_STOP_DISTANCE` / `FRONT_SLOW_DISTANCE` — corridors may be tighter     |
-| Nib wrap | `NIB_FORWARD_BEFORE` / `NIB_FORWARD_AFTER` — corners may be a different size |
-| Speed    | `BASE_SPEED` — slower is steadier through mixed corners                      |
+1. Print current state and active trigger.
 
----
+## Tunables
 
-## Tuning guide
+| Name                  | Unit | Purpose                  | Typical start value | Symptoms when too low | Symptoms when too high |
+| --------------------- | ---- | ------------------------ | ------------------- | --------------------- | ---------------------- |
+| `BASE_SPEED`          | PWM  | Global traversal speed   | 190 to 210          | Slow run              | Unstable corners       |
+| `FRONT_STOP_DISTANCE` | mm   | Dead-end trigger         | 120                 | Late turns            | Early turns            |
+| `NIB_FORWARD_BEFORE`  | s    | Outside-corner clearance | 0.25                | Corner clip           | Too wide wrap          |
+| `NIB_FORWARD_AFTER`   | s    | Reacquire alignment      | 0.30                | Missed wall           | Overrun                |
 
-| Observation                             | Fix                                                                  |
-| --------------------------------------- | -------------------------------------------------------------------- |
-| Turns the wrong way at a corner         | Check `AIDriver("left"/"right")` matches your wall side              |
-| Clips an inside corner on the way round | Raise `FRONT_STOP_DISTANCE` so it turns a little earlier             |
-| Misses the wrap at an outside corner    | Re-tune `NIB_FORWARD_BEFORE` / `NIB_FORWARD_AFTER`                   |
-| Spins randomly mid-corridor             | Leave `NIB_LOST_DISTANCE` / `NIB_CONFIRM_TIME` at the pre-set values |
-| Generally twitchy                       | Lower `BASE_SPEED` and re-check the side PID gains                   |
+## Tuning Guide
 
----
+1. Verify dead-end turns first.
+2. Verify nib wraps second.
+3. Adjust speed downward if transitions become unstable.
 
-## Try it
+## Debug Checklist
 
-1. Open **Challenge 6** — same three states as Challenge 5.
-2. Carry your numbers forward and adjust for the new maze.
-3. The tuned answer is in `app/answers/challenge-6.py`.
+- [ ] Dead ends trigger `TURN` consistently.
+- [ ] Nibs trigger `NIB_WALL` consistently.
+- [ ] Trigger precedence does not conflict.
+- [ ] Robot reaches exit across repeated runs.
 
----
+## Common Failure Modes
 
-## What's Next
+| Symptom                           | Root cause                    | Verification step                | Fix                                |
+| --------------------------------- | ----------------------------- | -------------------------------- | ---------------------------------- |
+| Wrong turn type selected          | Trigger precedence issue      | Log trigger checks per loop      | Enforce front trigger first        |
+| Works on dead ends, fails on nibs | Wrap timing not robust        | Isolate nib sections in run logs | Retune nib timings                 |
+| Works on nibs, fails on dead ends | Front approach too aggressive | Observe pre-turn speed           | Increase slowdown or stop distance |
+| Random instability                | Speed too high                | Compare behavior at lower speed  | Reduce `BASE_SPEED`                |
 
-[Challenge 7](docs.html?doc=Challenge_7) is the capstone: the full maze, solved end-to-end by the
-same unchanged state machine.
+## Exit Check
+
+Pass when the Success Criteria are met in at least 3 consecutive simulator runs.
+
+## What Is Next
+
+Challenge 7 uses the same machine on the full maze and focuses on long-run reliability.

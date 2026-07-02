@@ -1,139 +1,122 @@
-# Challenge 5: Outside Corners — Adding the Nib State
+# Challenge 5: Outside Corners - Add NIB_WALL State
 
-In Challenge 4 every turn was at a wall **in front** of you. But walls also **end**. At an
-**outside corner** (a convex corner, or the tip of a free-standing wall called a "nib") the side
-wall simply disappears and the side sensor returns `-1`. If you keep running the PID, the robot
-drives straight off into open space.
+## Purpose
 
-The state-machine answer is to add a **third state** that handles this case.
-
-You will learn:
-
-- How to detect that the wall you were following has **ended**.
-- Why a raw "wall is gone" reading needs a **debounce** before you trust it.
-- How to **wrap** an outside corner by driving past it and turning _toward_ it.
-
----
+Extend the state machine to handle outside corners where the side wall disappears.
 
 ## Success Criteria
 
-My robot follows the inside edge of its nib, reaches the **outside corner**, **wraps around it**,
-re-acquires the wall, and stops in the **goal pocket** on the far side.
-
----
+The robot detects side-wall loss at a nib, runs the wrap maneuver, reacquires the wall, and reaches the goal pocket.
 
 ## Before You Begin
 
-1. Complete [Challenge 4](docs.html?doc=Challenge_4) — carry forward all your tuned values.
-2. Open the **Simulator** and select **Challenge 5**.
-3. Run your Challenge 4 code here — it follows the nib up, then drives straight off the top because
-   it has no state for "the wall ended."
+1. Complete Challenge 4 with working turn behavior.
+2. Open simulator Challenge 5.
+3. Carry forward all tuned side and turn parameters.
 
----
+## Maze Situation
 
-## Concept 1 — The new state: `NIB_WALL`
+- Maze feature: outside corner (nib) where side wall ends.
+- Trigger condition expected in code: side wall lost for confirmation time.
+- New behavior introduced: NIB_WALL state for wrap-around maneuver.
+- Why previous challenge fails: with no side wall, follow logic drives into open space.
 
-You already have `FOLLOW_WALL` and `TURN`. Challenge 5 adds `NIB_WALL`:
+## What Is New In This Challenge
 
-| State         | What the robot does                                    |
-| ------------- | ------------------------------------------------------ |
-| `FOLLOW_WALL` | hold the side wall with the PID                        |
-| `TURN`        | wall close ahead → spin 90° **away** from the wall     |
-| `NIB_WALL`    | side wall **ended** → wrap 90° **toward** where it was |
+New: wall-lost debounce and nib wrap state.
+
+Unchanged: front-triggered TURN state and side PID follow state.
+
+## Carry Forward From Previous Challenge
+
+| Group   | Variable                                  | Notes                          |
+| ------- | ----------------------------------------- | ------------------------------ |
+| Reused  | Side PID and front-turn tunables          | Same as Challenge 4.           |
+| New     | `NIB_LOST_DISTANCE`, `NIB_CONFIRM_TIME`   | Side-wall loss detection.      |
+| New     | `NIB_FORWARD_BEFORE`, `NIB_FORWARD_AFTER` | Wrap maneuver distances/times. |
+| New     | `nib_lost_time`                           | Debounce timer.                |
+| Removed | None                                      | Existing states remain.        |
+
+## Algorithm Flow
 
 ```mermaid
 stateDiagram-v2
     [*] --> FOLLOW_WALL
     FOLLOW_WALL --> TURN: front <= FRONT_STOP_DISTANCE
     FOLLOW_WALL --> NIB_WALL: side lost for NIB_CONFIRM_TIME
-    TURN --> FOLLOW_WALL: turn finished
-    NIB_WALL --> FOLLOW_WALL: wrap finished
+    TURN --> FOLLOW_WALL: turn complete
+    NIB_WALL --> FOLLOW_WALL: wrap complete
 ```
 
-Notice the two turns spin in **opposite** directions. `TURN` turns _away_ from a wall blocking the
-front; `NIB_WALL` turns _toward_ the side the wall just left, to follow it around the corner.
+### State Table
 
----
+| State name    | Responsibilities                                                 | Exit conditions              |
+| ------------- | ---------------------------------------------------------------- | ---------------------------- |
+| `FOLLOW_WALL` | Run side PID, check front trigger, track side loss timer         | Exit to `TURN` or `NIB_WALL` |
+| `TURN`        | Execute inside-corner 90 deg turn away from wall                 | Exit to `FOLLOW_WALL`        |
+| `NIB_WALL`    | Drive forward, turn toward wall side, drive forward to reacquire | Exit to `FOLLOW_WALL`        |
 
-## Concept 2 — Detecting a lost wall (and why a debounce matters)
+### Trigger Table
 
-A wall is "lost" when the side reading is far larger than the distance you follow at, or `-1`:
+| Trigger condition                             | From state    | To state      | Priority |
+| --------------------------------------------- | ------------- | ------------- | -------- |
+| `front <= FRONT_STOP_DISTANCE`                | `FOLLOW_WALL` | `TURN`        | Highest  |
+| side lost continuously for `NIB_CONFIRM_TIME` | `FOLLOW_WALL` | `NIB_WALL`    | High     |
+| Wrap sequence complete                        | `NIB_WALL`    | `FOLLOW_WALL` | High     |
 
-```python
-side = my_robot.read_distance_2()
-if side != -1 and side <= NIB_LOST_DISTANCE:
-    nib_lost_time = 0.0          # wall still there — reset the timer
-else:
-    nib_lost_time += 0.05        # wall looks gone — start counting
-```
+## Starter Code Contract
 
-**The trap:** the PID normally overshoots a little, so the side reading wobbles above and below the
-target. If `NIB_LOST_DISTANCE` were the same as your follow distance, a normal wobble would look
-like a lost wall and the robot would spin at random.
+Safe to edit:
 
-Two ideas fix this:
+1. Nib wrap timing values.
+2. Nib loss thresholds if challenge explicitly allows.
+3. Existing front and side gains.
 
-| Tunable             | Job                                                                 |
-| ------------------- | ------------------------------------------------------------------- |
-| `NIB_LOST_DISTANCE` | "clearly gone" distance — set **well above** `TARGET_WALL_DISTANCE` |
-| `NIB_CONFIRM_TIME`  | the wall must stay lost this long (seconds) before `NIB_WALL` fires |
+Do not edit unless instructed:
 
-`NIB_LOST_DISTANCE` rejects normal overshoot; `NIB_CONFIRM_TIME` is a **debounce** that ignores a
-single noisy frame. Only when the wall is _clearly_ gone _and stays_ gone does the trigger fire.
+1. Trigger priority order.
+2. Debounce logic structure.
+3. Turn direction mapping using wall side.
 
-> These two are pre-set for you (`400` mm and `0.5` s) because they depend on the maze, not on your
-> driving. You tune the wrap itself, below.
+Optional debug edits:
 
----
+1. Print `state`, `side`, and `nib_lost_time`.
 
-## Concept 3 — Wrapping the corner
+## Tunables
 
-`NIB_WALL` runs a fixed little manoeuvre — no PID, because there is no wall to steer against yet:
+| Name                 | Unit | Purpose                            | Typical start value | Symptoms when too low | Symptoms when too high |
+| -------------------- | ---- | ---------------------------------- | ------------------- | --------------------- | ---------------------- |
+| `NIB_LOST_DISTANCE`  | mm   | Side distance considered wall-lost | 400                 | False nib triggers    | Slow nib detection     |
+| `NIB_CONFIRM_TIME`   | s    | Debounce before nib state          | 0.5                 | Noise-triggered turns | Delayed response       |
+| `NIB_FORWARD_BEFORE` | s    | Clear corner before turning        | 0.25                | Clips corner          | Wrap too wide          |
+| `NIB_FORWARD_AFTER`  | s    | Move alongside new wall after turn | 0.30                | Missed reacquire      | Overshoot past wall    |
 
-1. Drive forward for `NIB_FORWARD_BEFORE` seconds to clear past the corner.
-2. Spin 90° **toward** the wall side (reusing your `gyro_turn_pid` from Challenge 4).
-3. Drive forward for `NIB_FORWARD_AFTER` seconds to come alongside the new wall.
-4. Return to `FOLLOW_WALL`, which re-locks onto the wall.
+## Tuning Guide
 
-| Tunable              | Effect                                                                  |
-| -------------------- | ----------------------------------------------------------------------- |
-| `NIB_FORWARD_BEFORE` | too small → clips the corner; too large → swings out wide               |
-| `NIB_FORWARD_AFTER`  | too small → re-acquires the wall too early/late; too large → drifts off |
+1. Verify debounce behavior is stable first.
+2. Adjust `NIB_FORWARD_BEFORE` to avoid clipping.
+3. Adjust `NIB_FORWARD_AFTER` for reliable wall reacquisition.
 
----
+## Debug Checklist
 
-## What you tune in this challenge
+- [ ] Nib trigger occurs only when wall is truly gone.
+- [ ] No random nib turns on normal wall-follow oscillation.
+- [ ] Wrap turn direction is toward the previous wall side.
+- [ ] Robot reacquires wall and continues follow state.
 
-| Group        | Tunables                                                                    |
-| ------------ | --------------------------------------------------------------------------- |
-| Carried over | everything from Challenge 4 (`BASE_SPEED`, side PID, `FRONT_*`, gyro gains) |
-| Nib wrap     | `NIB_FORWARD_BEFORE`, `NIB_FORWARD_AFTER`                                   |
+## Common Failure Modes
 
-> Pre-set for you: `NIB_LOST_DISTANCE`, `NIB_CONFIRM_TIME`, and the turn mechanics.
+| Symptom                  | Root cause                                            | Verification step                | Fix                                    |
+| ------------------------ | ----------------------------------------------------- | -------------------------------- | -------------------------------------- |
+| Random nib turns         | `NIB_LOST_DISTANCE` too low or confirm time too short | Plot side reading around trigger | Increase threshold and/or confirm time |
+| Clips outside corner     | `NIB_FORWARD_BEFORE` too low                          | Observe position at turn start   | Increase `NIB_FORWARD_BEFORE`          |
+| Fails to reacquire wall  | `NIB_FORWARD_AFTER` not tuned                         | Observe side reading after wrap  | Adjust `NIB_FORWARD_AFTER`             |
+| Wraps in wrong direction | Wall-side mapping issue                               | Print wall sign and turn command | Fix mapping toward wall side           |
 
----
+## Exit Check
 
-## Tuning guide
+Pass when the Success Criteria are met in at least 3 consecutive simulator runs.
 
-| Observation                                 | Fix                                                                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Robot spins randomly while following a wall | `NIB_LOST_DISTANCE` too low for your `TARGET_WALL_DISTANCE` — leave it at the pre-set value |
-| Robot clips the corner as it wraps          | Increase `NIB_FORWARD_BEFORE`                                                               |
-| Robot wraps too wide and loses the new wall | Decrease `NIB_FORWARD_BEFORE`, or tune `NIB_FORWARD_AFTER`                                  |
-| Robot wraps but never re-locks the wall     | Adjust `NIB_FORWARD_AFTER` so it ends up beside the wall                                    |
-| Turn under/over-rotates                     | Re-check `turn_Kp` / `turn_Kd` from Challenge 4                                             |
+## What Is Next
 
----
-
-## Try it
-
-1. Open **Challenge 5** — the three states and the wrap are already written.
-2. Carry forward your Challenge 4 numbers, then tune the two `NIB_FORWARD_*` times.
-3. The tuned answer is in `app/answers/challenge-5.py`.
-
----
-
-## What's Next
-
-[Challenge 6](docs.html?doc=Challenge_6) puts both turn types in one maze — dead ends _and_ outside
-corners — handled by the exact same three-state machine.
+Challenge 6 combines dead ends and nibs in one maze and validates trigger precedence in the same three-state machine.

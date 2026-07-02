@@ -1,162 +1,129 @@
-# Challenge 10: Competition Run — Victims, Score & the OLED
+# Challenge 10: Competition Run - Victims, Score, OLED
 
-Challenge 10 is the **Rescue Maze capstone**. You bring together everything from the earlier
-challenges — driving, the colour sensor, and now the **SSD1306 OLED status display** — into a single
-competition run. As the robot drives up the corridor it must **identify each victim**, keep a
-**running score**, drop a **rescue kit** on the harmed ones, and **report what it is doing on the
-OLED** so a judge can read the screen at a glance.
+## Purpose
 
-This is exactly how the real robot communicates during a RoboCup Junior Rescue Maze round: the OLED
-shows the current state and score, and the rescue-kit servo drops a kit on a harmed victim for the
-bonus.
-
-You will learn:
-
-- How to drive the **OLED status display** with `display_status()` and `show_display()`.
-- How to keep a **running score** and a **victim count** in your own variables.
-- How to trigger the **rescue-kit** deployment on a harmed victim.
-
----
+Integrate navigation, victim detection, scoring, display reporting, and rescue-kit deployment into one complete competition run.
 
 ## Success Criteria
 
-My robot drives up the corridor, counts every **green (unharmed)** and **red (harmed)** victim, shows
-the live **state / score / victim count** on the OLED, drops a kit on each harmed victim, and reaches
-the **silver finish** showing a `RUN COMPLETE` report.
-
----
+The robot identifies red and green victims, updates score and counts, deploys rescue kit on harmed victims, shows live OLED status, and completes the run at silver finish.
 
 ## Before You Begin
 
-1. Complete [Challenge 8](docs.html?doc=Challenge_8) — you already know how to read and classify
-   colours.
-2. Open the **Simulator** and select **Challenge 10**. The simulated OLED appears in the top-right
-   corner of the arena and shows whatever your code displays.
+1. Complete Challenge 8 color classification.
+2. Complete Challenge 9 recovery behavior.
+3. Open simulator Challenge 10 and verify OLED panel visibility.
 
----
+## Maze Situation
 
-## Concept 1 — The OLED status display
+- Maze feature: victim markers and finish marker in one run.
+- Trigger condition expected in code: marker classification transitions and run-complete condition.
+- New behavior introduced: scoring and competition status state reporting.
+- Why previous challenge fails: no victim accounting, no score model, no OLED run status.
 
-The robot has an SSD1306 OLED on the shared I²C bus (GP16/GP17, address `0x3C`). The AIDriver gives
-you two output calls. They work the same in the simulator and on the real robot — and if no OLED is
-plugged in, the calls simply do nothing, so your program never breaks.
+## What Is New In This Challenge
 
-```python
-# High-level: show the competition state, score and victim count
-my_robot.display_status("SEARCH", 30, 2)
+New: competition scoring model and status output layer.
 
-# Low-level: show any four short lines (max 16 characters each)
-my_robot.show_display("RUN COMPLETE", "Unharmed:2", "Harmed:1", "Score:55")
-```
+Unchanged: core movement and color classification flow.
 
-> **Tip:** each OLED line holds **16 characters**. Keep your state labels short, e.g. `"HARMED VIC"`.
+## Carry Forward From Previous Challenge
 
----
+| Group   | Variable                                | Notes                                       |
+| ------- | --------------------------------------- | ------------------------------------------- |
+| Reused  | Color thresholds and movement control   | Same sensing baseline.                      |
+| New     | `unharmed`, `harmed`, score constants   | Competition accounting.                     |
+| New     | OLED status strings and state labels    | Live operator/judge feedback.               |
+| New     | Rescue-kit action call on harmed marker | Bonus-scoring behavior.                     |
+| Removed | None                                    | Challenge flow is marker-driven end-to-end. |
 
-## Concept 2 — Counting victims and scoring
-
-The simulator marks victims as coloured floor tiles, just like Challenge 8:
-
-- **Green** = an **unharmed** victim → **10 points**
-- **Red** = a **harmed** victim → **25 points**, plus **10** for dropping a rescue kit
-
-Keep your own counters and compute the score yourself so you can show it on the OLED:
-
-```python
-POINTS_UNHARMED = 10
-POINTS_HARMED = 25
-POINTS_KIT = 10
-
-unharmed = 0
-harmed = 0
-
-
-def score():
-    return (unharmed * POINTS_UNHARMED) + (harmed * POINTS_HARMED) + (harmed * POINTS_KIT)
-```
-
-Only count a victim the **first** frame you roll onto it — track the previous colour so a single tile
-is not counted on every loop:
-
-```python
-new_marker = color != "none" and color != previous_color
-```
-
----
-
-## Concept 3 — Dropping a rescue kit
-
-On a **harmed (red)** victim, call the kit-deploy method for the bonus. The servo hardware is fitted
-on the real robot; in the simulator the call is a safe no-op, so the same code runs in both places.
-
-```python
-if new_marker and color == "red":
-    harmed = harmed + 1
-    my_robot.brake()
-    my_robot.deploy_rescue_kit()
-    my_robot.display_status("HARMED VIC", score(), unharmed + harmed)
-    hold_state(VICTIM_PAUSE_TIME)
-```
-
----
-
-## Concept 4 — The competition state machine
+## Algorithm Flow
 
 ```mermaid
 stateDiagram-v2
     [*] --> START
-    START --> SEARCH: driven off the start tile
-    SEARCH --> GREEN_VIC: green victim
-    SEARCH --> HARMED_VIC: red victim
-    GREEN_VIC --> SEARCH: counted + shown
-    HARMED_VIC --> SEARCH: counted + kit dropped
+    START --> SEARCH: run begins
+    SEARCH --> GREEN_VIC: green marker
+    SEARCH --> HARMED_VIC: red marker
+    GREEN_VIC --> SEARCH: count and pause complete
+    HARMED_VIC --> SEARCH: count, deploy kit, pause complete
     SEARCH --> RUN_COMPLETE: silver finish
     RUN_COMPLETE --> [*]
 ```
 
-Push a fresh `display_status(...)` every time the state changes so the OLED always reflects what the
-robot is doing.
+### State Table
 
----
+| State name     | Responsibilities                                            | Exit conditions                         |
+| -------------- | ----------------------------------------------------------- | --------------------------------------- |
+| `START`        | Initialize counters, status, and started flag               | Enter `SEARCH` when moving off start    |
+| `SEARCH`       | Drive and classify markers                                  | Exit to victim states or `RUN_COMPLETE` |
+| `GREEN_VIC`    | Count unharmed victim, update score/status, pause           | Return to `SEARCH`                      |
+| `HARMED_VIC`   | Count harmed victim, deploy kit, update score/status, pause | Return to `SEARCH`                      |
+| `RUN_COMPLETE` | Brake and display final report                              | End                                     |
 
-## What you tune in this challenge
+### Trigger Table
 
-| Parameter            | What it does                                                  |
-| -------------------- | ------------------------------------------------------------- |
-| `color_min_clear`    | Clear value above which a tile counts as a marker (not floor) |
-| `color_red_ratio`    | Red fraction needed to classify a victim as harmed            |
-| `color_green_ratio`  | Green fraction needed to classify a victim as unharmed        |
-| `color_silver_clear` | Brightness above which a balanced tile counts as silver       |
-| `VICTIM_PAUSE_TIME`  | Seconds to stop on a victim (rules: at least 1 second)        |
+| Trigger condition         | From state                  | To state       | Priority |
+| ------------------------- | --------------------------- | -------------- | -------- |
+| New green marker          | `SEARCH`                    | `GREEN_VIC`    | High     |
+| New red marker            | `SEARCH`                    | `HARMED_VIC`   | High     |
+| Silver finish after start | `SEARCH`                    | `RUN_COMPLETE` | Highest  |
+| Pause complete            | `GREEN_VIC` or `HARMED_VIC` | `SEARCH`       | High     |
 
----
+## Starter Code Contract
 
-## Tuning guide
+Safe to edit:
 
-| Observation                          | Fix                                                            |
-| ------------------------------------ | -------------------------------------------------------------- |
-| Same victim counted many times       | Check `new_marker` — you must compare against `previous_color` |
-| Victims missed entirely              | Lower `color_min_clear` / re-tune the ratios from Challenge 8  |
-| Finish triggers immediately at start | Only finish on silver **after** `started` is `True`            |
-| OLED text is cut off                 | Shorten the line — the panel shows 16 characters per line      |
-| Score looks wrong                    | Remember a harmed victim is worth 25 **plus** 10 for the kit   |
+1. Scoring constants if competition rules change.
+2. Pause duration.
+3. OLED display text labels.
 
----
+Do not edit unless instructed:
 
-## Try it
+1. New-marker edge detection.
+2. Score-update formulas.
+3. Run-complete finish guard.
 
-1. Open **Challenge 10** and run the starter code — it drives up the corridor but ignores the
-   victims and leaves the OLED on `START`.
-2. Fill in the green / red / silver branches so the OLED shows the live state, score and victim
-   count, and a kit is dropped on each harmed victim.
-3. The completed answer is in `app/answers/challenge-10.py`.
+Optional debug edits:
 
----
+1. Print state, color class, counts, and score each loop.
 
-## Hardware notes
+## Tunables
 
-The OLED is an **SSD1306** (128×64) on the shared bit-banged I²C bus (GP16/GP17, address `0x3C`),
-alongside the LSM6DS3 gyro and TCS34725 colour sensor. The `deploy_rescue_kit()` call drives a hobby
-servo to release a kit. Both are **optional**: if the panel or servo is not wired, the AIDriver
-constructor sets `has_display` / `has_kit` to `False` and every display / kit call becomes a silent
-no-op — so this exact program runs whether or not the extra hardware is attached.
+| Name                 | Unit         | Purpose                     | Typical start value | Symptoms when too low | Symptoms when too high    |
+| -------------------- | ------------ | --------------------------- | ------------------- | --------------------- | ------------------------- |
+| `color_min_clear`    | clear counts | Marker gate threshold       | 180                 | False markers         | Missed markers            |
+| `color_red_ratio`    | fraction     | Red victim classification   | 0.55                | Red misses            | Red over-classification   |
+| `color_green_ratio`  | fraction     | Green victim classification | 0.55                | Green misses          | Green over-classification |
+| `color_silver_clear` | clear counts | Finish marker detection     | 500                 | Early finish          | Missed finish             |
+| `VICTIM_PAUSE_TIME`  | s            | Pause on victim marker      | 1.0                 | Insufficient pause    | Slow run                  |
+
+## Tuning Guide
+
+1. Verify marker edge detection avoids double counts.
+2. Verify finish is only valid after run start.
+3. Verify score math with a known marker sequence.
+
+## Debug Checklist
+
+- [ ] Each victim marker increments once.
+- [ ] Harmed marker triggers rescue-kit deploy call.
+- [ ] OLED status matches current state and score.
+- [ ] Final report appears at run completion.
+
+## Common Failure Modes
+
+| Symptom                        | Root cause                    | Verification step                     | Fix                                  |
+| ------------------------------ | ----------------------------- | ------------------------------------- | ------------------------------------ |
+| Same victim counted repeatedly | Missing edge detection        | Print current and previous marker     | Enforce new-marker condition         |
+| Score mismatch                 | Incorrect scoring formula     | Hand-calculate expected score         | Correct constants/formula            |
+| Finish at start tile           | Missing started guard         | Log started flag when finish triggers | Require started before finish        |
+| OLED unreadable or stale       | No update on state transition | Log display update calls              | Update display on every state change |
+
+## Exit Check
+
+Pass when the Success Criteria are met in at least 3 consecutive simulator runs.
+
+## What Is Next
+
+This challenge completes the student sequence. Next step is hardware calibration and transfer of tuned values to real-robot `main.py`.

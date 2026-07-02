@@ -547,6 +547,10 @@ class AIDriver:
         echo_pin=7,  # GP7 (front sensor, legacy HC-SR04 fallback)
         trig_pin_2=4,  # GP4 (second sensor)
         echo_pin_2=5,  # GP5 (second sensor, legacy HC-SR04 fallback)
+        tof_front_sda=27,  # GP27 (A0) — front ToF dedicated SoftI2C SDA
+        tof_front_scl=26,  # GP26 (A1) — front ToF dedicated SoftI2C SCL
+        tof_side_sda=6,  # GP6 (D6) — side ToF dedicated SoftI2C SDA
+        tof_side_scl=5,  # GP5 (D5) — side ToF dedicated SoftI2C SCL
         ultrasonic_mode="auto",  # "auto" (default), "grove", or "hcsr04"
         imu_sda=16,  # GP16 — IMU I2C SDA (SoftI2C)
         imu_scl=17,  # GP17 — IMU I2C SCL (SoftI2C)
@@ -575,11 +579,12 @@ class AIDriver:
             distance_sensor: Distance backend — "ultrasonic" (default) or "tof".
                        "ultrasonic": trig_pin/trig_pin_2 drive HC-SR04/Grove
                                      ultrasonic sensors (existing behaviour).
-                       "tof":        two VL53L0X Time-of-Flight sensors on the
-                                     shared SoftI2C bus. The SAME two pins
-                                     (trig_pin, trig_pin_2) are re-purposed as
-                                     the sensors' XSHUT reset lines instead of
-                                     ultrasonic SIG/TRIG. Example:
+                       "tof":        VL53L0X Time-of-Flight sensors. Each sensor
+                                     runs on its own dedicated SoftI2C bus at
+                                     address 0x29 with no XSHUT:
+                                       front = tof_front_sda/scl (GP27/GP26 = A0/A1)
+                                       side  = tof_side_sda/scl  (GP6/GP5 = D6/D5)
+                                     Example:
                                          AIDriver("left", "tof")
             right_speed_pin: PWM pin for right motor speed (default GP3)
             left_speed_pin: PWM pin for left motor speed (default GP11)
@@ -656,12 +661,15 @@ class AIDriver:
         self.has_tof = False
 
         if self.distance_sensor == "tof":
-            # ToF mode: trig_pin/trig_pin_2 become XSHUT reset lines.
+            # ToF mode: BOTH sensors run on their own dedicated SoftI2C bus, so
+            # each can stay at the VL53L0X default address 0x29 with no XSHUT.
+            # Front = tof_front_sda/scl (default GP27/GP26 = A0/A1),
+            # Side  = tof_side_sda/scl  (default GP6/GP5).
             self._init_tof_sensors(
-                xshut_pin_1=trig_pin,
-                xshut_pin_2=trig_pin_2,
-                sda=imu_sda,
-                scl=imu_scl,
+                front_sda=tof_front_sda,
+                front_scl=tof_front_scl,
+                side_sda=tof_side_sda,
+                side_scl=tof_side_scl,
             )
         else:
             self._init_ultrasonic_sensors(
@@ -934,18 +942,21 @@ class AIDriver:
                 "– check SIG_2/TRIG_2 and ECHO_2 wiring plus sensor power.",
             )
 
-    def _init_tof_sensors(self, xshut_pin_1, xshut_pin_2, sda, scl):
-        """Set up two VL53L0X Time-of-Flight sensors on the shared SoftI2C bus.
+    def _init_tof_sensors(self, front_sda, front_scl, side_sda, side_scl):
+        """Set up the front (and optional side) VL53L0X Time-of-Flight sensors.
 
-        Every VL53L0X powers up at address 0x29, so the two sensors are brought
-        out of reset one at a time (via their XSHUT pins) and each is moved to a
-        unique, non-default address. 0x29 is deliberately vacated so it stays
-        free for the TCS34725 colour sensor that shares this bus.
+        Each sensor lives on its OWN dedicated SoftI2C bus, so both can stay at
+        the VL53L0X default address 0x29 with no XSHUT juggling. This matches the
+        wiring confirmed by the pin-finder scan:
+            Front: SDA=GP27 (A0), SCL=GP26 (A1)
+            Side:  SDA=GP6 (D6),  SCL=GP5 (D5)
+            Both:  VIN=3V3, GND=GND
 
         Args:
-            xshut_pin_1: GPIO wired to sensor 1 XSHUT (the old trig_pin).
-            xshut_pin_2: GPIO wired to sensor 2 XSHUT (the old trig_pin_2).
-            sda/scl: SoftI2C pins (shared with the IMU/colour/OLED bus).
+            front_sda/front_scl: dedicated SoftI2C pins for the front ToF
+                                 (defaults GP27/GP26 = A0/A1).
+            side_sda/side_scl: dedicated SoftI2C pins for the side ToF
+                               (defaults GP6/GP5 = D6/D5).
         """
         if VL53L0X is None or SoftI2C is None:
             _d(
@@ -954,56 +965,40 @@ class AIDriver:
             )
             return
 
-        # Hold BOTH sensors in reset before touching the bus so neither is
-        # squatting on 0x29 while we bring the other up.
-        self._tof_xshut_1 = Pin(xshut_pin_1, Pin.OUT, value=0)
-        self._tof_xshut_2 = Pin(xshut_pin_2, Pin.OUT, value=0)
-        sleep_ms(10)
-
+        # --- Front ToF: dedicated bus, default 0x29, no XSHUT -------------
         try:
-            i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda), freq=400_000)
-
-            # Sensor 1: release from reset, then move it to 0x30.
-            self._tof_xshut_1.value(1)
-            sleep_ms(10)
-            self.tof_1 = VL53L0X(i2c)  # boots on default 0x29
-            self.tof_1.set_address(0x30)
+            front_i2c = SoftI2C(scl=Pin(front_scl), sda=Pin(front_sda), freq=400_000)
+            self.tof_1 = VL53L0X(front_i2c)  # stays on default 0x29 (own bus)
             self.tof_1.start()
-            _d("ToF sensor 1 OK on GP{}/GP{} @ 0x30".format(sda, scl))
-
-            # Sensor 2: release from reset, then move it to 0x31, leaving 0x29
-            # free for the colour sensor. If only one sensor is fitted this
-            # simply fails softly and read_distance_2() returns -1.
-            self._tof_xshut_2.value(1)
-            sleep_ms(10)
-            try:
-                self.tof_2 = VL53L0X(i2c)  # boots on default 0x29
-                self.tof_2.set_address(0x31)
-                self.tof_2.start()
-                _d("ToF sensor 2 OK on GP{}/GP{} @ 0x31".format(sda, scl))
-            except Exception as exc:
-                self.tof_2 = None
-                _d(
-                    "ToF sensor 2 init failed:",
-                    type(exc).__name__,
-                    str(exc),
-                    "– only one ToF sensor available.",
-                )
-
-            self.has_tof = self.tof_1 is not None
+            _d("Front ToF OK on GP{}/GP{} @ 0x29".format(front_sda, front_scl))
         except Exception as exc:
             self.tof_1 = None
-            self.tof_2 = None
-            self.has_tof = False
             _d(
-                "ToF init failed:",
+                "Front ToF init failed:",
                 type(exc).__name__,
                 str(exc),
-                "– distance readings will return -1. Check GP{}/GP{} wiring,".format(
-                    sda, scl
-                ),
-                "XSHUT on GP{}/GP{}, and 3V3 power.".format(xshut_pin_1, xshut_pin_2),
+                "– check GP{}/GP{} wiring and 3V3 power.".format(front_sda, front_scl),
             )
+
+        # --- Side ToF (optional): dedicated bus, default 0x29, no XSHUT ---
+        # On its own bus it can share 0x29 with the front sensor with no clash.
+        # If no side sensor is fitted this fails softly and read_distance_2()
+        # returns -1.
+        try:
+            side_i2c = SoftI2C(scl=Pin(side_scl), sda=Pin(side_sda), freq=400_000)
+            self.tof_2 = VL53L0X(side_i2c)  # stays on default 0x29 (own bus)
+            self.tof_2.start()
+            _d("Side ToF OK on GP{}/GP{} @ 0x29".format(side_sda, side_scl))
+        except Exception as exc:
+            self.tof_2 = None
+            _d(
+                "Side ToF init failed:",
+                type(exc).__name__,
+                str(exc),
+                "– check GP{}/GP{} wiring and 3V3 power.".format(side_sda, side_scl),
+            )
+
+        self.has_tof = self.tof_1 is not None
 
     def read_distance(self):
         """

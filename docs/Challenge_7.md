@@ -1,36 +1,41 @@
-# Challenge 7: The Full Maze — Capstone
+# Challenge 7: Full Maze - Capstone
 
-The final challenge. Your robot must solve a complete maze end-to-end using the **same three-state
-machine** you have built up since Challenge 4. There is no new behaviour to add — this is about
-**tuning the whole machine** until it runs the full course cleanly.
+## Purpose
 
-You will learn:
-
-- How the `FOLLOW_WALL` / `TURN` / `NIB_WALL` machine composes into a complete maze solver.
-- How to **tune for robustness** over a long run rather than a single corner.
-- How to read the robot's behaviour to find which state needs attention.
-
----
+Validate full-maze performance using the established three-state controller, focusing on reliability across long sequences of corners.
 
 ## Success Criteria
 
-My robot completes the **full maze** from start to the **green exit zone**, handling every dead end
-and outside corner along the way, without external help.
-
----
+The robot completes the full maze from start to green exit zone with stable behavior across dead ends and outside corners.
 
 ## Before You Begin
 
-1. Complete [Challenge 6](docs.html?doc=Challenge_6) — carry forward every tuned value.
-2. Open the **Simulator** and select **Challenge 7**.
-3. Run your Challenge 6 code — it already has every state it needs. The work here is **tuning** for
-   the longer, more varied course.
+1. Complete Challenge 6.
+2. Open simulator Challenge 7.
+3. Carry forward your best stable values.
 
----
+## Maze Situation
 
-## Concept — One machine, a whole maze
+- Maze feature: long run with repeated mixed-corner patterns.
+- Trigger condition expected in code: same front and side-loss triggers.
+- New behavior introduced: no new behavior, only robustness tuning.
+- Why previous challenge may fail: values tuned for short sections may drift or fail over long sequences.
 
-A complete maze is just a long sequence of the same three situations, in some order:
+## What Is New In This Challenge
+
+New: robustness target (repeatability over full run length).
+
+Unchanged: same states, triggers, and core algorithms.
+
+## Carry Forward From Previous Challenge
+
+| Group   | Variable           | Notes                     |
+| ------- | ------------------ | ------------------------- |
+| Reused  | All prior tunables | Entire machine is reused. |
+| New     | None               | Capstone tuning only.     |
+| Removed | None               | No structural changes.    |
+
+## Algorithm Flow
 
 ```mermaid
 stateDiagram-v2
@@ -39,65 +44,76 @@ stateDiagram-v2
     FOLLOW_WALL --> NIB_WALL: side wall ended
     TURN --> FOLLOW_WALL
     NIB_WALL --> FOLLOW_WALL
-    FOLLOW_WALL --> [*]: reached the exit zone
+    FOLLOW_WALL --> [*]: exit reached
 ```
 
-Because every state returns cleanly to `FOLLOW_WALL`, the machine can run forever, taking whichever
-turn each corner calls for. Following one wall the whole way (the **left-hand rule** from Challenge 6) is guaranteed to reach the exit of a simply-connected maze. Your job is to make each state robust
-enough to survive **dozens** of corners in a row.
+### State Table
 
----
+| State name    | Responsibilities                           | Exit conditions         |
+| ------------- | ------------------------------------------ | ----------------------- |
+| `FOLLOW_WALL` | Stable side control and trigger monitoring | To `TURN` or `NIB_WALL` |
+| `TURN`        | Controlled inside-corner turning           | Back to `FOLLOW_WALL`   |
+| `NIB_WALL`    | Controlled outside-corner wrapping         | Back to `FOLLOW_WALL`   |
 
-## What you tune in this challenge
+### Trigger Table
 
-No new parameters — you are balancing the **whole** machine:
+| Trigger condition              | From state          | To state      | Priority |
+| ------------------------------ | ------------------- | ------------- | -------- |
+| `front <= FRONT_STOP_DISTANCE` | `FOLLOW_WALL`       | `TURN`        | Highest  |
+| side lost for confirm window   | `FOLLOW_WALL`       | `NIB_WALL`    | High     |
+| Completion criteria met        | `TURN` / `NIB_WALL` | `FOLLOW_WALL` | High     |
 
-| Goal             | Levers                                                           |
-| ---------------- | ---------------------------------------------------------------- |
-| Smooth following | side PID gains (`side_Kp`, `side_Ki`, `side_Kd`), `MAX_STEERING` |
-| Reliable turns   | `turn_Kp`, `turn_Kd`, `turn_tolerance`                           |
-| Clean approaches | `FRONT_SLOW_DISTANCE`, `FRONT_STOP_DISTANCE`, `FRONT_Kp`         |
-| Solid wraps      | `NIB_FORWARD_BEFORE`, `NIB_FORWARD_AFTER`                        |
-| Speed vs. safety | `BASE_SPEED`                                                     |
+## Starter Code Contract
 
-> **Tune for the worst corner, not the average one.** A value that _just_ works on an easy corner
-> will fail on the tightest one. Find the hardest corner in the maze and tune until it is reliable;
-> the easy ones then take care of themselves.
+Safe to edit:
 
----
+1. Tunables only.
 
-## A debugging method
+Do not edit unless instructed:
 
-When a run fails, identify **which state** was active when it went wrong, then tune only that state:
+1. State machine topology.
+2. Trigger order.
+3. Safety clamp and timeout behavior.
 
-| Where it failed                         | Likely state  | Fix                                                 |
-| --------------------------------------- | ------------- | --------------------------------------------------- |
-| Drifted into a wall mid-corridor        | `FOLLOW_WALL` | side PID gains / `BASE_SPEED`                       |
-| Over/under-rotated at a corner          | `TURN`        | `turn_Kp` / `turn_Kd` / `turn_tolerance`            |
-| Clipped or missed an outside corner     | `NIB_WALL`    | `NIB_FORWARD_BEFORE` / `NIB_FORWARD_AFTER`          |
-| Started turning too late and hit a wall | trigger       | raise `FRONT_STOP_DISTANCE` / `FRONT_SLOW_DISTANCE` |
+Optional debug edits:
 
-Print the current `state` each loop while debugging so you can see exactly where the machine is when
-trouble starts.
+1. Add state-transition logging to identify where long-run failures start.
 
----
+## Tunables
 
-## Try it
+| Name                  | Unit | Purpose                          | Typical start value | Symptoms when too low | Symptoms when too high |
+| --------------------- | ---- | -------------------------------- | ------------------- | --------------------- | ---------------------- |
+| `BASE_SPEED`          | PWM  | Throughput vs stability tradeoff | 190 to 205          | Slow run              | Late reactions         |
+| `turn_tolerance`      | deg  | Turn completion precision        | 2.0                 | Slow completion       | Incomplete turns       |
+| `FRONT_STOP_DISTANCE` | mm   | Dead-end reaction margin         | 120                 | Wall contact risk     | Premature turn         |
+| `NIB_FORWARD_BEFORE`  | s    | Nib wrap clearance               | 0.25                | Clip corner           | Wide path              |
 
-1. Open **Challenge 7** — the same three-state machine, no new code.
-2. Carry all your numbers forward and tune for the full course.
-3. A fully tuned reference is in `app/answers/challenge-7.py`.
+## Tuning Guide
 
-> **Note on the bundled maze:** some maze layouts (such as a slalom of free-standing walls with no
-> continuous surface) cannot be solved by a hand-on-wall rule at all — there is no single wall to
-> follow from start to exit. If a maze seems impossible no matter how you tune, check whether it is
-> actually wall-followable before assuming your code is wrong.
+1. Verify behavior on the worst-case corner, not the average corner.
+2. Adjust speed downward first if instability appears.
+3. Verify failing states using transition logs.
 
----
+## Debug Checklist
 
-## What's Next
+- [ ] Robot completes full maze in repeated runs.
+- [ ] No state gets stuck.
+- [ ] Turn outcomes remain consistent late in the run.
+- [ ] Exit is reached without manual correction.
 
-You have built a complete, layered robot controller: a side PID, a gyro turn, and a state machine
-that composes them into a maze solver. To run it on the **real** robot, work through the
-[Real-World Calibration](docs.html?doc=Real_World_Calibration_Data) so the simulator physics match
-your hardware, then flash your tuned values to `main.py`.
+## Common Failure Modes
+
+| Symptom                | Root cause                           | Verification step                   | Fix                             |
+| ---------------------- | ------------------------------------ | ----------------------------------- | ------------------------------- |
+| Fails only late in run | Marginal tuning accumulates error    | Compare early vs late corner logs   | Lower speed and retune margins  |
+| Occasional missed turn | Trigger threshold too tight          | Log front distance at failed turn   | Increase stop distance margin   |
+| Random nib failures    | Wrap timing not robust               | Log nib entry/exit durations        | Retune `NIB_FORWARD_*`          |
+| General twitchiness    | Gains too aggressive for full course | Check steering saturation frequency | Slightly reduce gains and speed |
+
+## Exit Check
+
+Pass when the Success Criteria are met in at least 3 consecutive simulator runs.
+
+## What Is Next
+
+Challenge 8 adds marker sensing with the color sensor and introduces event-driven marker handling.

@@ -1,166 +1,139 @@
-# Challenge 9: No-Go Zones — Detect BLACK and Recover
+# Challenge 9: No-Go Zones - Detect Black and Recover
 
-Challenge 9 introduces a brand-new **state**: a recovery manoeuvre that runs when the robot drives
-onto a **BLACK no-go area**. Black floor patches are off-limits — the robot must notice it has
-strayed onto one and get itself back to safety, then carry on.
+## Purpose
 
-This builds directly on the colour sensor from Challenge 8, but uses it in the opposite way. A bright
-marker _raises_ the sensor's clear value; **black absorbs the LED**, so it reads _darker than the
-plain floor_. That means the brightness interrupt never fires for black — you have to **poll** the
-sensor every loop.
-
-You will learn:
-
-- How to detect a surface that is **darker** than the floor with a single threshold.
-- How to build a **multi-step recovery state** that reverses, turns, and re-acquires a wall.
-- How to drive straight **backwards and forwards on the gyro** using a heading PID.
-
----
+Add robust black-zone handling so the robot can detect black floor patches and recover using the implemented four-step maneuver.
 
 ## Success Criteria
 
-My robot wall-follows up the left wall, detects the **black no-go patch**, runs the four-step
-recovery, and reaches the **exit zone on the far side** of the arena.
-
----
+When the robot enters a black zone, it runs the recovery sequence, reacquires a wall, and continues navigation.
 
 ## Before You Begin
 
-1. Complete [Challenge 8](docs.html?doc=Challenge_8) — you already know how to read and classify
-   colours.
-2. Complete [Challenge 4](docs.html?doc=Challenge_4) — the recovery reuses the gyro turn.
-3. Open the **Simulator** and select **Challenge 9**.
+1. Complete Challenge 8 color thresholding.
+2. Confirm gyro turn behavior from Challenge 4 onward is stable.
+3. Open simulator Challenge 9.
 
----
+## Maze Situation
 
-## Concept 1 — Black is _darker_ than the floor
+- Maze feature: black no-go patch darker than floor.
+- Trigger condition expected in code: polled black classification in the control loop.
+- New behavior introduced: RECOVER state using heading-stabilized reverse and forward motion.
+- Why previous challenge fails: bright-marker interrupt logic does not detect dark black regions.
 
-`classify_color()` returns `"black"` when the clear channel falls below `color_black_clear`:
+## What Is New In This Challenge
 
-```python
-r, g, b, c = my_robot.read_color()   # plain floor c ~120, black c ~30
-```
+New: explicit RECOVER sequence with heading-hold motion and open-space turn selection.
 
-Set the threshold **between** the floor and the black patch, and leave it at `0` to disable black
-detection entirely:
+Unchanged: follow wall logic remains the primary navigation mode outside recovery.
 
-```python
-my_robot.color_black_clear = 60
-```
+## Carry Forward From Previous Challenge
 
-> **Important:** `color_detected()` only fires on **bright** markers (it is driven by the hardware
-> interrupt). Black is dark, so it never trips the interrupt — you must **poll** `classify_color()`
-> on every loop to catch it.
+| Group   | Variable                                                                  | Notes                                          |
+| ------- | ------------------------------------------------------------------------- | ---------------------------------------------- |
+| Reused  | Wall-follow tunables                                                      | Navigation remains unchanged outside recovery. |
+| New     | `color_black_clear`                                                       | Black classification threshold.                |
+| New     | `HEADING_Kp`                                                              | Heading-hold gain during reverse and forward.  |
+| New     | `REVERSE_SPEED`, `REVERSE_DT`, `REVERSE_CLEAR_STEPS`, `REVERSE_MAX_STEPS` | Reverse phase controls and safety cap.         |
+| New     | `OPEN_SPACE_DISTANCE`                                                     | Open-space decision threshold.                 |
+| New     | `FORWARD_SPEED`, `FORWARD_DT`, `WALL_FOUND_DISTANCE`, `FORWARD_MAX_STEPS` | Forward search controls and safety cap.        |
+| Removed | Interrupt-only marker assumption                                          | Black requires polling classification.         |
 
----
-
-## Concept 2 — The recovery state
-
-The robot is always in one of two states. `FOLLOW_WALL` watches for black on every tick; the moment
-it sees black it switches to `RECOVER`, which runs the four steps in order and then hands control
-back.
+## Algorithm Flow
 
 ```mermaid
 stateDiagram-v2
     [*] --> FOLLOW_WALL
-    FOLLOW_WALL --> RECOVER: classify_color() == "black"
-    RECOVER --> FOLLOW_WALL: wall re-acquired
-    state RECOVER {
-        [*] --> Reverse
-        Reverse --> Turn90: clear of black
-        Turn90 --> Forward: turned toward open space
-        Forward --> [*]: wall found ahead
-    }
+    FOLLOW_WALL --> RECOVER: classify_color == black
+    RECOVER --> FOLLOW_WALL: recovery sequence complete
 ```
 
----
+### State Table
 
-## Concept 3 — The four-step manoeuvre
+| State name    | Responsibilities                             | Exit conditions                          |
+| ------------- | -------------------------------------------- | ---------------------------------------- |
+| `FOLLOW_WALL` | Normal navigation, poll black-zone condition | Exit to `RECOVER` on black detection     |
+| `RECOVER`     | Execute the four-step recovery sequence      | Exit to `FOLLOW_WALL` when sequence ends |
 
-| Step | What it does                         | How                                                       |
-| ---- | ------------------------------------ | --------------------------------------------------------- |
-| 1    | **Reverse** straight off the black   | Drive backwards, holding heading with a gyro PID          |
-| 2    | **Turn 90°** toward open space       | Read the side sensor, turn **away** from the nearest wall |
-| 3    | **Drive forward** in a straight line | Drive forwards, holding the new heading with the gyro PID |
-| 4    | **Look for a wall**                  | Stop once `read_distance()` finds a wall to follow again  |
+### Trigger Table
 
-### Driving straight on the gyro
+| Trigger condition             | From state    | To state      | Priority |
+| ----------------------------- | ------------- | ------------- | -------- |
+| `classify_color() == "black"` | `FOLLOW_WALL` | `RECOVER`     | Highest  |
+| Recovery sequence complete    | `RECOVER`     | `FOLLOW_WALL` | High     |
 
-Both the reverse and the forward phases hold a straight line the same way: integrate
-`read_gyro_z_dps()` into a heading estimate and steer to drive it back to zero.
+## Starter Code Contract
 
-```python
-gz = my_robot.read_gyro_z_dps()
-heading = heading + gz * DT
-correction = HEADING_Kp * heading
-my_robot.drive(int(base_speed + correction), int(base_speed - correction))
-```
+Safe to edit:
 
-`base_speed` is **negative** for the reverse phase and **positive** for the forward phase — the same
-correction keeps both straight.
+1. Recovery distances and thresholds.
+2. Reverse and forward phase limits.
+3. Black threshold.
 
-### Turning toward open space
+Do not edit unless instructed:
 
-The side sensor faces the wall you were following. If it still sees a near wall, the open space is on
-the **other** side, so turn that way:
+1. Recovery step order.
+2. Heading-hold correction sign.
+3. Side-wall open-space turn decision logic.
+4. Steering output clamps in recovery phases.
 
-```python
-side = my_robot.read_distance_2()
-sensor_on_left = my_robot.wall_sign < 0
-if side != -1 and side < OPEN_SPACE_DISTANCE:
-    turn_dir = "right" if sensor_on_left else "left"   # away from the wall
-else:
-    turn_dir = "left" if sensor_on_left else "right"   # toward the open side
-my_robot.turn_90(turn_dir)
-```
+Optional debug edits:
 
----
+1. Print recovery phase, heading error, and wall pickup readings.
 
-## What you tune in this challenge
+## Tunables
 
-| Parameter             | What it does                                                         |
-| --------------------- | -------------------------------------------------------------------- |
-| `color_black_clear`   | Clear value below which the floor counts as a BLACK no-go area       |
-| `HEADING_Kp`          | How hard to correct heading drift while reversing / driving straight |
-| `REVERSE_SPEED`       | How fast to back out of the no-go area                               |
-| `REVERSE_CLEAR_STEPS` | Extra straight-back steps after the sensor leaves the black          |
-| `OPEN_SPACE_DISTANCE` | Side reading above which that side counts as "open"                  |
-| `FORWARD_SPEED`       | Cruise speed while hunting for the next wall                         |
-| `WALL_FOUND_DISTANCE` | Front distance that counts as "wall found"                           |
+| Name                  | Unit         | Purpose                               | Typical start value | Symptoms when too low  | Symptoms when too high       |
+| --------------------- | ------------ | ------------------------------------- | ------------------- | ---------------------- | ---------------------------- |
+| `color_black_clear`   | clear counts | Detect black zone                     | 60                  | Misses black           | False black on floor         |
+| `HEADING_Kp`          | gain         | Heading-hold correction               | 0.8                 | Curved reverse/forward | Twitchy heading correction   |
+| `REVERSE_SPEED`       | PWM          | Reverse speed off black               | 160                 | Slow escape            | Harsh reverse                |
+| `REVERSE_CLEAR_STEPS` | loop count   | Extra clear loops after leaving black | 6                   | Re-entry risk          | Overlong reverse             |
+| `OPEN_SPACE_DISTANCE` | mm           | Decide which side is open             | 400                 | Wrong turn choice      | Too conservative turn choice |
+| `FORWARD_SPEED`       | PWM          | Forward search speed                  | 170                 | Slow reacquire         | Overshoot wall               |
+| `WALL_FOUND_DISTANCE` | mm           | Wall reacquire threshold              | 300                 | Missed wall pickup     | Early stop                   |
 
----
+## Tuning Guide
 
-## Tuning guide
+1. Verify black detection first.
+2. Adjust the reverse phase until black is cleared reliably.
+3. Adjust open-space turn selection and forward wall pickup.
+4. Verify reverse and forward safety caps stay in place.
 
-| Observation                       | Fix                                                                          |
-| --------------------------------- | ---------------------------------------------------------------------------- |
-| Never reacts to the black patch   | Lower `color_black_clear` is wrong — RAISE it toward the floor's clear value |
-| Triggers black on the plain floor | Lower `color_black_clear` until the floor reads `none`                       |
-| Reverses in a curve               | Raise `HEADING_Kp`; check the correction sign on `drive()`                   |
-| Turns back into the no-go area    | Check `choose_open_direction()` and your `OPEN_SPACE_DISTANCE`               |
-| Drives forever after turning      | Raise `WALL_FOUND_DISTANCE` or lower `FORWARD_MAX_STEPS`                     |
+## Debug Checklist
 
----
+- [ ] Black detection is polled and reliable.
+- [ ] Recovery phases execute in documented order.
+- [ ] Reverse and forward heading remain stable (no strong curve).
+- [ ] Recovery returns to follow-wall behavior after reacquiring wall.
 
-## Try it
+## Common Failure Modes
 
-1. Open **Challenge 9** and run the starter code — it ignores the black patch at first.
-2. Tune `color_black_clear`, then the recovery parameters, until the robot backs out, turns toward
-   open space, and reaches the exit.
-3. The tuned answer is in `app/answers/challenge-9.py`.
+| Symptom                       | Root cause                        | Verification step                       | Fix                            |
+| ----------------------------- | --------------------------------- | --------------------------------------- | ------------------------------ |
+| Ignores black patch           | `color_black_clear` too low       | Log clear channel at black entry        | Raise threshold                |
+| Recovers but re-enters black  | Reverse clear window too short    | Track black->non-black transition count | Increase `REVERSE_CLEAR_STEPS` |
+| Fails to find wall after turn | Forward stop threshold too strict | Log front distance during search        | Increase `WALL_FOUND_DISTANCE` |
+| Recovery path curves badly    | Heading hold gain too low/high    | Log heading drift during recovery       | Retune `HEADING_Kp`            |
 
----
+## Exit Check
 
-## Hardware notes
+Pass when the Success Criteria are met in at least 3 consecutive simulator runs.
 
-Detection uses the same TCS34725 as Challenge 8 (shared bit-banged I²C on GP16/GP17, address `0x29`).
-Because black never raises the brightness interrupt on GP7, the recovery loop **polls**
-`classify_color()` rather than waiting on `color_detected()`. The reverse and forward phases rely on
-the LSM6DS3 gyro (`read_gyro_z_dps()`) exactly like the Challenge 4 turn.
+## What Is Next
+
+Challenge 10 adds competition scoring, victim handling, OLED status updates, and rescue-kit actions on top of stable navigation.
 
 ---
 
-## What's Next
+## Challenge 9 Concrete Recovery Sequence
 
-[Challenge 10](docs.html?doc=Challenge_10) is the **Rescue Maze capstone**: identify victims, keep a
-running score, drop a rescue kit on the harmed ones, and report it all live on the **OLED** display.
+Use this exact sequence in RECOVER state:
+
+1. Detect black-zone entry using polled `classify_color()`.
+2. Latch RECOVER state.
+3. Reverse straight with heading hold until black is cleared for `REVERSE_CLEAR_STEPS` loops.
+4. Read side distance and choose turn direction toward open space.
+5. Turn 90 deg using `my_robot.turn_90(turn_dir)`.
+6. Drive forward with heading hold until front wall is found (`front <= WALL_FOUND_DISTANCE`) or step cap is reached.
+7. Brake and return to FOLLOW_WALL.
