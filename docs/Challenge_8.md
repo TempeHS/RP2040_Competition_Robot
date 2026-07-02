@@ -145,3 +145,11 @@ On the real robot the TCS34725 shares the IMU's bit-banged I²C bus (GP16 = SDA,
 `0x29`). Its active-low interrupt pin is wired to **GP7**. The driver lives in
 `project/lib/tcs34725.py` and is wired into `AIDriver` automatically — if the sensor is missing,
 `my_robot.has_color` is `False` and the colour methods return safe defaults.
+
+---
+
+## What's Next
+
+[Challenge 9](docs.html?doc=Challenge_9) uses the same colour sensor the opposite way: a **black**
+no-go patch reads _darker_ than the floor, so you'll **poll** for it and add a **recovery** state
+that backs the robot out of trouble.

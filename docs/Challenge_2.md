@@ -184,3 +184,10 @@ Full worked solution: `app/answers/challenge-2.py`.
 - Add `print("D:", derivative, "steer:", steering)` inside the loop to see how the derivative affects steering.
 - If both numbers look the same as Challenge 1, check that you are updating `side_previous_error` at the end of each loop.
 - The D term should be largest in the first few loops (when the initial error is large and changing fast) and settle near zero once the robot is at the right distance.
+
+---
+
+## What's Next
+
+[Challenge 3](docs.html?doc=Challenge_3) adds an **L-shaped corner** where PD control drifts. You'll
+add the **Integral (I)** term — completing the full PID — to close that steady-state gap.

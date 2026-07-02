@@ -31,6 +31,41 @@ All components can be purchased from [AliExpress](https://www.aliexpress.com/) a
 > [!Note]
 > This build now uses **Seeed Studio Grove sensors** plugged into a **Grove Base Shield** instead of bare ultrasonic modules. The Grove ultrasonic rangers handle front/side distance, and the Grove LSM6DS3 gyroscope provides the yaw rate used for the closed-loop 90°/180° gyro turns.
 
+### Pin Assignments
+
+Default GPIO map used by the `AIDriver` library (all numbers are RP2040 `GP` pins).
+
+**Motors — via the L298N motor shield**
+
+| Function              | Pin  |
+| --------------------- | ---- |
+| Right motor PWM/speed | GP3  |
+| Right motor direction | GP12 |
+| Right motor brake     | GP9  |
+| Left motor PWM/speed  | GP11 |
+| Left motor direction  | GP13 |
+| Left motor brake      | GP8  |
+
+**Sensors & display**
+
+| Device                      | Interface       | Pins                             | I²C address |
+| --------------------------- | --------------- | -------------------------------- | ----------- |
+| Front ultrasonic (Grove)    | single-wire SIG | GP6                              | —           |
+| Side ultrasonic (Grove)     | single-wire SIG | GP4                              | —           |
+| Gyroscope LSM6DS3 (Grove)   | SoftI²C         | SDA GP16 / SCL GP17              | `0x6A`      |
+| Colour sensor TCS34725      | SoftI²C + INT   | SDA GP16 / SCL GP17, **INT GP7** | `0x29`      |
+| OLED display SSD1306        | SoftI²C         | SDA GP16 / SCL GP17              | `0x3C`      |
+| Rescue-kit servo (optional) | PWM             | unassigned by default            | —           |
+
+**System**
+
+| Function                  | Pin                                                              |
+| ------------------------- | ---------------------------------------------------------------- |
+| Firmware recovery / reset | **GP2 → GND during boot** (restores `main.py` + `event_log.txt`) |
+
+> [!Note]
+> **GP16 / GP17** are a single shared bit-banged **SoftI²C** bus carrying three devices at once — the gyro (`0x6A`), colour sensor (`0x29`) and OLED (`0x3C`). The **colour sensor's active-low interrupt** is on **GP7**. GP7 is also the legacy HC-SR04 _echo_ pin for the front sensor, but the Grove ultrasonic ranger uses a single-wire SIG on GP6, so GP7 is free for the colour interrupt. Holding **GP2 low at boot** enters firmware recovery mode.
+
 ### Preparation
 
 > [!Note]
@@ -72,15 +107,26 @@ Once students have assembled their robot they are to complete the programming ch
 
 **🎮 Web Simulator:** Test your code before uploading to the robot using the [AIDriver Simulator](https://tempehs.github.io/AIDriver_MicroPython_Challanges/) - no hardware required!
 
-1. [Challenge 1](Challenge_1.md) - Drive in a straight line
-2. [Challenge 2](Challenge_2.md) - Drive in a large circle
-3. [Challenge 3](Challenge_3.md) - Autonomous collision prevention
-4. [Challenge 4](Challenge_4.md) - Drive in a square
-5. [Challenge 5](Challenge_5.md) - Autonomous obstacle avoidance
-6. [Challenge 6](Challenge_6.md) - Autonomous maze navigation
-7. [Challenge 7](Challenge_7.md) - Remote control
-8. [Challenge 8](Challenge_8.md) - Ground colour detection
-9. [Challenge 9](Challenge_9.md) - No-go zone detection and recovery
+The challenges build in three stages — each one carries its code forward to the next, so work through them in order.
+
+**Stage 1 — PID wall following** (side sensor + control theory)
+
+1. [Challenge 1](Challenge_1.md) - Wall Follow: P control
+2. [Challenge 2](Challenge_2.md) - Wall Follow: PD control
+3. [Challenge 3](Challenge_3.md) - Wall Follow: full PID
+
+**Stage 2 — State machine maze solving** (front sensor + gyro turns)
+
+4. [Challenge 4](Challenge_4.md) - Corner detection & your first state machine
+5. [Challenge 5](Challenge_5.md) - Outside corners: the nib state
+6. [Challenge 6](Challenge_6.md) - Dead ends and nibs: one machine, both turns
+7. [Challenge 7](Challenge_7.md) - The full maze: capstone
+
+**Stage 3 — Rescue sensors & competition** (colour sensor + OLED)
+
+8. [Challenge 8](Challenge_8.md) - Ground colour detection: pause on markers
+9. [Challenge 9](Challenge_9.md) - No-go zones: detect black and recover
+10. [Challenge 10](Challenge_10.md) - Competition run: victims, score & the OLED
 
 ### Competition
 

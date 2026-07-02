@@ -22,6 +22,11 @@ except Exception:
     GroveUltrasonic = None
 
 try:
+    from vl53l0x import VL53L0X
+except Exception:
+    VL53L0X = None
+
+try:
     from lsm6ds3 import LSM6DS3, _recover_i2c_bus
 except Exception:
     LSM6DS3 = None
@@ -530,6 +535,7 @@ class AIDriver:
     def __init__(
         self,
         wall_side,  # Required: "left" or "right" — which wall the robot follows
+        distance_sensor="ultrasonic",  # "ultrasonic" (default) or "tof" (VL53L0X)
         min_approach_speed=130,  # Floor PWM for the front-approach ramp
         right_speed_pin=3,  # GP3 (PWM capable)
         left_speed_pin=11,  # GP11 (PWM capable)
@@ -566,6 +572,15 @@ class AIDriver:
                        Sets self.wall_sign = 1 for right, -1 for left.
                        Use in PID loops: right_speed = BASE - (wall_sign * steering)
                                          left_speed  = BASE + (wall_sign * steering)
+            distance_sensor: Distance backend — "ultrasonic" (default) or "tof".
+                       "ultrasonic": trig_pin/trig_pin_2 drive HC-SR04/Grove
+                                     ultrasonic sensors (existing behaviour).
+                       "tof":        two VL53L0X Time-of-Flight sensors on the
+                                     shared SoftI2C bus. The SAME two pins
+                                     (trig_pin, trig_pin_2) are re-purposed as
+                                     the sensors' XSHUT reset lines instead of
+                                     ultrasonic SIG/TRIG. Example:
+                                         AIDriver("left", "tof")
             right_speed_pin: PWM pin for right motor speed (default GP3)
             left_speed_pin: PWM pin for left motor speed (default GP11)
             right_dir_pin: Digital pin for right motor direction (default GP12)
@@ -626,58 +641,35 @@ class AIDriver:
         self.motor_right = L298N(right_speed_pin, right_dir_pin, right_brake_pin)
         self.motor_left = L298N(left_speed_pin, left_dir_pin, left_brake_pin)
 
-        # Initialize ultrasonic sensors.
-        # Preferred: Grove single-pin driver (SIG). Fallback: legacy HC-SR04.
-        mode = str(ultrasonic_mode).strip().lower()
-        if mode not in ("auto", "grove", "hcsr04"):
-            mode = "auto"
+        # Initialize the distance sensing backend: ultrasonic OR time-of-flight.
+        # "tof" re-purposes the two ultrasonic SIG pins (trig_pin, trig_pin_2)
+        # as the VL53L0X XSHUT reset lines — no other pins change.
+        self.distance_sensor = str(distance_sensor).strip().lower()
+        if self.distance_sensor not in ("ultrasonic", "tof"):
+            self.distance_sensor = "ultrasonic"
 
-        if mode == "grove" and GroveUltrasonic is None:
-            raise ImportError(
-                "ultrasonic_mode='grove' requested but grove_ultrasonic module is unavailable"
+        # Attributes exist in every mode so callers can test them safely.
+        self.ultrasonic_1 = None
+        self.ultrasonic_2 = None
+        self.tof_1 = None
+        self.tof_2 = None
+        self.has_tof = False
+
+        if self.distance_sensor == "tof":
+            # ToF mode: trig_pin/trig_pin_2 become XSHUT reset lines.
+            self._init_tof_sensors(
+                xshut_pin_1=trig_pin,
+                xshut_pin_2=trig_pin_2,
+                sda=imu_sda,
+                scl=imu_scl,
             )
-
-        use_grove = (mode == "grove") or (
-            mode == "auto" and GroveUltrasonic is not None
-        )
-
-        if use_grove:
-            self.ultrasonic_1 = GroveUltrasonic(sig_pin=trig_pin)
-            self.ultrasonic_2 = GroveUltrasonic(sig_pin=trig_pin_2)
-            _d("Ultrasonic mode: GroveUltrasonic (single-pin SIG)")
         else:
-            self.ultrasonic_1 = UltrasonicSensor(trig_pin, echo_pin)
-            self.ultrasonic_2 = UltrasonicSensor(trig_pin_2, echo_pin_2)
-            _d("Ultrasonic mode: UltrasonicSensor (legacy HC-SR04 fallback)")
-
-        # Silent hardware sanity ping for sensor 1 (only visible if DEBUG_AIDRIVER is True)
-        try:
-            d = self.ultrasonic_1.read_distance_mm()
-            if d == -1:
-                _d(
-                    "Ultrasonic 1 preflight: reading -1. Check wiring, aim at object 2–200cm.",
-                )
-        except Exception as exc:
-            _d(
-                "Ultrasonic 1 preflight error:",
-                type(exc).__name__,
-                str(exc),
-                "– check SIG_1/TRIG_1 and ECHO_1 wiring plus sensor power.",
-            )
-
-        # Silent hardware sanity ping for sensor 2
-        try:
-            d = self.ultrasonic_2.read_distance_mm()
-            if d == -1:
-                _d(
-                    "Ultrasonic 2 preflight: reading -1. Check wiring, aim at object 2–200cm.",
-                )
-        except Exception as exc:
-            _d(
-                "Ultrasonic 2 preflight error:",
-                type(exc).__name__,
-                str(exc),
-                "– check SIG_2/TRIG_2 and ECHO_2 wiring plus sensor power.",
+            self._init_ultrasonic_sensors(
+                ultrasonic_mode=ultrasonic_mode,
+                trig_pin=trig_pin,
+                echo_pin=echo_pin,
+                trig_pin_2=trig_pin_2,
+                echo_pin_2=echo_pin_2,
             )
 
         _d("AIDriver initialized - debug logging active")
@@ -883,13 +875,157 @@ class AIDriver:
         # with zero CPU interrupts or impact on motor control.
         _start_pwm_heartbeat()
 
+    def _init_ultrasonic_sensors(
+        self, ultrasonic_mode, trig_pin, echo_pin, trig_pin_2, echo_pin_2
+    ):
+        """Set up the two ultrasonic distance sensors (default backend).
+
+        Preferred: Grove single-pin driver (SIG). Fallback: legacy HC-SR04.
+        """
+        mode = str(ultrasonic_mode).strip().lower()
+        if mode not in ("auto", "grove", "hcsr04"):
+            mode = "auto"
+
+        if mode == "grove" and GroveUltrasonic is None:
+            raise ImportError(
+                "ultrasonic_mode='grove' requested but grove_ultrasonic module is unavailable"
+            )
+
+        use_grove = (mode == "grove") or (
+            mode == "auto" and GroveUltrasonic is not None
+        )
+
+        if use_grove:
+            self.ultrasonic_1 = GroveUltrasonic(sig_pin=trig_pin)
+            self.ultrasonic_2 = GroveUltrasonic(sig_pin=trig_pin_2)
+            _d("Ultrasonic mode: GroveUltrasonic (single-pin SIG)")
+        else:
+            self.ultrasonic_1 = UltrasonicSensor(trig_pin, echo_pin)
+            self.ultrasonic_2 = UltrasonicSensor(trig_pin_2, echo_pin_2)
+            _d("Ultrasonic mode: UltrasonicSensor (legacy HC-SR04 fallback)")
+
+        # Silent hardware sanity ping for sensor 1 (only visible if DEBUG_AIDRIVER is True)
+        try:
+            d = self.ultrasonic_1.read_distance_mm()
+            if d == -1:
+                _d(
+                    "Ultrasonic 1 preflight: reading -1. Check wiring, aim at object 2–200cm.",
+                )
+        except Exception as exc:
+            _d(
+                "Ultrasonic 1 preflight error:",
+                type(exc).__name__,
+                str(exc),
+                "– check SIG_1/TRIG_1 and ECHO_1 wiring plus sensor power.",
+            )
+
+        # Silent hardware sanity ping for sensor 2
+        try:
+            d = self.ultrasonic_2.read_distance_mm()
+            if d == -1:
+                _d(
+                    "Ultrasonic 2 preflight: reading -1. Check wiring, aim at object 2–200cm.",
+                )
+        except Exception as exc:
+            _d(
+                "Ultrasonic 2 preflight error:",
+                type(exc).__name__,
+                str(exc),
+                "– check SIG_2/TRIG_2 and ECHO_2 wiring plus sensor power.",
+            )
+
+    def _init_tof_sensors(self, xshut_pin_1, xshut_pin_2, sda, scl):
+        """Set up two VL53L0X Time-of-Flight sensors on the shared SoftI2C bus.
+
+        Every VL53L0X powers up at address 0x29, so the two sensors are brought
+        out of reset one at a time (via their XSHUT pins) and each is moved to a
+        unique, non-default address. 0x29 is deliberately vacated so it stays
+        free for the TCS34725 colour sensor that shares this bus.
+
+        Args:
+            xshut_pin_1: GPIO wired to sensor 1 XSHUT (the old trig_pin).
+            xshut_pin_2: GPIO wired to sensor 2 XSHUT (the old trig_pin_2).
+            sda/scl: SoftI2C pins (shared with the IMU/colour/OLED bus).
+        """
+        if VL53L0X is None or SoftI2C is None:
+            _d(
+                "ToF requested but vl53l0x/SoftI2C module unavailable —",
+                "distance readings will return -1.",
+            )
+            return
+
+        # Hold BOTH sensors in reset before touching the bus so neither is
+        # squatting on 0x29 while we bring the other up.
+        self._tof_xshut_1 = Pin(xshut_pin_1, Pin.OUT, value=0)
+        self._tof_xshut_2 = Pin(xshut_pin_2, Pin.OUT, value=0)
+        sleep_ms(10)
+
+        try:
+            i2c = SoftI2C(scl=Pin(scl), sda=Pin(sda), freq=400_000)
+
+            # Sensor 1: release from reset, then move it to 0x30.
+            self._tof_xshut_1.value(1)
+            sleep_ms(10)
+            self.tof_1 = VL53L0X(i2c)  # boots on default 0x29
+            self.tof_1.set_address(0x30)
+            self.tof_1.start()
+            _d("ToF sensor 1 OK on GP{}/GP{} @ 0x30".format(sda, scl))
+
+            # Sensor 2: release from reset, then move it to 0x31, leaving 0x29
+            # free for the colour sensor. If only one sensor is fitted this
+            # simply fails softly and read_distance_2() returns -1.
+            self._tof_xshut_2.value(1)
+            sleep_ms(10)
+            try:
+                self.tof_2 = VL53L0X(i2c)  # boots on default 0x29
+                self.tof_2.set_address(0x31)
+                self.tof_2.start()
+                _d("ToF sensor 2 OK on GP{}/GP{} @ 0x31".format(sda, scl))
+            except Exception as exc:
+                self.tof_2 = None
+                _d(
+                    "ToF sensor 2 init failed:",
+                    type(exc).__name__,
+                    str(exc),
+                    "– only one ToF sensor available.",
+                )
+
+            self.has_tof = self.tof_1 is not None
+        except Exception as exc:
+            self.tof_1 = None
+            self.tof_2 = None
+            self.has_tof = False
+            _d(
+                "ToF init failed:",
+                type(exc).__name__,
+                str(exc),
+                "– distance readings will return -1. Check GP{}/GP{} wiring,".format(
+                    sda, scl
+                ),
+                "XSHUT on GP{}/GP{}, and 3V3 power.".format(xshut_pin_1, xshut_pin_2),
+            )
+
     def read_distance(self):
         """
-        Read distance from ultrasonic sensor 1 (front sensor).
+        Read distance from front distance sensor 1.
+
+        Works for both backends: ultrasonic (HC-SR04/Grove) or ToF (VL53L0X),
+        selected by the ``distance_sensor`` constructor argument.
 
         Returns:
             Distance in millimeters, or -1 if invalid reading.
         """
+        if self.distance_sensor == "tof":
+            if self.tof_1 is None:
+                return -1
+            try:
+                distance_mm = self.tof_1.read()
+            except Exception as exc:
+                _d("read_distance (ToF) error:", type(exc).__name__, str(exc))
+                return -1
+            _d("read_distance (ToF):", distance_mm, "mm")
+            return int(distance_mm)
+
         distance_mm = self.ultrasonic_1.read_distance_mm()
         if distance_mm == -1:
             # Don't print debug here - inline warning handles user feedback
@@ -899,7 +1035,10 @@ class AIDriver:
 
     def read_distance_2(self):
         """
-        Read distance from ultrasonic sensor 2 (second sensor on GP4/GP5).
+        Read distance from side distance sensor 2.
+
+        Works for both backends: ultrasonic (HC-SR04/Grove) or ToF (VL53L0X),
+        selected by the ``distance_sensor`` constructor argument.
 
         Also updates self.dt with the elapsed seconds since the previous call.
         Use this in PID derivative and integral terms to compensate for variable
@@ -918,6 +1057,17 @@ class AIDriver:
         # Guard against zero (first call) and negative wrap-around.
         self.dt = max(elapsed, 1) / 1000.0
         self._last_side_read_ms = now
+
+        if self.distance_sensor == "tof":
+            if self.tof_2 is None:
+                return -1
+            try:
+                distance_mm = self.tof_2.read()
+            except Exception as exc:
+                _d("read_distance_2 (ToF) error:", type(exc).__name__, str(exc))
+                return -1
+            _d("read_distance_2 (ToF):", distance_mm, "mm", "dt:", self.dt, "s")
+            return int(distance_mm)
 
         distance_mm = self.ultrasonic_2.read_distance_mm()
         if distance_mm == -1:

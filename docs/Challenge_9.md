@@ -157,3 +157,10 @@ Detection uses the same TCS34725 as Challenge 8 (shared bit-banged I²C on GP16/
 Because black never raises the brightness interrupt on GP7, the recovery loop **polls**
 `classify_color()` rather than waiting on `color_detected()`. The reverse and forward phases rely on
 the LSM6DS3 gyro (`read_gyro_z_dps()`) exactly like the Challenge 4 turn.
+
+---
+
+## What's Next
+
+[Challenge 10](docs.html?doc=Challenge_10) is the **Rescue Maze capstone**: identify victims, keep a
+running score, drop a rescue kit on the harmed ones, and report it all live on the **OLED** display.

@@ -195,3 +195,10 @@ These are a starting point only — the full tuned answer is in `app/answers/cha
   ```
 
   to see what numbers the controller is producing.
+
+---
+
+## What's Next
+
+[Challenge 2](docs.html?doc=Challenge_2) starts the robot **off-centre and angled**, so P-only
+control zig-zags. You'll add a **Derivative (D)** term to smooth it out.

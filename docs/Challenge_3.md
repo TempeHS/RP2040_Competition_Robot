@@ -207,3 +207,10 @@ Full worked solution: `app/answers/challenge-3.py`. This tuned side-follow block
 - The integral column should stay near zero on straight sections and slowly grow on the corner.
 - If the integral grows even on a straight section, your `side_Kp` may be too low and the robot is already slightly off-target.
 - If something confusing happens, temporarily set `side_Ki = 0` to confirm the PD part is still working correctly, then re-add Ki.
+
+---
+
+## What's Next
+
+[Challenge 4](docs.html?doc=Challenge_4) is a big step: your PID becomes one **state** in a **state
+machine**, and you'll write the reusable **gyro turn** that every later challenge builds on.
