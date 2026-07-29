@@ -547,8 +547,8 @@ class AIDriver:
         echo_pin=7,  # GP7 (front sensor, legacy HC-SR04 fallback)
         trig_pin_2=4,  # GP4 (second sensor)
         echo_pin_2=5,  # GP5 (second sensor, legacy HC-SR04 fallback)
-        tof_front_sda=26,  # GP27 (A0) — front ToF dedicated SoftI2C SDA
-        tof_front_scl=27,  # GP26 (A1) — front ToF dedicated SoftI2C SCL
+        tof_front_sda=27,  # GP27 (A0) — front ToF dedicated SoftI2C SDA
+        tof_front_scl=26,  # GP26 (A1) — front ToF dedicated SoftI2C SCL
         tof_side_sda=6,  # GP6 (D6) — side ToF dedicated SoftI2C SDA
         tof_side_scl=5,  # GP5 (D5) — side ToF dedicated SoftI2C SCL
         ultrasonic_mode="auto",  # "auto" (default), "grove", or "hcsr04"
@@ -967,7 +967,9 @@ class AIDriver:
 
         # --- Front ToF: dedicated bus, default 0x29, no XSHUT -------------
         try:
-            front_i2c = SoftI2C(scl=Pin(front_scl), sda=Pin(front_sda), freq=400_000)
+            front_sda_pin = Pin(front_sda, Pin.OPEN_DRAIN, Pin.PULL_UP)
+            front_scl_pin = Pin(front_scl, Pin.OPEN_DRAIN, Pin.PULL_UP)
+            front_i2c = SoftI2C(scl=front_scl_pin, sda=front_sda_pin, freq=400_000)
             self.tof_1 = VL53L0X(front_i2c)  # stays on default 0x29 (own bus)
             self.tof_1.start()
             _d("Front ToF OK on GP{}/GP{} @ 0x29".format(front_sda, front_scl))
@@ -985,7 +987,9 @@ class AIDriver:
         # If no side sensor is fitted this fails softly and read_distance_2()
         # returns -1.
         try:
-            side_i2c = SoftI2C(scl=Pin(side_scl), sda=Pin(side_sda), freq=400_000)
+            side_sda_pin = Pin(side_sda, Pin.OPEN_DRAIN, Pin.PULL_UP)
+            side_scl_pin = Pin(side_scl, Pin.OPEN_DRAIN, Pin.PULL_UP)
+            side_i2c = SoftI2C(scl=side_scl_pin, sda=side_sda_pin, freq=400_000)
             self.tof_2 = VL53L0X(side_i2c)  # stays on default 0x29 (own bus)
             self.tof_2.start()
             _d("Side ToF OK on GP{}/GP{} @ 0x29".format(side_sda, side_scl))
