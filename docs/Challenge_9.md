@@ -37,7 +37,7 @@ Unchanged: follow wall logic remains the primary navigation mode outside recover
 | New     | `REVERSE_SPEED`, `REVERSE_DT`, `REVERSE_CLEAR_STEPS`, `REVERSE_MAX_STEPS` | Reverse phase controls and safety cap.         |
 | New     | `OPEN_SPACE_DISTANCE`                                                     | Open-space decision threshold.                 |
 | New     | `FORWARD_SPEED`, `FORWARD_DT`, `WALL_FOUND_DISTANCE`, `FORWARD_MAX_STEPS` | Forward search controls and safety cap.        |
-| New     | `GRID_CELL_MM`, `GRID_WALL_OFFSET_MM`, `GRID_ERROR_CLAMP_MM` | Section-based wall estimate compensation. |
+| New     | `GRID_CELL_MM`, `GRID_WALL_OFFSET_MM`, `GRID_ERROR_CLAMP_MM`              | Section-based wall estimate compensation.      |
 | Removed | Interrupt-only marker assumption                                          | Black requires polling classification.         |
 
 ## Algorithm Flow
@@ -84,17 +84,17 @@ Optional debug edits:
 
 ## Tunables
 
-| Name                  | Unit         | Purpose                               | Typical start value | Symptoms when too low  | Symptoms when too high       |
-| --------------------- | ------------ | ------------------------------------- | ------------------- | ---------------------- | ---------------------------- |
-| `color_black_clear`   | clear counts | Detect black zone                     | 60                  | Misses black           | False black on floor         |
-| `HEADING_Kp`          | gain         | Heading-hold correction               | 0.8                 | Curved reverse/forward | Twitchy heading correction   |
-| `REVERSE_SPEED`       | PWM          | Reverse speed off black               | 160                 | Slow escape            | Harsh reverse                |
-| `REVERSE_CLEAR_STEPS` | loop count   | Extra clear loops after leaving black | 6                   | Re-entry risk          | Overlong reverse             |
-| `OPEN_SPACE_DISTANCE` | mm           | Decide which side is open             | 400                 | Wrong turn choice      | Too conservative turn choice |
-| `FORWARD_SPEED`       | PWM          | Forward search speed                  | 170                 | Slow reacquire         | Overshoot wall               |
-| `WALL_FOUND_DISTANCE` | mm           | Wall reacquire threshold              | 300                 | Missed wall pickup     | Early stop                   |
-| `GRID_WALL_OFFSET_MM` | mm           | Theoretical wall offset in section estimate | 6             | Persistent under-stop  | Persistent over-stop         |
-| `GRID_ERROR_CLAMP_MM` | mm           | Clamp for section compensation        | 25                  | Too little correction  | Overreacts to noisy readings |
+| Name                  | Unit         | Purpose                                     | Typical start value | Symptoms when too low  | Symptoms when too high       |
+| --------------------- | ------------ | ------------------------------------------- | ------------------- | ---------------------- | ---------------------------- |
+| `color_black_clear`   | clear counts | Detect black zone                           | 60                  | Misses black           | False black on floor         |
+| `HEADING_Kp`          | gain         | Heading-hold correction                     | 0.8                 | Curved reverse/forward | Twitchy heading correction   |
+| `REVERSE_SPEED`       | PWM          | Reverse speed off black                     | 160                 | Slow escape            | Harsh reverse                |
+| `REVERSE_CLEAR_STEPS` | loop count   | Extra clear loops after leaving black       | 6                   | Re-entry risk          | Overlong reverse             |
+| `OPEN_SPACE_DISTANCE` | mm           | Decide which side is open                   | 400                 | Wrong turn choice      | Too conservative turn choice |
+| `FORWARD_SPEED`       | PWM          | Forward search speed                        | 170                 | Slow reacquire         | Overshoot wall               |
+| `WALL_FOUND_DISTANCE` | mm           | Wall reacquire threshold                    | 300                 | Missed wall pickup     | Early stop                   |
+| `GRID_WALL_OFFSET_MM` | mm           | Theoretical wall offset in section estimate | 6                   | Persistent under-stop  | Persistent over-stop         |
+| `GRID_ERROR_CLAMP_MM` | mm           | Clamp for section compensation              | 25                  | Too little correction  | Overreacts to noisy readings |
 
 ## Tuning Guide
 
@@ -112,13 +112,13 @@ Optional debug edits:
 
 ## Common Failure Modes
 
-| Symptom                       | Root cause                        | Verification step                       | Fix                            |
-| ----------------------------- | --------------------------------- | --------------------------------------- | ------------------------------ |
-| Ignores black patch           | `color_black_clear` too low       | Log clear channel at black entry        | Raise threshold                |
-| Recovers but re-enters black  | Reverse clear window too short    | Track black->non-black transition count | Increase `REVERSE_CLEAR_STEPS` |
-| Fails to find wall after turn | Forward stop threshold too strict | Log front distance during search        | Increase `WALL_FOUND_DISTANCE` |
-| Recovery path curves badly    | Heading hold gain too low/high    | Log heading drift during recovery       | Retune `HEADING_Kp`            |
-| Reacquire point jumps around  | Section compensation too aggressive | Log section estimate and stop target  | Lower `GRID_ERROR_CLAMP_MM`    |
+| Symptom                       | Root cause                          | Verification step                       | Fix                            |
+| ----------------------------- | ----------------------------------- | --------------------------------------- | ------------------------------ |
+| Ignores black patch           | `color_black_clear` too low         | Log clear channel at black entry        | Raise threshold                |
+| Recovers but re-enters black  | Reverse clear window too short      | Track black->non-black transition count | Increase `REVERSE_CLEAR_STEPS` |
+| Fails to find wall after turn | Forward stop threshold too strict   | Log front distance during search        | Increase `WALL_FOUND_DISTANCE` |
+| Recovery path curves badly    | Heading hold gain too low/high      | Log heading drift during recovery       | Retune `HEADING_Kp`            |
+| Reacquire point jumps around  | Section compensation too aggressive | Log section estimate and stop target    | Lower `GRID_ERROR_CLAMP_MM`    |
 
 ## Exit Check
 
