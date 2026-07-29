@@ -547,8 +547,8 @@ class AIDriver:
         echo_pin=7,  # GP7 (front sensor, legacy HC-SR04 fallback)
         trig_pin_2=4,  # GP4 (second sensor)
         echo_pin_2=5,  # GP5 (second sensor, legacy HC-SR04 fallback)
-        tof_front_sda=27,  # GP27 (A0) — front ToF dedicated SoftI2C SDA
-        tof_front_scl=26,  # GP26 (A1) — front ToF dedicated SoftI2C SCL
+        tof_front_sda=29,  # GP27 (A0) — front ToF dedicated SoftI2C SDA
+        tof_front_scl=28,  # GP26 (A1) — front ToF dedicated SoftI2C SCL
         tof_side_sda=6,  # GP6 (D6) — side ToF dedicated SoftI2C SDA
         tof_side_scl=5,  # GP5 (D5) — side ToF dedicated SoftI2C SCL
         ultrasonic_mode="auto",  # "auto" (default), "grove", or "hcsr04"
