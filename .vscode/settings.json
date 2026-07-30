@@ -27,7 +27,9 @@
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.0.2/emulator/mock/typings",
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.0.2/emulator/mock/micropython",
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.3.40/emulator/mock/typings",
-    "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.3.40/emulator/mock/micropython"
+    "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.3.40/emulator/mock/micropython",
+    "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.3.43/emulator/mock/typings",
+    "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.3.43/emulator/mock/micropython"
   ],
   "micropico.syncFolder": "project",
   "workbench.colorTheme": "Visual Studio Dark",
