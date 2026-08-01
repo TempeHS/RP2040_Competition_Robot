@@ -1,15 +1,12 @@
-"""
-AIDriver MicroPython Library for RP2040
-A unified 2-wheel robot library with ultrasonic sensor
+"""The AIDriver class: unified 2-wheel robot driver with sensors.
 
-Converted from Arduino C++ library by Ben Jones @ Tempe High School
-Original licenses maintained: GNU GPL for code, Creative Commons for content
-
-Dependencies: machine, time modules (built into MicroPython)
+Ties together the motor driver (motor.py), the legacy ultrasonic fallback
+(ultrasonic.py), and optional Grove ultrasonic / ToF / gyro / colour / OLED
+peripherals into a single classroom-friendly API.
 """
 
-from machine import Pin, PWM, time_pulse_us
-from time import sleep_us, sleep_ms, sleep as _sleep, ticks_ms, ticks_diff
+from machine import Pin, PWM
+from time import sleep_ms, ticks_ms, ticks_diff
 
 try:
     from machine import SoftI2C
@@ -42,483 +39,60 @@ try:
 except Exception:
     SSD1306_I2C = None
 
-try:
-    import eventlog
-except Exception:
-    eventlog = None
+from . import _d, _explain_error, _log_event, _start_pwm_heartbeat
+from ._messages import _describe_drive, _describe_rotation
+from .motor import L298N
+from .ultrasonic import UltrasonicSensor
+
+# Any I2C scan finding more addresses than this is a phantom (a stuck/floating
+# SDA or SCL line ACKing every address), not a real device - matches the same
+# cutoff used by i2c_scanner.is_real_hit().
+_I2C_PHANTOM_MAX_ADDRS = 8
+
+# Consecutive missed readings before a distance sensor is reported as absent.
+# A single dropped reading is usually noise; five in a row means it's unplugged.
+_SENSOR_FAIL_THRESHOLD = 5
 
 
-def _speed_band(speed_value):
-    """Return a human label for a motor speed using agreed classroom bands."""
-    if speed_value <= 80:
-        return "stopped"
-    if speed_value <= 120:
-        return "very slow"
-    if speed_value <= 180:
-        return "slow"
-    if speed_value <= 220:
-        return "normal"
-    return "very fast"
+def _i2c_prescan(i2c, expected_addr, label):
+    """Scan an I2C bus and report whether ``expected_addr`` answers.
 
+    Always prints (regardless of DEBUG_AIDRIVER) so wiring/power problems are
+    visible BEFORE a sensor driver constructor runs and potentially raises a
+    less helpful error.
 
-def _describe_drive(direction, right_speed, left_speed):
-    """Build an event-log sentence for forward/backward movement commands."""
-    max_speed = max(right_speed, left_speed)
-    if max_speed <= 80:
-        return (
-            f"{direction} requested with R={right_speed}, L={left_speed} – "
-            "speeds are in the stopped range so the robot may not move"
-        )
-
-    band = _speed_band(max_speed)
-    message = f"{direction} at {band} speed" f" (R={right_speed}, L={left_speed})"
-
-    speed_diff = right_speed - left_speed
-    if abs(speed_diff) > 20:
-        arc_direction = "right" if speed_diff > 0 else "left"
-        message += f"; expect an arc toward the {arc_direction}"
-
-    return message
-
-
-def _describe_rotation(direction, turn_speed):
-    """Build an event-log sentence for rotate commands."""
-    if turn_speed <= 80:
-        return (
-            f"Rotate {direction} requested with speed {turn_speed} – "
-            "speed is in the stopped range so the robot may not turn"
-        )
-
-    band = _speed_band(turn_speed)
-    return f"Rotate {direction} on the spot at {band} speed ({turn_speed})"
-
-
-# Global debug flag for AIDriver library
-DEBUG_AIDRIVER = False
-
-
-# Onboard status LED – use GPIO 25 (Raspberry Pi Pico onboard LED).
-# GPIO 13 cannot be used here because it is the left-motor direction pin.
-# Using PWM for heartbeat - runs entirely in hardware with zero CPU impact.
-_STATUS_LED_PIN = 25
-_STATUS_LED_PWM = None  # Initialized lazily in AIDriver.__init__()
-
-
-# Internal state for non-blocking heartbeat timing (legacy, kept for compatibility)
-_last_heartbeat_ms = 0
-
-
-# Ultrasonic sensor inline warning state
-_ultrasonic_fail_count = 0
-_ultrasonic_warned = False  # Have we printed the initial warning?
-
-
-def _ultrasonic_warn_inline(message):
-    """Print a warning once, then add dots for each subsequent failure.
-
-    This approach works in all terminals including Arduino Lab which
-    doesn't support carriage return for in-place updates.
+    Returns:
+        bool: True only when the expected device is present and the bus is
+              not a floating-line phantom (every address ACKing).
     """
-    global _ultrasonic_fail_count, _ultrasonic_warned
-
-    _ultrasonic_fail_count += 1
-
-    # Print the initial warning (no newline)
-    if not _ultrasonic_warned:
-        # Use separate print to ensure message appears
-        print()  # newline first to separate from previous output
-        print("[AIDriver] " + message, end="")
-        _ultrasonic_warned = True
-    else:
-        # Just add a dot for each subsequent failure
-        print(".", end="")
-
-
-def _ultrasonic_warn_clear():
-    """End the warning line and reset the failure counter."""
-    global _ultrasonic_fail_count, _ultrasonic_warned
-
-    if _ultrasonic_warned:
-        # End the line with newline
-        print()  # newline
-
-    _ultrasonic_fail_count = 0
-    _ultrasonic_warned = False
-    _ultrasonic_last_warn_ms = 0
-
-
-def _start_pwm_heartbeat():
-    """Start PWM-based heartbeat on the onboard LED.
-
-    Uses hardware PWM at ~1Hz with 50% duty cycle - runs entirely in
-    hardware with zero CPU interrupts or blocking.
-    """
-    global _STATUS_LED_PWM
-    if _STATUS_LED_PWM is not None:
-        return  # Already running
-
     try:
-        _STATUS_LED_PWM = PWM(Pin(_STATUS_LED_PIN))
-        _STATUS_LED_PWM.freq(8)  # RP2040 minimum PWM freq is ~8Hz
-        _STATUS_LED_PWM.duty_u16(32768)  # 50% duty cycle
-        _d("PWM heartbeat started (8Hz, hardware-driven)")
+        found = i2c.scan()
     except Exception as exc:
-        _d("Failed to start PWM heartbeat:", exc)
-        _STATUS_LED_PWM = None
+        print("[AIDriver] {} pre-scan failed: {}".format(label, exc))
+        return False
 
+    if len(found) > _I2C_PHANTOM_MAX_ADDRS:
+        print(
+            "[AIDriver] {} pre-scan: {} addresses ACKed - floating bus "
+            "(missing pull-ups?), ignored.".format(label, len(found))
+        )
+        return False
 
-def heartbeat(period_ms=1000):
-    """Adjust the PWM heartbeat frequency.
+    if expected_addr in found:
+        print("[AIDriver] {} pre-scan: found 0x{:02X}.".format(label, expected_addr))
+        return True
 
-    With PWM-based heartbeat, this adjusts the blink rate.
-    The LED blinks automatically in hardware - no need to call this
-    from a loop. Use it only if you want to change the blink speed.
-
-    Args:
-        period_ms: Blink period in milliseconds (default 1000 = 1Hz)
-    """
-    if _STATUS_LED_PWM is None:
-        return
-
-    try:
-        # Convert period to frequency (Hz)
-        freq = max(1, 1000 // period_ms)
-        _STATUS_LED_PWM.freq(freq)
-    except Exception:
-        pass
-
-
-def _explain_error(exc):
-    """Internal helper to add student-friendly hints for common exceptions.
-
-    This is automatically used around key AIDriver methods when DEBUG_AIDRIVER
-    is True. It never changes the actual exception behaviour; it only prints
-    extra guidance before the normal traceback.
-    """
-
-    if not DEBUG_AIDRIVER:
-        return
-
-    msg = str(exc)
-    print("[AIDriver] Extra help for error:")
-
-    # NameError hints – usually missing or mis-typed my_robot / AIDriver
-    if isinstance(exc, NameError):
-        if "my_robot" in msg:
-            print(" - You are using 'my_robot' but have not created it.")
-            print("   Make sure you have 'my_robot = AIDriver(\"left\")' near the top.")
-            print('   Use "right" if your wall is on the right side.')
-        elif "AIDriver" in msg:
-            print(" - Python cannot find 'AIDriver'.")
-            print("   Check you wrote 'from aidriver import AIDriver' exactly.")
-        else:
-            print(" - A name in your code does not exist.")
-            print("   Check for spelling differences from the example code.")
-
-    # AttributeError hints – often wrong method name on AIDriver
-    elif isinstance(exc, AttributeError):
-        if "AIDriver" in msg or "object has no attribute" in msg:
-            print(" - You likely called a method that is not in AIDriver.")
-            print("   Valid AIDriver methods include:")
-            print("     drive_forward, drive_backward, rotate_left,")
-            print("     rotate_right, brake, read_distance")
-            print("   Compare your code with the challenge notes.")
-
-    # ImportError hints – aidriver not found
-    elif isinstance(exc, ImportError):
-        if "aidriver" in msg:
-            print(" - Python cannot import 'aidriver'.")
-            print("   Ensure 'aidriver.py' is in the 'lib/' folder ")
-            print("   in the Arduino MicroPython Lab workspace.")
-
-    # ValueError hints – often wrong speed ranges, etc.
-    elif isinstance(exc, ValueError):
-        print(" - A value passed into a function is not acceptable.")
-        print("   Check speed values are between 0 and 255,")
-        print("   and that distances or times are sensible.")
-
+    if found:
+        print(
+            "[AIDriver] {} pre-scan: 0x{:02X} not found (saw {}).".format(
+                label,
+                expected_addr,
+                ", ".join("0x%02X" % a for a in found),
+            )
+        )
     else:
-        print(" -", type(exc).__name__, msg)
-
-    print("[AIDriver] See 'Common_Errors.md' for more examples.")
-
-
-def _d(*args):
-    """Internal debug logger for the AIDriver library.
-
-    When DEBUG_AIDRIVER is True, messages are printed with an [AIDriver] prefix.
-    This is intended for teachers or advanced students diagnosing issues.
-    """
-    if DEBUG_AIDRIVER:
-        print("[AIDriver]", *args)
-
-
-def hold_state(seconds):
-    """Pause the robot while recording the pause in the event log.
-
-    This is a classroom-friendly helper that replaces raw ``sleep(seconds)``.
-
-    Example usage in ``main.py``::
-
-        from aidriver import AIDriver, hold_state
-
-        my_robot = AIDriver("left")  # or AIDriver("right")
-
-        my_robot.drive_forward(200, 200)
-        hold_state(1)  # robot keeps doing the same thing for 1 second
-        my_robot.brake()
-
-    The helper uses the built-in time.sleep under the hood, so timing
-    behaviour is the same as calling ``sleep(seconds)`` directly.
-    """
-
-    try:
-        seconds_float = float(seconds)
-    except (TypeError, ValueError):
-        # Fall back to 0 seconds if a bad value is passed; let MicroPython
-        # handle any deeper issues rather than raising here.
-        seconds_float = 0
-
-    if eventlog is not None:
-        try:
-            if seconds_float == 1:
-                msg = "Robot holding state for 1 second"
-            else:
-                msg = "Robot holding state for {:.2f} second(s)".format(seconds_float)
-            eventlog.log_event(msg)
-        except Exception:
-            # Never let logging break student programs.
-            pass
-
-    _d("hold_state:", seconds_float, "second(s)")
-    _sleep(seconds_float)
-
-
-def _led_heartbeat_ok():
-    """Legacy function - heartbeat is now automatic via PWM.
-
-    The onboard LED now blinks automatically using hardware PWM when
-    AIDriver is instantiated. This function is kept for compatibility
-    but does nothing.
-    """
-    pass
-
-
-class UltrasonicSensor:
-    """
-    HC-SR04 Ultrasonic Sensor class for distance measurement.
-    """
-
-    def __init__(self, trig_pin, echo_pin):
-        """
-        Initialize ultrasonic sensor.
-
-        Args:
-            trig_pin: GPIO pin for trigger signal.
-            echo_pin: GPIO pin for echo signal.
-        """
-        self.trig_pin = Pin(trig_pin, Pin.OUT)
-        self.echo_pin = Pin(echo_pin, Pin.IN)
-        self.trig_pin.off()
-
-        # Sensor configuration
-        self.max_distance_mm = 2000  # Max sensor range in mm
-        # Timeout: 30,000μs allows ~2x longer echo wait (500 * 2 * 30)
-        self.timeout_us = 30000
-
-    def read_distance_mm(self):
-        """
-        Read distance from the sensor and return it in millimeters.
-
-        Returns:
-            int: Distance in millimeters, or -1 if the reading is out of range or fails.
-        """
-        # Pre-check: ensure echo pin is LOW (not stuck high from wiring issue)
-        if self.echo_pin.value() != 0:
-            _ultrasonic_warn_inline("Echo pin stuck HIGH – check wiring")
-            if _ultrasonic_fail_count <= 3 and eventlog is not None:
-                try:
-                    eventlog.log_event("ultrasonic echo pin stuck high")
-                except Exception:
-                    pass
-            return -1
-
-        # Send a 10μs trigger pulse with 5μs stabilization
-        self.trig_pin.off()
-        sleep_us(5)
-        self.trig_pin.on()
-        sleep_us(10)
-        self.trig_pin.off()
-
-        try:
-            # Measure the duration of the echo pulse (with retry on failure)
-            duration = time_pulse_us(self.echo_pin, 1, self.timeout_us)
-
-            # time_pulse_us returns -1 on timeout and -2 on invalid state
-            if duration < 0:
-                # Retry once after brief delay to handle transient issues
-                sleep_ms(20)  # Let sensor settle
-                self.trig_pin.off()
-                sleep_us(5)
-                self.trig_pin.on()
-                sleep_us(10)
-                self.trig_pin.off()
-                duration = time_pulse_us(self.echo_pin, 1, self.timeout_us)
-
-                # If still failing after retry, report error
-                if duration < 0:
-                    if duration == -1:
-                        # Timeout means no echo returned in time. This is expected
-                        # when the target is too far away or open space is ahead.
-                        _ultrasonic_warn_inline("No echo (out of range/open space)")
-                        if _ultrasonic_fail_count <= 3 and eventlog is not None:
-                            try:
-                                eventlog.log_event("ultrasonic no echo (out of range)")
-                            except Exception:
-                                pass
-                    else:
-                        _ultrasonic_warn_inline("Sensor error – check wiring")
-                        # Only log to eventlog on first few failures to avoid log spam
-                        if _ultrasonic_fail_count <= 3 and eventlog is not None:
-                            try:
-                                eventlog.log_event("ultrasonic invalid echo state")
-                            except Exception:
-                                pass
-                    return -1
-
-            # Calculate distance in mm using integer math (avoids floating point)
-            # Sound speed: 343.2 m/s = 0.3432 mm/μs
-            # distance = (time * speed) / 2, so: time * 100 // 582
-            distance_mm = duration * 100 // 582
-
-            # Check if the reading is within the valid range (20mm to 2000mm)
-            if 20 <= distance_mm <= self.max_distance_mm:
-                # Clear any inline warning since we got a good reading
-                _ultrasonic_warn_clear()
-                result = int(distance_mm)
-
-                # Log AFTER timing-sensitive measurement is complete
-                if eventlog is not None:
-                    try:
-                        eventlog.log_event("distance reading: {} mm".format(result))
-                    except Exception:
-                        pass
-                return result
-
-            # Out of range – likely too close, too far, or pointing into open space
-            _ultrasonic_warn_inline("Out of range ({}mm)".format(int(distance_mm)))
-            # Only log to eventlog on first few failures to avoid log spam
-            if _ultrasonic_fail_count <= 3 and eventlog is not None:
-                try:
-                    eventlog.log_event(
-                        "ultrasonic out of range: {} mm".format(int(distance_mm))
-                    )
-                except Exception:
-                    pass
-            return -1
-
-        except OSError as exc:
-            # This can occur if there's an issue with time_pulse_us or pin configuration
-            _ultrasonic_warn_inline("OSError – check pins & power")
-            # Only log to eventlog on first few failures to avoid log spam
-            if _ultrasonic_fail_count <= 3 and eventlog is not None:
-                try:
-                    eventlog.log_event("ultrasonic OSError: {}".format(exc))
-                except Exception:
-                    pass
-            return -1
-
-
-class L298N:
-    """
-    L298N Motor Driver class for controlling a single motor
-    """
-
-    # Direction constants
-    FORWARD = 0
-    BACKWARD = 1
-    STOP = -1
-
-    def __init__(self, pin_enable, pin_direction, pin_brake):
-        """
-        Initialize L298N motor controller
-
-        Args:
-            pin_enable: PWM pin for speed control (0-65535)
-            pin_direction: Digital pin for direction control
-            pin_brake: Digital pin for brake control
-        """
-        self._pin_enable = PWM(Pin(pin_enable))
-        self._pin_enable.freq(1000)  # 1kHz PWM frequency
-        self._pin_direction = Pin(pin_direction, Pin.OUT)
-        self._pin_brake = Pin(pin_brake, Pin.OUT)
-
-        self._pwm_val = 65535  # Max speed (16-bit PWM)
-        self._is_moving = False
-        self._can_move = True
-        self._direction = self.STOP
-
-        # Initialize pins to stopped state
-        self.stop()
-
-    def set_speed(self, speed):
-        """
-        Set motor speed
-
-        Args:
-            speed: Speed value 0-255 (Arduino compatible) or 0-65535 (full RP2040 range)
-        """
-        # Convert Arduino 0-255 range to RP2040 0-65535 range if needed
-        if speed <= 255:
-            self._pwm_val = int(speed * 257)  # 257 = 65535/255
-        else:
-            self._pwm_val = min(speed, 65535)
-
-        _d("L298N set_speed: raw=", speed, "pwm=", self._pwm_val)
-
-    def get_speed(self):
-        """
-        Get current motor speed
-
-        Returns:
-            Current speed (0 if stopped, otherwise the set PWM value)
-        """
-        return self._pwm_val if self._is_moving else 0
-
-    def forward(self):
-        """Move motor forward"""
-        self._pin_brake.off()
-        self._pin_direction.on()
-        self._pin_enable.duty_u16(self._pwm_val)
-        self._direction = self.FORWARD
-        self._is_moving = True
-        _d("L298N forward: pwm=", self._pwm_val)
-
-    def backward(self):
-        """Move motor backward"""
-        self._pin_brake.off()
-        self._pin_direction.off()
-        self._pin_enable.duty_u16(self._pwm_val)
-        self._direction = self.BACKWARD
-        self._is_moving = True
-        _d("L298N backward: pwm=", self._pwm_val)
-
-    def stop(self):
-        """Stop motor with brake"""
-        self._pin_direction.on()
-        self._pin_brake.on()
-        self._pin_enable.duty_u16(65535)  # Short motor terminals for brake
-        self._direction = self.STOP
-        self._is_moving = False
-        _d("L298N stop (brake engaged)")
-
-    def is_moving(self):
-        """Check if motor is currently moving"""
-        return self._is_moving
-
-    def get_direction(self):
-        """Get current direction"""
-        return self._direction
+        print("[AIDriver] {} pre-scan: no ACK - check wiring/power.".format(label))
+    return False
 
 
 class AIDriver:
@@ -527,7 +101,7 @@ class AIDriver:
 
     By default, AIDriver uses Grove single-pin ultrasonic sensors via
     GroveUltrasonic when available. The legacy HC-SR04 UltrasonicSensor class
-    remains in this file and is used as an automatic fallback.
+    remains available (see ultrasonic.py) and is used as an automatic fallback.
 
     The L298NH requires L298N channels to be called simultaneously.
     """
@@ -547,8 +121,8 @@ class AIDriver:
         echo_pin=7,  # GP7 (front sensor, legacy HC-SR04 fallback)
         trig_pin_2=4,  # GP4 (second sensor)
         echo_pin_2=5,  # GP5 (second sensor, legacy HC-SR04 fallback)
-        tof_front_sda=29,  # GP29 (A0) — front ToF dedicated SoftI2C SDA
-        tof_front_scl=28,  # GP28 (A1) — front ToF dedicated SoftI2C SCL
+        tof_front_sda=29,  # GP29 (A3) — front ToF dedicated SoftI2C SDA
+        tof_front_scl=28,  # GP28 (A2) — front ToF dedicated SoftI2C SCL
         tof_side_sda=6,  # GP6 (D6) — side ToF dedicated SoftI2C SDA
         tof_side_scl=5,  # GP5 (D5) — side ToF dedicated SoftI2C SCL
         ultrasonic_mode="auto",  # "auto" (default), "grove", or "hcsr04"
@@ -582,7 +156,7 @@ class AIDriver:
                        "tof":        VL53L0X Time-of-Flight sensors. Each sensor
                                      runs on its own dedicated SoftI2C bus at
                                      address 0x29 with no XSHUT:
-                                       front = tof_front_sda/scl (GP27/GP26 = A0/A1)
+                                       front = tof_front_sda/scl (GP29/GP28 = A3/A2)
                                        side  = tof_side_sda/scl  (GP6/GP5 = D6/D5)
                                      Example:
                                          AIDriver("left", "tof")
@@ -663,7 +237,7 @@ class AIDriver:
         if self.distance_sensor == "tof":
             # ToF mode: BOTH sensors run on their own dedicated SoftI2C bus, so
             # each can stay at the VL53L0X default address 0x29 with no XSHUT.
-            # Front = tof_front_sda/scl (default GP27/GP26 = A0/A1),
+            # Front = tof_front_sda/scl (default GP29/GP28 = A3/A2),
             # Side  = tof_side_sda/scl  (default GP6/GP5).
             self._init_tof_sensors(
                 front_sda=tof_front_sda,
@@ -681,6 +255,22 @@ class AIDriver:
             )
 
         _d("AIDriver initialized - debug logging active")
+
+        # Live sensor-health tracking, used by system_check()/display_status():
+        #   - ToF: fixed here by whether the sensor answered its I2C address
+        #     (see _init_tof_sensors) - never re-evaluated on later reads, so
+        #     a good sensor facing open space isn't mistaken for a fault.
+        #   - Ultrasonic: front_ok/side_ok flip to False after
+        #     _SENSOR_FAIL_THRESHOLD (5) consecutive -1 reads, and flip back
+        #     to True on the very next good reading (see _note_sensor_result).
+        self._front_fail_count = 0
+        self._side_fail_count = 0
+        if self.distance_sensor == "tof":
+            self.front_ok = self.tof_1 is not None
+            self.side_ok = self.tof_2 is not None
+        else:
+            self.front_ok = True
+            self.side_ok = True
 
         # Δt tracking for the side sensor PID loop.
         # self.dt is updated every call to read_distance_2() and holds the
@@ -821,8 +411,8 @@ class AIDriver:
                 if _recover_i2c_bus is not None:
                     _recover_i2c_bus(display_sda, display_scl)
                 _disp_i2c = SoftI2C(
-                    sda=Pin(display_sda),
-                    scl=Pin(display_scl),
+                    sda=Pin(display_sda, Pin.OPEN_DRAIN, Pin.PULL_UP),
+                    scl=Pin(display_scl, Pin.OPEN_DRAIN, Pin.PULL_UP),
                     freq=display_freq,
                 )
                 self.display = SSD1306_I2C(
@@ -878,6 +468,11 @@ class AIDriver:
                     str(exc),
                     "– kit deployment unavailable. Check GP{}.".format(kit_servo_pin),
                 )
+
+        # ── Startup system check ──────────────────────────────────────────
+        # Always prints a PASS/FAIL summary to serial and (if fitted) the OLED
+        # so wiring problems are visible immediately, without DEBUG_AIDRIVER.
+        self.system_check()
 
         # Start PWM-based heartbeat - runs entirely in hardware
         # with zero CPU interrupts or impact on motor control.
@@ -948,13 +543,13 @@ class AIDriver:
         Each sensor lives on its OWN dedicated SoftI2C bus, so both can stay at
         the VL53L0X default address 0x29 with no XSHUT juggling. This matches the
         wiring confirmed by the pin-finder scan:
-            Front: SDA=GP27 (A0), SCL=GP26 (A1)
+            Front: SDA=GP29 (A3), SCL=GP28 (A2)
             Side:  SDA=GP6 (D6),  SCL=GP5 (D5)
             Both:  VIN=3V3, GND=GND
 
         Args:
             front_sda/front_scl: dedicated SoftI2C pins for the front ToF
-                                 (defaults GP27/GP26 = A0/A1).
+                                 (defaults GP29/GP28 = A3/A2).
             side_sda/side_scl: dedicated SoftI2C pins for the side ToF
                                (defaults GP6/GP5 = D6/D5).
         """
@@ -970,9 +565,13 @@ class AIDriver:
             front_sda_pin = Pin(front_sda, Pin.OPEN_DRAIN, Pin.PULL_UP)
             front_scl_pin = Pin(front_scl, Pin.OPEN_DRAIN, Pin.PULL_UP)
             front_i2c = SoftI2C(scl=front_scl_pin, sda=front_sda_pin, freq=400_000)
-            self.tof_1 = VL53L0X(front_i2c)  # stays on default 0x29 (own bus)
-            self.tof_1.start()
-            _d("Front ToF OK on GP{}/GP{} @ 0x29".format(front_sda, front_scl))
+            front_label = "Front ToF GP{}/GP{}".format(front_sda, front_scl)
+            if _i2c_prescan(front_i2c, 0x29, front_label):
+                self.tof_1 = VL53L0X(front_i2c)  # stays on default 0x29 (own bus)
+                self.tof_1.start()
+                _d("Front ToF OK on GP{}/GP{} @ 0x29".format(front_sda, front_scl))
+            else:
+                self.tof_1 = None
         except Exception as exc:
             self.tof_1 = None
             _d(
@@ -990,9 +589,13 @@ class AIDriver:
             side_sda_pin = Pin(side_sda, Pin.OPEN_DRAIN, Pin.PULL_UP)
             side_scl_pin = Pin(side_scl, Pin.OPEN_DRAIN, Pin.PULL_UP)
             side_i2c = SoftI2C(scl=side_scl_pin, sda=side_sda_pin, freq=400_000)
-            self.tof_2 = VL53L0X(side_i2c)  # stays on default 0x29 (own bus)
-            self.tof_2.start()
-            _d("Side ToF OK on GP{}/GP{} @ 0x29".format(side_sda, side_scl))
+            side_label = "Side ToF GP{}/GP{}".format(side_sda, side_scl)
+            if _i2c_prescan(side_i2c, 0x29, side_label):
+                self.tof_2 = VL53L0X(side_i2c)  # stays on default 0x29 (own bus)
+                self.tof_2.start()
+                _d("Side ToF OK on GP{}/GP{} @ 0x29".format(side_sda, side_scl))
+            else:
+                self.tof_2 = None
         except Exception as exc:
             self.tof_2 = None
             _d(
@@ -1003,6 +606,30 @@ class AIDriver:
             )
 
         self.has_tof = self.tof_1 is not None
+
+    def _note_sensor_result(self, which, ok):
+        """Roll an ultrasonic distance-sensor read result into front_ok/side_ok.
+
+        ToF health isn't tracked here — it's fixed at init by whether the
+        VL53L0X answered its I2C address (see _init_tof_sensors). For
+        ultrasonic, only flips ``*_ok`` to False after
+        ``_SENSOR_FAIL_THRESHOLD`` (5) consecutive -1 reads; any good reading
+        immediately clears it back to True.
+
+        Args:
+            which: "front" or "side".
+            ok: True if the reading just taken was valid (not -1).
+        """
+        count_attr = "_front_fail_count" if which == "front" else "_side_fail_count"
+        ok_attr = "front_ok" if which == "front" else "side_ok"
+        if ok:
+            setattr(self, count_attr, 0)
+            setattr(self, ok_attr, True)
+            return
+        count = getattr(self, count_attr) + 1
+        setattr(self, count_attr, count)
+        if count >= _SENSOR_FAIL_THRESHOLD:
+            setattr(self, ok_attr, False)
 
     def read_distance(self):
         """
@@ -1015,17 +642,23 @@ class AIDriver:
             Distance in millimeters, or -1 if invalid reading.
         """
         if self.distance_sensor == "tof":
+            # front_ok is fixed at init by I2C address discovery, not by
+            # per-read timeouts, so a good sensor facing open space never
+            # gets misreported as an error.
             if self.tof_1 is None:
                 return -1
             try:
                 distance_mm = self.tof_1.read()
             except Exception as exc:
                 _d("read_distance (ToF) error:", type(exc).__name__, str(exc))
+                distance_mm = -1
+            if distance_mm == -1:
                 return -1
             _d("read_distance (ToF):", distance_mm, "mm")
             return int(distance_mm)
 
         distance_mm = self.ultrasonic_1.read_distance_mm()
+        self._note_sensor_result("front", distance_mm != -1)
         if distance_mm == -1:
             # Don't print debug here - inline warning handles user feedback
             return -1
@@ -1058,17 +691,22 @@ class AIDriver:
         self._last_side_read_ms = now
 
         if self.distance_sensor == "tof":
+            # side_ok is fixed at init by I2C address discovery, not by
+            # per-read timeouts — see the matching note in read_distance().
             if self.tof_2 is None:
                 return -1
             try:
                 distance_mm = self.tof_2.read()
             except Exception as exc:
                 _d("read_distance_2 (ToF) error:", type(exc).__name__, str(exc))
+                distance_mm = -1
+            if distance_mm == -1:
                 return -1
             _d("read_distance_2 (ToF):", distance_mm, "mm", "dt:", self.dt, "s")
             return int(distance_mm)
 
         distance_mm = self.ultrasonic_2.read_distance_mm()
+        self._note_sensor_result("side", distance_mm != -1)
         if distance_mm == -1:
             # Don't print debug here - inline warning handles user feedback
             return -1
@@ -1104,11 +742,7 @@ class AIDriver:
                     self.motor_left.backward()
                 sleep_ms(10)
             _d("AIDriver.brake(): rotation ramp-down complete")
-        if eventlog is not None:
-            try:
-                eventlog.log_event("Brake applied; motors stopping")
-            except Exception:
-                pass
+        _log_event("Brake applied; motors stopping")
         try:
             self.motor_right.stop()
             self.motor_left.stop()
@@ -1137,15 +771,9 @@ class AIDriver:
             left_wheel_speed: Speed for left wheel (0-255)
         """
         _d("AIDriver.drive_forward: R=", right_wheel_speed, "L=", left_wheel_speed)
-        if eventlog is not None:
-            try:
-                eventlog.log_event(
-                    _describe_drive(
-                        "Drive forward", right_wheel_speed, left_wheel_speed
-                    )
-                )
-            except Exception:
-                pass
+        _log_event(
+            _describe_drive("Drive forward", right_wheel_speed, left_wheel_speed)
+        )
         try:
             self.motor_right.set_speed(right_wheel_speed)
             self.motor_left.set_speed(left_wheel_speed)
@@ -1164,15 +792,9 @@ class AIDriver:
             left_wheel_speed: Speed for left wheel (0-255)
         """
         _d("AIDriver.drive_backward: R=", right_wheel_speed, "L=", left_wheel_speed)
-        if eventlog is not None:
-            try:
-                eventlog.log_event(
-                    _describe_drive(
-                        "Drive backward", right_wheel_speed, left_wheel_speed
-                    )
-                )
-            except Exception:
-                pass
+        _log_event(
+            _describe_drive("Drive backward", right_wheel_speed, left_wheel_speed)
+        )
         try:
             self.motor_right.set_speed(right_wheel_speed)
             self.motor_left.set_speed(left_wheel_speed)
@@ -1190,11 +812,7 @@ class AIDriver:
             turn_speed: Speed for rotation (0-255)
         """
         _d("AIDriver.rotate_right: speed=", turn_speed)
-        if eventlog is not None:
-            try:
-                eventlog.log_event(_describe_rotation("right", turn_speed))
-            except Exception:
-                pass
+        _log_event(_describe_rotation("right", turn_speed))
         try:
             # Ramp up from MIN_MOTOR_SPEED to turn_speed over ROTATE_RAMP_MS.
             # This makes spin-up time deterministic regardless of battery
@@ -1228,11 +846,7 @@ class AIDriver:
             turn_speed: Speed for rotation (0-255)
         """
         _d("AIDriver.rotate_left: speed=", turn_speed)
-        if eventlog is not None:
-            try:
-                eventlog.log_event(_describe_rotation("left", turn_speed))
-            except Exception:
-                pass
+        _log_event(_describe_rotation("left", turn_speed))
         try:
             steps = max(self.ROTATE_RAMP_MS // 10, 1)
             speed_range = turn_speed - self.MIN_MOTOR_SPEED
@@ -1288,10 +902,16 @@ class AIDriver:
 
         Args:
             target_deg: Magnitude of the turn in degrees (always positive when
-                        ``direction`` is given; a negative value with no
-                        ``direction`` means turn left/counter-clockwise).
-            direction:  "right"/"cw" or "left"/"ccw". If None, the sign of
-                        ``target_deg`` chooses (positive = right).
+                        ``direction`` is given). When ``direction`` is None,
+                        the sign is relative to ``wall_side`` so a positive
+                        angle always turns AWAY from the wall you follow and a
+                        negative angle turns TOWARD it:
+                          - ``wall_side="left"``  (wall_sign=-1): +90 -> right,
+                            -90 -> left.
+                          - ``wall_side="right"`` (wall_sign=+1): +90 -> left,
+                            -90 -> right.
+            direction:  "right"/"cw" or "left"/"ccw". Overrides the sign-based
+                        rule above and always means that literal direction.
 
         Returns:
             float: Actual degrees turned (for debugging / logging).
@@ -1307,19 +927,13 @@ class AIDriver:
 
         target = abs(target_deg)
         if direction is None:
-            is_right = target_deg >= 0
+            is_right = (target_deg >= 0) if self.wall_sign < 0 else (target_deg < 0)
         else:
             is_right = str(direction).lower()[0] == "r"
 
-        if eventlog is not None:
-            try:
-                eventlog.log_event(
-                    "Gyro turn {} {:.0f} deg".format(
-                        "right" if is_right else "left", target
-                    )
-                )
-            except Exception:
-                pass
+        _log_event(
+            "Gyro turn {} {:.0f} deg".format("right" if is_right else "left", target)
+        )
 
         heading = 0.0
         integral = 0.0
@@ -1589,19 +1203,13 @@ class AIDriver:
             self.motor_left.stop()
 
         # Log the movement
-        if eventlog is not None:
-            try:
-                if right_speed >= 0 and left_speed >= 0:
-                    direction = "forward"
-                elif right_speed <= 0 and left_speed <= 0:
-                    direction = "backward"
-                else:
-                    direction = "mixed"
-                eventlog.log_event(
-                    "drive {} R={}, L={}".format(direction, right_speed, left_speed)
-                )
-            except Exception:
-                pass
+        if right_speed >= 0 and left_speed >= 0:
+            direction = "forward"
+        elif right_speed <= 0 and left_speed <= 0:
+            direction = "backward"
+        else:
+            direction = "mixed"
+        _log_event("drive {} R={}, L={}".format(direction, right_speed, left_speed))
 
     def set_motor_speeds(self, right_speed, left_speed):
         """
@@ -1647,6 +1255,56 @@ class AIDriver:
     # and the simulator can still inspect what *would* have been shown) and
     # return without touching any hardware.
 
+    def system_check(self, verbose=True):
+        """Check every sensor the constructor tried to set up and report it.
+
+        Called automatically at the end of __init__, and safe to call again
+        any time (e.g. right before a run) to re-check current sensor health.
+        Always prints a PASS/FAIL line per subsystem to serial (regardless of
+        DEBUG_AIDRIVER) and mirrors a summary on the OLED when one is fitted.
+
+        Args:
+            verbose: When True (default) print the per-subsystem report.
+
+        Returns:
+            bool: True only when every configured subsystem checks out.
+        """
+        # front_ok/side_ok are read-error flags, not presence flags - a False
+        # here means "sensor is erroring", which may or may not mean it's
+        # unplugged. has_gyro/has_color/has_display are genuine one-time
+        # presence checks done at init, so they use a different fail label.
+        checks = [
+            ("Front sensor", self.front_ok, "ERROR"),
+            ("Side sensor", self.side_ok, "ERROR"),
+            ("Gyro/IMU", self.has_gyro, "MISSING"),
+            ("Colour", self.has_color, "MISSING"),
+            ("OLED", self.has_display, "MISSING"),
+        ]
+        self.system_issues = [name for name, ok, _fail in checks if not ok]
+        self.system_ok = not self.system_issues
+
+        if verbose:
+            print("[AIDriver] ---- System check ----")
+            for name, ok, fail_label in checks:
+                print("[AIDriver] {:<12} {}".format(name, "OK" if ok else fail_label))
+            if self.system_ok:
+                print("[AIDriver] System check: ALL OK")
+            else:
+                print(
+                    "[AIDriver] System check: {} issue(s) -> {}".format(
+                        len(self.system_issues), ", ".join(self.system_issues)
+                    )
+                )
+
+        if self.has_display:
+            if self.system_ok:
+                self.show_display("System Check", "All systems", "OK!", "")
+            else:
+                issues = ", ".join(self.system_issues)
+                self.show_display("System Check", "ISSUES:", issues[:16], issues[16:32])
+
+        return self.system_ok
+
     def show_display(self, line1="", line2="", line3="", line4=""):
         """Show up to four text lines on the OLED.
 
@@ -1673,21 +1331,26 @@ class AIDriver:
             _d("show_display failed:", type(exc).__name__, str(exc))
 
     def display_status(self, state, score=0, victims=0):
-        """Show the competition state and running score on the OLED.
+        """Show the competition state, sensor health and colour on the OLED.
 
         This is the high-level call the maze controller makes every time the
-        state changes so handlers and judges can read what the robot is doing.
+        state changes. Alongside state/score/victims it always mirrors the
+        live front/side sensor health (``front_ok``/``side_ok``, see
+        ``system_check()``) and the current floor colour, so the OLED stays a
+        useful diagnostic screen even when nothing else prints to serial.
 
         Args:
             state: Short state label, e.g. "SEARCH" or "AT VICTIM".
             score: Estimated running score to display.
             victims: Number of victims found so far.
         """
+        f_status = "OK" if self.front_ok else "ERR"
+        s_status = "OK" if self.side_ok else "ERR"
         self.show_display(
-            "THS RescueMaze",
             "State:{}".format(str(state)[:9]),
+            "F:{} S:{}".format(f_status, s_status),
             "Score:{}".format(int(score)),
-            "Victims:{}".format(int(victims)),
+            "V:{} C:{}".format(int(victims), self.classify_color()),
         )
 
     def clear_display(self):

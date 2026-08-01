@@ -169,7 +169,7 @@ package_firmware() {
         {
             echo "Build Date: $(date)"
             echo "MicroPython Version: $(get_micropython_version)"
-            echo "Custom Modules: ${#CUSTOM_FILES[@]} files"
+            echo "Custom Modules: ${#CUSTOM_FILES[@]} files + ${#CUSTOM_PACKAGES[@]} package(s)"
             echo "Build Host: $(hostname)"
         } > "$build_info"
         

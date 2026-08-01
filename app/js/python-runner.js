@@ -260,12 +260,16 @@ class AIDriver:
         """Closed-loop gyro turn by target_deg. direction: 'left' or 'right'.
 
         Replaces timed turns: the simulator rotates exactly target_deg.
+        When direction is omitted, the sign is relative to wall_side so a
+        positive angle always turns AWAY from the followed wall: left wall
+        (wall_sign=-1) +90=right/-90=left, right wall (wall_sign=+1)
+        +90=left/-90=right.
         """
         global DEBUG_AIDRIVER
         import time
         target = abs(target_deg)
         if direction is None:
-            is_right = target_deg >= 0
+            is_right = target_deg >= 0 if self.wall_sign < 0 else target_deg < 0
         else:
             is_right = str(direction).lower()[0] == "r"
         self._is_moving = True
@@ -360,6 +364,14 @@ class AIDriver:
         """Clear a latched colour interrupt (no-op in the simulator)."""
         _queue_command("clear_color_interrupt")
 
+    def system_check(self, verbose=True):
+        """Report sensor health. Always OK in the simulator (nothing to fail)."""
+        global DEBUG_AIDRIVER
+        if verbose and DEBUG_AIDRIVER:
+            print("[AIDriver] System check: ALL OK (simulator)")
+        self.show_display("System Check", "All systems", "OK!", "")
+        return True
+
     # OLED status display (SSD1306). Output-only API; the simulator queues the
     # text for the trace so it can be inspected, the hardware renders it.
     def show_display(self, line1="", line2="", line3="", line4=""):
@@ -368,12 +380,12 @@ class AIDriver:
         _queue_command("show_display", {"lines": self._display_lines})
 
     def display_status(self, state, score=0, victims=0):
-        """Show the competition state and running score on the OLED."""
+        """Show the competition state, sensor health and colour on the OLED."""
         self._display_lines = [
-            "THS RescueMaze",
             "State:" + str(state)[:9],
+            "F:OK S:OK",
             "Score:" + str(int(score)),
-            "Victims:" + str(int(victims)),
+            "V:" + str(int(victims)) + " C:" + self.classify_color(),
         ]
         _queue_command("display_status", {"lines": self._display_lines})
 

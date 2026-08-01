@@ -29,12 +29,19 @@ export FIRMWARE_DEST="$PROJECT_BASE/_Firmware/THS_Comp_RP2040.uf2"
 # Mirrors project/lib/*.py so the firmware is self-contained: aidriver and every
 # driver it imports are frozen. main.py is excluded - it goes to the filesystem.
 export CUSTOM_FILES=(
-    "$PROJECT_LIB_DIR/aidriver.py"
     "$PROJECT_LIB_DIR/eventlog.py"
     "$PROJECT_LIB_DIR/grove_ultrasonic.py"
     "$PROJECT_LIB_DIR/lsm6ds3.py"
     "$PROJECT_LIB_DIR/tcs34725.py"
     "$PROJECT_LIB_DIR/ssd1306.py"
+)
+
+# aidriver is a package (directory with __init__.py + submodules), copied and
+# cleaned as a whole tree rather than a single file - see copy_custom_modules()
+# and clean_custom_modules() below. MicroPython's freeze() walks subdirectories
+# of $MODULES_DIR automatically, so no manifest.py changes are needed.
+export CUSTOM_PACKAGES=(
+    "$PROJECT_LIB_DIR/aidriver"
 )
 
 # Files to copy to filesystem (not frozen)
@@ -151,6 +158,7 @@ clean_custom_modules() {
     
     # Define module filenames to clean from frozen modules
     local frozen_modules=("aidriver.py" "eventlog.py" "grove_ultrasonic.py" "lsm6ds3.py" "tcs34725.py" "ssd1306.py")
+    local frozen_packages=("aidriver")
     local filesystem_modules=("main.py")
     
     # Clean frozen modules
@@ -158,6 +166,18 @@ clean_custom_modules() {
         if [[ -f "$frozen_target_dir/$module" ]]; then
             log_info "Removing frozen module: $module"
             rm -f "$frozen_target_dir/$module"
+        fi
+    done
+
+    # Clean frozen packages (directories), plus any stale compiled .mpy tree
+    for package in "${frozen_packages[@]}"; do
+        if [[ -d "$frozen_target_dir/$package" ]]; then
+            log_info "Removing frozen package: $package"
+            rm -rf "$frozen_target_dir/$package"
+        fi
+        if [[ -d "$frozen_mpy_dir/$package" ]]; then
+            log_info "Removing compiled $package package from frozen modules"
+            rm -rf "$frozen_mpy_dir/$package"
         fi
     done
     
@@ -233,6 +253,18 @@ copy_custom_modules() {
             fi
         done
     fi
+
+    # Copy package directories (e.g. aidriver/) from project/lib, preserving
+    # their internal structure so freeze() sees them as proper packages.
+    for package_dir in "${CUSTOM_PACKAGES[@]}"; do
+        if [[ -d "$package_dir" ]]; then
+            local package_name=$(basename "$package_dir")
+            echo "Copying $package_name/ package to frozen modules"
+            cp -r "$package_dir" "$frozen_target_dir/"
+            local file_count=$(find "$package_dir" -name '*.py' | wc -l)
+            frozen_copy_count=$((frozen_copy_count + file_count))
+        fi
+    done
     
     log_success "Copied $frozen_copy_count modules to frozen modules directory"
     log_success "Copied $filesystem_copy_count files to filesystem directory"

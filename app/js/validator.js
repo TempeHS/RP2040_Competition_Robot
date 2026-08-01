@@ -95,6 +95,7 @@ const Validator = (function () {
     "display_status",
     "clear_display",
     "deploy_rescue_kit",
+    "system_check",
     "is_moving",
     "get_motor_speeds",
     "set_motor_speeds",

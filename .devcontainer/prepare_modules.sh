@@ -50,7 +50,7 @@ main() {
     copy_custom_modules
     
     # Summary
-    if [ -f "$MODULES_DIR/aidriver.py" ] && [ -f "$MODULES_DIR/main.py" ]; then
+    if [ -f "$MODULES_DIR/aidriver/__init__.py" ] && [ -f "$MODULES_DIR/main.py" ]; then
         log_success "🎉 All custom modules prepared successfully!"
         log_info "📦 Files ready for firmware build"
         log_info "💡 Run './build_firmware.sh' to build complete firmware"
@@ -63,6 +63,14 @@ main() {
                 log_success "   ✅ $filename"
             else
                 log_error "   ❌ $filename (missing)"
+            fi
+        done
+        for package_dir in "${CUSTOM_PACKAGES[@]}"; do
+            local package_name="$(basename "$package_dir")"
+            if [ -f "$MODULES_DIR/$package_name/__init__.py" ]; then
+                log_success "   ✅ $package_name/ (package)"
+            else
+                log_error "   ❌ $package_name/ (package missing)"
             fi
         done
     fi

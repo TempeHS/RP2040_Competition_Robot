@@ -54,10 +54,12 @@ Default GPIO map used by `AIDriver` (all pin numbers are RP2040 `GP` values).
 | Mode                       | Front Sensor Pins  | Side Sensor Pins | Notes                                                 |
 | -------------------------- | ------------------ | ---------------- | ----------------------------------------------------- |
 | Ultrasonic (Grove default) | GP6 SIG            | GP4 SIG          | Single-wire Grove interface                           |
-| ToF (VL53L0X)              | GP27 SDA, GP26 SCL | GP6 SDA, GP5 SCL | Separate SoftI2C buses; both sensors use address 0x29 |
+| ToF (VL53L0X)              | GP29 SDA, GP28 SCL | GP6 SDA, GP5 SCL | Separate SoftI2C buses; both sensors use address 0x29 |
 
 > [!NOTE]
 > In ToF mode, the front and side VL53L0X sensors are on separate SoftI2C buses, so both can use 0x29 without an address conflict.
+>
+> The front ToF bus was moved from GP26/GP27 (Uno `A0`/`A1`) to GP28/GP29 (Uno `A2`/`A3`) because `A0`/`A1` are physically wired to the Arduino Motor Shield's current-sensing outputs (see [Pin Summary](#pin-summary-micropython-gpio--uno-header) below). Bit-banging SoftI2C on those pins fought with the shield's analog current-sense lines and caused unreliable ToF readings. Do not reuse `A0`/`A1` (GP26/GP27) for anything else — pick free pins instead.
 
 ### Shared Sensors and Display (Both Modes)
 
@@ -77,6 +79,44 @@ Default GPIO map used by `AIDriver` (all pin numbers are RP2040 `GP` values).
 
 > [!NOTE]
 > GP16 and GP17 form one shared bit-banged SoftI2C bus for the gyro (0x6A), color sensor (0x29), and OLED (0x3C). GP7 is used for the color sensor interrupt line.
+
+### Pin Summary (MicroPython GPIO ↔ Uno Header)
+
+The controller board is an RP2040 chip on an **Uno form-factor** board, so every pin has both a MicroPython `machine.Pin` GPIO number and a silkscreened Uno header name (`D0`-`D13`, `A0`-`A5`). `Dn` maps directly to `GPn`. Only 4 GPIOs on the RP2040 are ADC-capable, so the Uno analog header only exposes 4 real analog pins: `A0`=GP26, `A1`=GP27, `A2`=GP28, `A3`=GP29. `A4`/`A5` are not wired to RP2040 ADC pins.
+
+The **Arduino Motor Shield (L298N)** is a fixed-function shield: it hardwires the pins below to its H-bridge and current-sense circuitry _whether or not the code reads them_. This table lists every pin the shield uses, including the `A0`/`A1` current-sense lines that previously conflicted with the front ToF SoftI2C bus.
+
+| Uno Pin | GPIO | Motor Shield Function       | Used By AIDriver                    |
+| ------- | ---- | --------------------------- | ----------------------------------- |
+| D3      | GP3  | PWM Channel A (speed)       | Right motor speed                   |
+| D8      | GP8  | Brake Channel B             | Left motor brake                    |
+| D9      | GP9  | Brake Channel A             | Right motor brake                   |
+| D11     | GP11 | PWM Channel B (speed)       | Left motor speed                    |
+| D12     | GP12 | Direction Channel A         | Right motor direction               |
+| D13     | GP13 | Direction Channel B         | Left motor direction                |
+| A0      | GP26 | **Current sense Channel A** | Free — do not reuse for I2C/SoftI2C |
+| A1      | GP27 | **Current sense Channel B** | Free — do not reuse for I2C/SoftI2C |
+
+> [!WARNING]
+> `A0` (GP26) and `A1` (GP27) are physically connected to the Motor Shield's analog current-sense outputs. Even though AIDriver never reads them, bit-banging SoftI2C (or anything else) on these two pins caused unreliable readings for the front ToF sensor. This is why the front ToF SoftI2C bus was moved to `A2`/`A3` (GP28/GP29). **Avoid `A0`/`A1` for any new sensor wiring.**
+
+All other pins used by this project (Grove ultrasonic, ToF, IMU, color sensor, OLED, status LED, recovery pin) sit outside the Uno `D0`-`D13`/`A0`-`A5` header and are only available via this board's extra GPIO breakout:
+
+| Function                       | GPIO | Uno Header Equivalent |
+| ------------------------------ | ---- | --------------------- |
+| Front ultrasonic SIG           | GP6  | D6                    |
+| Front ultrasonic ECHO (legacy) | GP7  | D7                    |
+| Side ultrasonic SIG            | GP4  | D4                    |
+| Side ultrasonic ECHO (legacy)  | GP5  | D5                    |
+| Front ToF SoftI2C SDA          | GP29 | A3                    |
+| Front ToF SoftI2C SCL          | GP28 | A2                    |
+| Side ToF SoftI2C SDA           | GP6  | D6                    |
+| Side ToF SoftI2C SCL           | GP5  | D5                    |
+| IMU/color/OLED SoftI2C SDA     | GP16 | none (extra breakout) |
+| IMU/color/OLED SoftI2C SCL     | GP17 | none (extra breakout) |
+| Color sensor interrupt         | GP7  | D7                    |
+| Firmware recovery/reset        | GP2  | D2                    |
+| Onboard status LED             | GP25 | none (extra breakout) |
 
 ## Preparation
 

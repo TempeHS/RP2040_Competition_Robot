@@ -14,9 +14,16 @@ describe("AIDriver API Consistency", () => {
   let simulatorAidriverSource;
 
   beforeAll(() => {
-    // Read the real aidriver.py
-    const realPath = path.join(__dirname, "../../../project/lib/aidriver.py");
-    realAidriverSource = fs.readFileSync(realPath, "utf8");
+    // Read the real aidriver package (project/lib/aidriver/*.py), concatenated.
+    // aidriver.py was split into a package for maintainability; the AIDriver
+    // class itself still lives whole in driver.py, so the class-boundary
+    // extraction below is unaffected by the split.
+    const realDir = path.join(__dirname, "../../../project/lib/aidriver");
+    realAidriverSource = fs
+      .readdirSync(realDir)
+      .filter((f) => f.endsWith(".py"))
+      .map((f) => fs.readFileSync(path.join(realDir, f), "utf8"))
+      .join("\n\n");
 
     // Read the simulator's python-runner.js to extract the stub
     const simulatorPath = path.join(__dirname, "../../js/python-runner.js");

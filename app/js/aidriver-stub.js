@@ -378,8 +378,11 @@ const AIDriverStub = {
           /**
            * Turn on the spot by target_deg using the simulated gyro-PID loop.
            * @param {Sk.builtin.int_} targetDeg Magnitude of the turn (deg).
-           * @param {Sk.builtin.str} [direction] "left"/"right"; sign of
-           *        targetDeg is used when omitted (positive = right).
+           * @param {Sk.builtin.str} [direction] "left"/"right"; when omitted,
+           *        the sign of targetDeg is relative to wall_sign so a
+           *        positive angle always turns AWAY from the followed wall:
+           *        left wall (wall_sign=-1) +90=right/-90=left, right wall
+           *        (wall_sign=+1) +90=left/-90=right.
            * @returns {Sk.misceval.Suspension}
            */
           $loc.turn_degrees = new Sk.builtin.func(function (
@@ -397,7 +400,8 @@ const AIDriverStub = {
               isRight =
                 String(Sk.ffi.remapToJs(direction)).toLowerCase()[0] === "r";
             } else {
-              isRight = raw >= 0;
+              const wallSign = readTurnGain(self, "wall_sign", -1);
+              isRight = wallSign < 0 ? raw >= 0 : raw < 0;
             }
             return runGyroTurn(self, target, isRight);
           });
@@ -644,6 +648,22 @@ const AIDriverStub = {
           });
 
           /**
+           * Report sensor health. Always OK in the simulator (nothing to
+           * fail) - provided for API parity with the hardware's
+           * AIDriver.system_check().
+           * @returns {Sk.builtin.bool} True.
+           */
+          $loc.system_check = new Sk.builtin.func(function (self) {
+            AIDriverStub.queueCommand({
+              type: "show_display",
+              params: {
+                lines: ["System Check", "All systems", "OK!", ""],
+              },
+            });
+            return new Sk.builtin.bool(true);
+          });
+
+          /**
            * Show up to four text lines on the (simulated) OLED. The hardware
            * renders these on the SSD1306; in the simulator the text is queued
            * for the trace/logger so students can see what the screen would say.
@@ -675,8 +695,8 @@ const AIDriverStub = {
           });
 
           /**
-           * Show the competition state and running score on the OLED. Mirrors
-           * AIDriver.display_status() on the hardware.
+           * Show the competition state, sensor health and colour on the
+           * OLED. Mirrors AIDriver.display_status() on the hardware.
            * @returns {null}
            */
           $loc.display_status = new Sk.builtin.func(function (
@@ -697,11 +717,19 @@ const AIDriverStub = {
               victims === undefined || victims instanceof Sk.builtin.none
                 ? 0
                 : Sk.ffi.remapToJs(victims);
+            let colorName = "none";
+            if (
+              typeof Simulator !== "undefined" &&
+              typeof App !== "undefined" &&
+              App.robot
+            ) {
+              colorName = Simulator.simulateColor(App.robot).name;
+            }
             const lines = [
-              "THS RescueMaze",
               "State:" + String(stateStr).slice(0, 9),
+              "F:OK S:OK",
               "Score:" + Math.trunc(scoreVal),
-              "Victims:" + Math.trunc(victimVal),
+              "V:" + Math.trunc(victimVal) + " C:" + colorName,
             ];
             self.displayLines = lines;
             AIDriverStub.queueCommand({

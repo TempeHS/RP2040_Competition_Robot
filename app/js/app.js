@@ -43,6 +43,22 @@ const App = {
 };
 
 /**
+ * Insert `distance_sensor="tof"` into an `AIDriver("left"|"right")` call so
+ * copied code targets a real ToF-equipped robot. Only touches the plain
+ * single-argument form; leaves calls that already pass a second argument
+ * (e.g. already has distance_sensor=...) untouched, so it's idempotent.
+ *
+ * @param {string} code Student code from the editor.
+ * @returns {string} Code with the ToF argument inserted where applicable.
+ */
+function withTofSensorArg(code) {
+  return code.replace(
+    /AIDriver\(\s*(["'])(left|right)\1\s*\)/g,
+    'AIDriver($1$2$1, distance_sensor="tof")',
+  );
+}
+
+/**
  * Bridge invoked from the Skulpt-side AIDriver constructor command queue.
  * Mounts the side sensor, mirrors the spawn pose if the user picked the
  * non-default wall side, and re-renders. This makes the AIDriver(side)
@@ -202,6 +218,7 @@ function cacheElements() {
     btnReset: document.getElementById("btnReset"),
     btnResetCode: document.getElementById("btnResetCode"),
     btnCopyCode: document.getElementById("btnCopyCode"),
+    chkTofSensor: document.getElementById("chkTofSensor"),
     btnClearDebug: document.getElementById("btnClearDebug"),
     btnConfirmReset: document.getElementById("btnConfirmReset"),
     btnRotateCar: document.getElementById("btnRotateCar"),
@@ -319,7 +336,10 @@ function setupEventListeners() {
 
   // Copy code button
   App.elements.btnCopyCode.addEventListener("click", () => {
-    const code = Editor.getCode();
+    let code = Editor.getCode();
+    if (App.elements.chkTofSensor && App.elements.chkTofSensor.checked) {
+      code = withTofSensorArg(code);
+    }
     navigator.clipboard
       .writeText(code)
       .then(() => {
