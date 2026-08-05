@@ -13,17 +13,17 @@ my_robot = AIDriver("left")
 # States: FOLLOW_WALL (hold the wall) and TURN (spin 90° away from a wall ahead).
 
 # --- FOLLOW_WALL parameters ---
-BASE_SPEED = 0  # cruise speed
-TARGET_WALL_DISTANCE = 0  # mm to hold from the side wall
-MAX_STEERING = 0  # steering clamp
+BASE_SPEED = 200  # carry forward
+TARGET_WALL_DISTANCE = 40  # carry forward
+MAX_STEERING = 60  # carry forward
 
-side_Kp = 0.0  # proportional gain
-side_Ki = 0.0  # integral gain
-side_Kd = 0.0  # derivative gain
-side_INTEGRAL_MAX = 0  # anti-windup clamp
+side_Kp = 0.4  # carry forward
+side_Kd = 0.3  # carry forward
+side_Ki = 0.015  # integral gain — start very small
+side_INTEGRAL_MAX = 1100  # anti-windup clamp
 
-FRONT_SLOW_DISTANCE = 0  # start slowing when a wall is this close ahead
-FRONT_Kp = 0.0  # how hard to slow down on approach
+FRONT_SLOW_DISTANCE = 200  # start slowing when a wall is this close ahead
+FRONT_Kp = 1.0  # how hard to slow down on approach
 
 # --- TURN parameters (your gyro turn PID — reused in every later challenge) ---
 turn_Kp = 0.0  # proportional gain on the heading error
@@ -38,7 +38,7 @@ MIN_TURN_SPEED = 120  # slowest spin that still moves the motors
 TURN_MAX_STEPS = 200  # safety cap so an untuned turn can't loop forever
 
 # --- Trigger threshold (the logic that moves between states) ---
-FRONT_STOP_DISTANCE = 0  # a front wall this close = reached -> TURN (you set)
+FRONT_STOP_DISTANCE = 50  # a front wall this close = reached -> TURN (you set)
 
 # --- Persistent state ---
 state = "FOLLOW_WALL"
@@ -46,15 +46,24 @@ side_integral = 0
 side_previous_error = 0
 
 
-def gyro_turn_pid(turn_right):
-    """Spin 90 deg on the spot using the gyro turn PID, then stop."""
+def _turn_is_right(relative_angle_deg):
+    """Map wall-relative turn sign to a physical spin direction."""
+    if my_robot.wall_sign < 0:
+        return relative_angle_deg >= 0
+    return relative_angle_deg < 0
+
+
+def gyro_turn_pid(relative_angle_deg):
+    """Spin by a wall-relative angle using the gyro turn PID, then stop."""
+    target_angle = abs(relative_angle_deg)
     heading = 0.0
-    prev_error = TURN_ANGLE
+    prev_error = target_angle
+    turn_right = _turn_is_right(relative_angle_deg)
     steps = 0
-    while (TURN_ANGLE - heading) > turn_tolerance and steps < TURN_MAX_STEPS:
+    while (target_angle - heading) > turn_tolerance and steps < TURN_MAX_STEPS:
         gz = my_robot.read_gyro_z_dps()
         heading = heading + abs(gz) * TURN_DT
-        error = TURN_ANGLE - heading
+        error = target_angle - heading
         derivative = error - prev_error
         speed = (turn_Kp * error) + (turn_Kd * derivative)
         if speed > TURN_MAX_SPEED:
@@ -125,7 +134,7 @@ def turn():
     """STATE: wall ahead — spin 90 deg AWAY from the wall."""
     my_robot.brake()
     hold_state(0.3)
-    gyro_turn_pid(my_robot.wall_sign == -1)  # left wall -> spin right
+    gyro_turn_pid(TURN_ANGLE)
     hold_state(0.3)
     return "FOLLOW_WALL"
 
