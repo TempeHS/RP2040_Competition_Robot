@@ -85,12 +85,12 @@ describe("Challenge progression: P → PD → PID tightens lateral excursion", (
    * Run a Python challenge answer through the full pipeline.
    * @param {string} code - Python source
    * @param {object} opts
-   * @param {number} opts.startX - starting X position (default 300)
+   * @param {number} opts.startX - starting X position (default 140)
    * Returns { samples, stopReason, xRange, xStdDev, lateralExcursion, meanX, minX, maxX }.
    */
   function runChallenge(
     code,
-    { dt = 0.05, maxTicks = 600, startX = 300 } = {},
+    { dt = 0.05, maxTicks = 600, startX = 140 } = {},
   ) {
     // Eliminate sensor noise so we measure pure controller quality.
     // With random noise the integral term accumulates drift, unfairly
@@ -366,11 +366,11 @@ describe("Challenge progression: P → PD → PID tightens lateral excursion", (
 
   /* ── Multi-start: converges to target from any starting distance ── */
 
-  // TARGET_WALL_DISTANCE = 200mm. The side sensor is mounted ROBOT_WIDTH/2
-  // = 60mm from body centre. So when the sensor reads 200mm the body centre
-  // sits at x = 200 + 60 = 260mm from the left arena wall.
-  const TARGET_X = 260;
-  const START_DISTANCES = [100, 150, 200, 260, 300, 350];
+  // TARGET_WALL_DISTANCE = 40mm. The side sensor is mounted ROBOT_WIDTH/2
+  // = 60mm from body centre. So when the sensor reads 40mm the body centre
+  // sits at x = 40 + 60 = 100mm from the left arena wall.
+  const TARGET_X = 100;
+  const START_DISTANCES = [70, 85, 100, 115, 130, 140];
   // Tolerance: steady-state mean X must be within this many mm of target.
   const CONVERGE_TOLERANCE = 20;
 

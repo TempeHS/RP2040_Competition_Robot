@@ -44,10 +44,16 @@ while True:
         (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
     )
 
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
+    # Cap steering so the slower wheel can never fall into the motor dead zone.
+    steer_limit = BASE_SPEED - my_robot.MIN_MOTOR_SPEED
+    if steer_limit < 0:
+        steer_limit = 0
+    if steer_limit > MAX_STEERING:
+        steer_limit = MAX_STEERING
+    if steering > steer_limit:
+        steering = steer_limit
+    elif steering < -steer_limit:
+        steering = -steer_limit
 
     right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
     left_speed = BASE_SPEED + (my_robot.wall_sign * steering)

@@ -14,11 +14,16 @@ const AIDriverStub = {
   // Robot instance state
   robotInstance: null,
 
+  // Simulated elapsed time in ms, advanced by hold_state. Kept separate from
+  // wall-clock time so ticks_ms() is unaffected by the speed multiplier.
+  simTimeMs: 0,
+
   /**
    * Reset the simulator command queue so pending actions are discarded.
    */
   clearQueue() {
     this.commandQueue = [];
+    this.simTimeMs = 0;
   },
 
   /**
@@ -695,6 +700,21 @@ const AIDriverStub = {
           });
 
           /**
+           * Blank the (simulated) OLED. On hardware this also frees the shared
+           * I2C bus, which matters inside tight gyro loops.
+           * @returns {null}
+           */
+          $loc.clear_display = new Sk.builtin.func(function (self) {
+            const lines = ["", "", "", ""];
+            self.displayLines = lines;
+            AIDriverStub.queueCommand({
+              type: "show_display",
+              params: { lines },
+            });
+            return Sk.builtin.none.none$;
+          });
+
+          /**
            * Show the competition state, sensor health and colour on the
            * OLED. Mirrors AIDriver.display_status() on the hardware.
            * @returns {null}
@@ -821,6 +841,8 @@ const AIDriverStub = {
 
         console.log("[AIDriverStub] hold_state JS called with seconds:", secs);
 
+        AIDriverStub.simTimeMs += secs * 1000;
+
         AIDriverStub.queueCommand({
           type: "hold_state",
           params: { seconds: secs },
@@ -850,6 +872,35 @@ const AIDriverStub = {
             }, scaledMs);
           }),
         );
+      });
+
+      /**
+       * Simulated millisecond counter, mirroring MicroPython's time.ticks_ms().
+       * Advances with hold_state so learner code measures simulated time, not
+       * wall-clock time that the speed multiplier would distort.
+       * @returns {Sk.builtin.int_} Milliseconds since the run started.
+       */
+      mod.ticks_ms = new Sk.builtin.func(function () {
+        return new Sk.builtin.int_(
+          Math.floor(AIDriverStub.simTimeMs) & 0x3fffffff,
+        );
+      });
+
+      /**
+       * Signed difference between two ticks_ms() values, mirroring
+       * MicroPython's time.ticks_diff() wraparound handling.
+       * @param {Sk.builtin.int_} t1 Later ticks value.
+       * @param {Sk.builtin.int_} t2 Earlier ticks value.
+       * @returns {Sk.builtin.int_} Elapsed milliseconds.
+       */
+      mod.ticks_diff = new Sk.builtin.func(function (t1, t2) {
+        let diff = Sk.ffi.remapToJs(t1) - Sk.ffi.remapToJs(t2);
+        if (diff < -0x20000000) {
+          diff += 0x40000000;
+        } else if (diff > 0x1fffffff) {
+          diff -= 0x40000000;
+        }
+        return new Sk.builtin.int_(diff);
       });
 
       return mod;

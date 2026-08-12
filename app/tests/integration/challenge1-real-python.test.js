@@ -96,7 +96,7 @@ describe("Challenge 1 answer — real Python through the browser pipeline", () =
     // Reset robot pose to the EXACT spawn the browser uses for Challenge 1.
     // (See app/js/challenges.js → challenges[1].startPosition.)
     App.robot = {
-      x: 300,
+      x: 145,
       y: 1700,
       heading: 0,
       leftSpeed: 0,

@@ -12,11 +12,11 @@ aidriver.DEBUG_AIDRIVER = False
 my_robot = AIDriver("left")
 
 BASE_SPEED = 200  # carry forward from C1
-TARGET_WALL_DISTANCE = 200  # carry forward from C1
+TARGET_WALL_DISTANCE = 40  # carry forward from C1
 MAX_STEERING = 60  # carry forward from C1
 
-side_Kp = 0.25  # carry forward from C1
-side_Kd = 0.30  # derivative gain — dampens oscillation
+side_Kp = 0.4  # carry forward from C1
+side_Kd = 0.3  # derivative gain — dampens oscillation
 
 side_previous_error = 0
 
@@ -34,10 +34,16 @@ while True:
 
     steering = (side_Kp * error) + (side_Kd * side_derivative)
 
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
+    # Cap steering so the slower wheel can never fall into the motor dead zone.
+    steer_limit = BASE_SPEED - my_robot.MIN_MOTOR_SPEED
+    if steer_limit < 0:
+        steer_limit = 0
+    if steer_limit > MAX_STEERING:
+        steer_limit = MAX_STEERING
+    if steering > steer_limit:
+        steering = steer_limit
+    elif steering < -steer_limit:
+        steering = -steer_limit
 
     right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
     left_speed = BASE_SPEED + (my_robot.wall_sign * steering)

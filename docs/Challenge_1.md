@@ -83,9 +83,9 @@ Optional debug edits:
 | Name                   | Unit      | Purpose                 | Typical start value | Symptoms when too low | Symptoms when too high          |
 | ---------------------- | --------- | ----------------------- | ------------------- | --------------------- | ------------------------------- |
 | `BASE_SPEED`           | PWM       | Forward speed baseline  | 200                 | Robot may stall       | Harder to control corners later |
-| `TARGET_WALL_DISTANCE` | mm        | Desired side clearance  | 200                 | Too close to wall     | Too far from wall               |
+| `TARGET_WALL_DISTANCE` | mm        | Desired side clearance  | 40                  | Too close to wall     | Too far from wall               |
 | `MAX_STEERING`         | PWM delta | Max wheel speed split   | 60                  | Weak correction       | One wheel can slow too much     |
-| `side_Kp`              | gain      | Error to steering scale | 0.25                | Slow drift away       | Zig-zag oscillation             |
+| `side_Kp`              | gain      | Error to steering scale | 0.4                 | Slow drift away       | Zig-zag oscillation             |
 
 ## Tuning Guide
 

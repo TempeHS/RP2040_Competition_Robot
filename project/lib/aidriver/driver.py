@@ -301,8 +301,25 @@ class AIDriver:
         self.turn_Ki = 0.0  # integral gain (usually 0 for turns)
         self.turn_Kd = 0.4  # derivative gain (damps overshoot)
         self.turn_tolerance = 2.0  # deg — stop when |error| within this band
-        self.turn_max_speed = 200  # clamp on turn wheel speed
+        self.turn_max_speed = 240  # clamp on turn wheel speed
+        self.turn_min_speed = 190  # slowest spin that still rotates the robot
         self.turn_timeout_ms = 4000  # safety: abort a turn after this long
+
+        # Turn mechanics measured on the reference chassis. A standing pivot
+        # will not start at turn_min_speed, and the robot keeps rolling after
+        # power is cut, so the loop kicks to start and brakes early to stop.
+        self.turn_kick_speed = 255  # burst that breaks static friction
+        self.turn_kick_ms = 80  # how long that burst lasts
+        self.turn_coast_time = 0.03  # seconds of rotation after power is cut
+        self.turn_settle_ms = 300  # coast measurement window before correcting
+
+        # Correction pulses. The motors stall below MIN_MOTOR_SPEED, so the
+        # last few degrees are closed with short bursts, not by driving slower.
+        self.turn_nudge_speed = 220
+        self.turn_nudge_ms_per_deg = 4
+        self.turn_nudge_min_ms = 25
+        self.turn_nudge_max_ms = 250
+        self.turn_max_nudges = 6
         self._gyro_bias_dps = 0.0  # measured stationary yaw-rate offset
 
         self.imu = None
@@ -937,14 +954,31 @@ class AIDriver:
 
         heading = 0.0
         integral = 0.0
-        prev_error = target
-        settle = 0
         last_ms = ticks_ms()
-        start_ms = last_ms
 
         try:
+            # ── Phase 1: kick ────────────────────────────────────────────
+            # A standing pivot will not start at turn_min_speed. The burst also
+            # reveals which sign this IMU reports for this rotation, so an
+            # inverted mounting cannot make the controller run away.
+            self._spin_in_place(is_right, self.turn_kick_speed)
+            raw_sum = 0.0
+            kick_start = last_ms
+            while ticks_diff(ticks_ms(), kick_start) < self.turn_kick_ms:
+                raw = self.imu.read_gyro_z_dps() - self._gyro_bias_dps
+                raw_sum += raw
+                now = ticks_ms()
+                dt = ticks_diff(now, last_ms) / 1000.0
+                last_ms = now
+                heading += abs(raw) * dt
+                sleep_ms(5)
+            gyro_sign = -1.0 if raw_sum < 0 else 1.0
+
+            # ── Phase 2: PID cruise with predictive braking ──────────────
+            prev_error = target - heading
+            start_ms = last_ms
             while True:
-                gz = self.imu.read_gyro_z_dps() - self._gyro_bias_dps
+                gz = (self.imu.read_gyro_z_dps() - self._gyro_bias_dps) * gyro_sign
 
                 now = ticks_ms()
                 dt = ticks_diff(now, last_ms) / 1000.0
@@ -952,23 +986,19 @@ class AIDriver:
                     dt = 0.001
                 last_ms = now
 
-                heading += abs(gz) * dt
-                error = target - heading
+                heading += gz * dt
 
-                # Stop once we have settled inside the tolerance band.
-                if abs(error) <= self.turn_tolerance:
-                    settle += 1
-                    if settle >= 2:
-                        break
-                else:
-                    settle = 0
+                # Cut power once the angle we would coast through lands on the
+                # target; brake() does not stop the robot dead.
+                if heading + (gz * self.turn_coast_time) >= target:
+                    break
 
                 # Safety timeout so a wiring/stall fault cannot spin forever.
                 if ticks_diff(now, start_ms) > self.turn_timeout_ms:
                     _d("turn_degrees: timeout, stopping early")
                     break
 
-                # PID → wheel-speed magnitude.
+                error = target - heading
                 integral += error * dt
                 derivative = (error - prev_error) / dt
                 prev_error = error
@@ -979,21 +1009,51 @@ class AIDriver:
                 )
 
                 speed = int(output)
-                if speed < self.MIN_MOTOR_SPEED:
-                    speed = self.MIN_MOTOR_SPEED
+                if speed < self.turn_min_speed:
+                    speed = self.turn_min_speed
                 if speed > self.turn_max_speed:
                     speed = self.turn_max_speed
 
-                self.motor_right.set_speed(speed)
-                self.motor_left.set_speed(speed)
-                if is_right:
-                    self.motor_right.forward()
-                    self.motor_left.forward()
-                else:
-                    self.motor_right.backward()
-                    self.motor_left.backward()
-
+                self._spin_in_place(is_right, speed)
                 sleep_ms(5)
+
+            self.motor_right.stop()
+            self.motor_left.stop()
+
+            # ── Phase 3: measure the coast, then correct with pulses ─────
+            heading, last_ms = self._integrate_coast(
+                heading, last_ms, gyro_sign, self.turn_settle_ms
+            )
+            nudges = 0
+            while nudges < self.turn_max_nudges:
+                error = target - heading
+                if abs(error) <= self.turn_tolerance:
+                    break
+                pulse_ms = int(self.turn_nudge_ms_per_deg * abs(error))
+                if pulse_ms < self.turn_nudge_min_ms:
+                    pulse_ms = self.turn_nudge_min_ms
+                if pulse_ms > self.turn_nudge_max_ms:
+                    pulse_ms = self.turn_nudge_max_ms
+
+                self._spin_in_place(
+                    is_right if error > 0 else (not is_right),
+                    self.turn_nudge_speed,
+                )
+                pulse_start = ticks_ms()
+                while ticks_diff(ticks_ms(), pulse_start) < pulse_ms:
+                    gz = (self.imu.read_gyro_z_dps() - self._gyro_bias_dps) * gyro_sign
+                    now = ticks_ms()
+                    dt = ticks_diff(now, last_ms) / 1000.0
+                    last_ms = now
+                    heading += gz * dt
+                    sleep_ms(5)
+
+                self.motor_right.stop()
+                self.motor_left.stop()
+                heading, last_ms = self._integrate_coast(
+                    heading, last_ms, gyro_sign, self.turn_settle_ms
+                )
+                nudges += 1
         except Exception as exc:
             _explain_error(exc)
             raise
@@ -1005,6 +1065,33 @@ class AIDriver:
 
         _d("turn_degrees: target={:.0f} actual={:.1f} deg".format(target, heading))
         return heading
+
+    def _spin_in_place(self, is_right, speed):
+        """Counter-rotate the wheels at *speed* to pivot on the spot."""
+        self.motor_right.set_speed(speed)
+        self.motor_left.set_speed(speed)
+        if is_right:
+            self.motor_right.forward()
+            self.motor_left.forward()
+        else:
+            self.motor_right.backward()
+            self.motor_left.backward()
+
+    def _integrate_coast(self, heading, last_ms, gyro_sign, window_ms):
+        """Keep integrating the gyro while the robot coasts after a stop.
+
+        Returns the updated ``(heading, last_ms)`` so the caller knows the true
+        angle reached, including the rotation that happened after power was cut.
+        """
+        window_start = ticks_ms()
+        while ticks_diff(ticks_ms(), window_start) < window_ms:
+            sleep_ms(10)
+            gz = (self.imu.read_gyro_z_dps() - self._gyro_bias_dps) * gyro_sign
+            now = ticks_ms()
+            dt = ticks_diff(now, last_ms) / 1000.0
+            last_ms = now
+            heading += gz * dt
+        return heading, last_ms
 
     def turn_90(self, direction):
         """Turn 90° in *direction* ("left" or "right") using the gyro PID."""

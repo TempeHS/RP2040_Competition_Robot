@@ -13,10 +13,11 @@ These constants come from the canonical `CONFIG_BASE` block used by every challe
 
 ```python
 BASE_SPEED           = 200   # Forward speed (must be >= 100)
-TARGET_WALL_DISTANCE = 200   # mm
+TARGET_WALL_DISTANCE = 40    # mm
 MAX_STEERING         = 60    # Max wheel speed difference
 # Loop delay: hold_state(0.05)
-# Rule: BASE_SPEED - MAX_STEERING >= 100 (MIN_MOTOR_SPEED dead zone)
+# Rule: the slower wheel must stay above MIN_MOTOR_SPEED (120), so cap steering
+# at (current speed - 120) as well as at MAX_STEERING.
 ```
 
 Start every gain at **zero**:
@@ -163,11 +164,11 @@ Typical final wrap times on the real robot: `NIB_FORWARD_BEFORE` **0.25 – 0.40
 
 ```python
 BASE_SPEED           = 200
-TARGET_WALL_DISTANCE = 200
+TARGET_WALL_DISTANCE = 40
 MAX_STEERING         = 60
 
-side_Kp           = 0.25
-side_Kd           = 0.40
+side_Kp           = 0.4
+side_Kd           = 0.3
 side_Ki           = 0.001
 side_INTEGRAL_MAX = 50
 

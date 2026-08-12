@@ -12,10 +12,10 @@ aidriver.DEBUG_AIDRIVER = False  # Set True to print sensor + motor values
 my_robot = AIDriver("left")  # "left" or "right" — match the simulator scene
 
 BASE_SPEED = 200  # forward speed (keep BASE_SPEED - MAX_STEERING > 120)
-TARGET_WALL_DISTANCE = 200  # distance to hold from the wall (mm)
+TARGET_WALL_DISTANCE = 40  # distance to hold from the wall (mm)
 MAX_STEERING = 60  # max wheel-speed difference
 
-side_Kp = 0.25  # proportional gain
+side_Kp = 0.4  # proportional gain
 
 
 while True:
@@ -30,10 +30,16 @@ while True:
     error = wall_distance - TARGET_WALL_DISTANCE
     steering = side_Kp * error
 
-    if steering > MAX_STEERING:
-        steering = MAX_STEERING
-    elif steering < -MAX_STEERING:
-        steering = -MAX_STEERING
+    # Cap steering so the slower wheel can never fall into the motor dead zone.
+    steer_limit = BASE_SPEED - my_robot.MIN_MOTOR_SPEED
+    if steer_limit < 0:
+        steer_limit = 0
+    if steer_limit > MAX_STEERING:
+        steer_limit = MAX_STEERING
+    if steering > steer_limit:
+        steering = steer_limit
+    elif steering < -steer_limit:
+        steering = -steer_limit
 
     right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
     left_speed = BASE_SPEED + (my_robot.wall_sign * steering)

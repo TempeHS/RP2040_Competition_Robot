@@ -21,6 +21,10 @@ Everything a caller needs is re-exported here, so existing code such as
 from machine import Pin, PWM
 from time import sleep as _sleep
 
+# Re-exported so learner code can measure real loop time with the same import
+# on hardware and in the browser simulator.
+from time import ticks_ms, ticks_diff
+
 try:
     import eventlog
 except Exception:

@@ -10,7 +10,12 @@ const Validator = (function () {
   const ALLOWED_IMPORTS = new Set(["aidriver", "time"]);
 
   // Allowed from aidriver imports
-  const ALLOWED_FROM_AIDRIVER = new Set(["AIDriver", "hold_state"]);
+  const ALLOWED_FROM_AIDRIVER = new Set([
+    "AIDriver",
+    "hold_state",
+    "ticks_ms",
+    "ticks_diff",
+  ]);
 
   // Allowed function calls (builtins + aidriver functions)
   const ALLOWED_FUNCTIONS = new Set([
@@ -36,6 +41,8 @@ const Validator = (function () {
     // AIDriver functions
     "AIDriver",
     "hold_state",
+    "ticks_ms",
+    "ticks_diff",
   ]);
 
   // Allowed builtins
@@ -257,7 +264,7 @@ const Validator = (function () {
             if (name !== "*" && !ALLOWED_FROM_AIDRIVER.has(name)) {
               warnings.push({
                 line: imp.line,
-                message: `'${name}' is not a known export from aidriver. Expected: AIDriver, hold_state`,
+                message: `'${name}' is not a known export from aidriver. Expected: AIDriver, hold_state, ticks_ms, ticks_diff`,
                 type: "import",
               });
             }

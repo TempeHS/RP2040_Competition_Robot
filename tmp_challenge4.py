@@ -1,60 +1,86 @@
-# Challenge 4: Corner Detection — your first state machine.
-# The robot is always in ONE state: FOLLOW_WALL or TURN.
-# Write the gyro turn PID here — you reuse it in every later challenge.
-# Fill in the values below. Guide: docs.html?doc=Challenge_4
+# TEMP tuning file — Challenge 4: Corner Detection (90 deg turn)
+# Scratch copy we keep iterating on. Not part of the challenge set.
 
-from aidriver import AIDriver, hold_state, ticks_ms, ticks_diff
+from time import ticks_ms, ticks_diff
+
+from aidriver import AIDriver, hold_state
 import aidriver
 
 aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")
-
-# Each loop runs the current state, which returns the next state to run.
-# States: FOLLOW_WALL (hold the wall) and TURN (spin 90° away from a wall ahead).
+my_robot = AIDriver("left", "tof")
 
 # --- FOLLOW_WALL parameters ---
-BASE_SPEED = 200  # carry forward
-TARGET_WALL_DISTANCE = 40  # carry forward
-MAX_STEERING = 60  # carry forward
+BASE_SPEED = 200
+TARGET_WALL_DISTANCE = 40
+MAX_STEERING = 60
 
-side_Kp = 0.4  # carry forward
-side_Kd = 0.3  # carry forward
-side_Ki = 0.015  # integral gain — start very small
-side_INTEGRAL_MAX = 1100  # anti-windup clamp
+side_Kp = 0.4
+side_Kd = 0.3
+side_Ki = 0.015
+side_INTEGRAL_MAX = 1100
 
-FRONT_SLOW_DISTANCE = 200  # start slowing when a wall is this close ahead
-FRONT_Kp = 1.0  # how hard to slow down on approach
+FRONT_SLOW_DISTANCE = 150
+FRONT_Kp = 1.0
 
-# --- TURN parameters (your gyro turn PID — reused in every later challenge) ---
-turn_Kp = 0.0  # proportional gain on the heading error
-turn_Kd = 0.0  # derivative gain — damps overshoot
-turn_tolerance = 0.0  # stop within this many degrees of the target
+# --- TURN parameters ---
+turn_Kp = 30.0
+turn_Kd = 0.4
+turn_tolerance = 2.0
 
-# Fixed turn mechanics (no tuning needed):
-TURN_ANGLE = 90  # every corner is a 90 degree turn
-TURN_DT = 0.02  # seconds per turn step (matches hold_state)
-TURN_MAX_SPEED = 240  # fastest spin speed
-MIN_TURN_SPEED = 190  # slowest spin that still rotates the robot
-TURN_TIMEOUT_MS = 2500  # safety cap so an untuned turn can't spin forever
-TURN_KICK_SPEED = 255  # opening burst that breaks static friction
-TURN_KICK_STEPS = 4  # how many steps that burst lasts
-TURN_COAST_TIME = 0.03  # seconds the robot keeps rotating after braking
-TURN_SETTLE_STEPS = 15  # gyro samples taken while it coasts to a stop
-NUDGE_SPEED = 220  # correction pulse speed (must beat static friction)
-NUDGE_MS_PER_DEG = 4  # pulse length per degree of remaining error
-NUDGE_MIN_MS = 25  # shortest useful pulse
-NUDGE_MAX_MS = 250  # longest allowed pulse
-NUDGE_STEP = 0.005  # sample interval inside a pulse
-TURN_MAX_NUDGES = 6  # give up correcting after this many pulses
-TURN_CLEAR_TIME = 0.4  # drive on after a turn to leave the trigger zone
+TURN_ANGLE = 90
+TURN_DT = 0.02
+TURN_MAX_SPEED = 240
+MIN_TURN_SPEED = 190
+TURN_TIMEOUT_MS = 2500  # hard stop: a 90 deg pivot takes well under 1 second
+TURN_CLEAR_TIME = 0.4  # forward burst after a turn, to leave the trigger zone
 
-# --- Trigger threshold (the logic that moves between states) ---
-FRONT_STOP_DISTANCE = 50  # a front wall this close = reached -> TURN (you set)
+TURN_KICK_SPEED = 255  # break static friction; 150 alone will not start a pivot
+TURN_KICK_STEPS = 4
+TURN_COAST_TIME = 0.03  # seconds the robot keeps spinning after brake()
+TURN_SETTLE_STEPS = 15  # gyro samples taken while coasting, before correcting
+
+# Correction pulses. Below MIN_TURN_SPEED the motors stall, so fine angles are
+# reached with short bursts rather than by driving slower. The pulse must be
+# strong enough to break static friction from a standstill, like the kick.
+NUDGE_SPEED = 220
+NUDGE_MS_PER_DEG = 4
+NUDGE_MIN_MS = 25
+NUDGE_MAX_MS = 250
+TURN_MAX_NUDGES = 6
+
+# --- Trigger threshold ---
+FRONT_STOP_DISTANCE = 150
 
 # --- Persistent state ---
 state = "FOLLOW_WALL"
 side_integral = 0
 side_previous_error = 0
+display_tick = 0
+
+
+def boot_check():
+    """Prove this file is running and that the gyro is alive. Halts if not."""
+    gz_max = 0.0
+    for _ in range(20):
+        gz = abs(my_robot.read_gyro_z_dps())
+        if gz > gz_max:
+            gz_max = gz
+        hold_state(0.01)
+    print("TMP4 boot: has_gyro=", my_robot.has_gyro)
+    print("TMP4 boot: has_display=", my_robot.has_display)
+    print("TMP4 boot: idle |gz| max=", gz_max)
+    my_robot.show_display(
+        "TMP4 BOOT",
+        "gyro:{}".format("OK" if my_robot.has_gyro else "NONE"),
+        "oled:{}".format("OK" if my_robot.has_display else "NONE"),
+        "idle gz:{}".format(int(gz_max)),
+    )
+    hold_state(3.0)
+    if not my_robot.has_gyro:
+        my_robot.brake()
+        my_robot.show_display("HALTED", "NO GYRO FOUND", "check GP16/17", "wiring")
+        print("TMP4: no gyro - turns are impossible, halting.")
+        raise SystemExit
 
 
 def _turn_is_right(relative_angle_deg):
@@ -64,16 +90,8 @@ def _turn_is_right(relative_angle_deg):
     return relative_angle_deg < 0
 
 
-def _spin(turn_right, speed, reverse=False):
-    """Pivot on the spot at *speed*, optionally against the turn direction."""
-    if turn_right != reverse:
-        my_robot.drive(-speed, speed)
-    else:
-        my_robot.drive(speed, -speed)
-
-
 def _settle(heading, last_ms, gyro_sign, samples):
-    """Integrate the gyro while the robot coasts to a stop after braking."""
+    """Integrate the gyro while the robot coasts to a stop after brake()."""
     for _ in range(samples):
         hold_state(0.02)
         gz = my_robot.read_gyro_z_dps() * gyro_sign
@@ -82,6 +100,14 @@ def _settle(heading, last_ms, gyro_sign, samples):
         last_ms = now
         heading = heading + (gz * dt)
     return heading, last_ms
+
+
+def _spin(turn_right, speed, reverse=False):
+    """Pivot on the spot at *speed*, optionally against the turn direction."""
+    if turn_right != reverse:
+        my_robot.drive(-speed, speed)
+    else:
+        my_robot.drive(speed, -speed)
 
 
 def gyro_turn_pid(relative_angle_deg):
@@ -109,9 +135,14 @@ def gyro_turn_pid(relative_angle_deg):
     # Phase 2 - PID cruise. Braking is predictive: cut power once the angle we
     # would coast through lands on the target.
     prev_error = target - heading
+    steps = 0
+    gz_peak = 0.0
+    timed_out = False
     start_ms = last_ms
     while True:
         gz = my_robot.read_gyro_z_dps() * gyro_sign
+        if abs(gz) > gz_peak:
+            gz_peak = abs(gz)
         now = ticks_ms()
         dt = ticks_diff(now, last_ms) / 1000.0
         if dt <= 0:
@@ -122,6 +153,7 @@ def gyro_turn_pid(relative_angle_deg):
         if heading + (gz * TURN_COAST_TIME) >= target:
             break
         if ticks_diff(now, start_ms) > TURN_TIMEOUT_MS:
+            timed_out = True
             break
 
         error = target - heading
@@ -134,6 +166,7 @@ def gyro_turn_pid(relative_angle_deg):
             speed = MIN_TURN_SPEED
         _spin(turn_right, speed)
         hold_state(TURN_DT)
+        steps = steps + 1
 
     my_robot.brake()
 
@@ -153,7 +186,6 @@ def gyro_turn_pid(relative_angle_deg):
         _spin(turn_right, NUDGE_SPEED, error < 0)
         pulse_start = ticks_ms()
         while ticks_diff(ticks_ms(), pulse_start) < pulse_ms:
-            hold_state(NUDGE_STEP)
             gz = my_robot.read_gyro_z_dps() * gyro_sign
             now = ticks_ms()
             dt = ticks_diff(now, last_ms) / 1000.0
@@ -162,15 +194,36 @@ def gyro_turn_pid(relative_angle_deg):
         my_robot.brake()
         heading, last_ms = _settle(heading, last_ms, gyro_sign, 10)
         nudges = nudges + 1
-    return heading
+
+    print(
+        "TMP4 turn: want",
+        target,
+        "got",
+        heading,
+        "steps",
+        steps,
+        "nudges",
+        nudges,
+        "sign",
+        gyro_sign,
+        "peak",
+        gz_peak,
+        "timeout",
+        timed_out,
+    )
+    my_robot.show_display(
+        "TURN {}".format("TIMEOUT" if timed_out else "DONE"),
+        "want{} got{}".format(int(target), int(heading)),
+        "nudge:{} sgn:{}".format(nudges, gyro_sign),
+        "peak:{} n:{}".format(int(gz_peak), steps),
+    )
 
 
 def follow_wall():
     """STATE: hold the side wall with the side PID. Returns the next state."""
-    global side_integral, side_previous_error
+    global side_integral, side_previous_error, display_tick
 
     front = my_robot.read_distance()
-    # Trigger -> TURN: a wall is reached straight ahead (the corner).
     if front != -1 and front <= FRONT_STOP_DISTANCE:
         side_integral = 0
         side_previous_error = 0
@@ -178,12 +231,10 @@ def follow_wall():
 
     side = my_robot.read_distance_2()
     if side == -1:
-        # No side wall this tick: cruise straight until it returns.
         my_robot.drive(BASE_SPEED, BASE_SPEED)
         hold_state(0.05)
         return "FOLLOW_WALL"
 
-    # Speed: slow down if a wall is coming up ahead.
     if front != -1 and front < FRONT_SLOW_DISTANCE:
         speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
         if speed < my_robot.min_approach_speed:
@@ -193,7 +244,6 @@ def follow_wall():
     else:
         speed = BASE_SPEED
 
-    # Steering: the side PID holds the wall at the target distance.
     error = side - TARGET_WALL_DISTANCE
     side_integral = side_integral + error
     if side_integral > side_INTEGRAL_MAX:
@@ -218,6 +268,18 @@ def follow_wall():
     left_speed = speed + (my_robot.wall_sign * steering)
     my_robot.drive(int(right_speed), int(left_speed))
     side_previous_error = error
+
+    # OLED is slow I2C — refresh ~2x/sec, not every loop.
+    display_tick = display_tick + 1
+    if display_tick >= 10:
+        display_tick = 0
+        my_robot.show_display(
+            "FOLLOW",
+            "F:{} S:{}".format(front, side),
+            "err:{} st:{}".format(int(error), int(steering)),
+            "R:{} L:{}".format(int(right_speed), int(left_speed)),
+        )
+
     hold_state(0.05)
     return "FOLLOW_WALL"
 
@@ -228,7 +290,7 @@ def turn():
     my_robot.clear_display()  # no I2C traffic while the gyro loop is running
     hold_state(0.3)
     gyro_turn_pid(TURN_ANGLE)
-    hold_state(0.3)
+    hold_state(2.0)  # long enough to read the result off the OLED
     # Move out of the trigger zone, else FOLLOW_WALL re-fires TURN instantly.
     front = my_robot.read_distance()
     if front == -1 or front > FRONT_STOP_DISTANCE:
@@ -239,6 +301,7 @@ def turn():
 
 
 # --- Main loop ---
+boot_check()
 while True:
     if state == "FOLLOW_WALL":
         state = follow_wall()

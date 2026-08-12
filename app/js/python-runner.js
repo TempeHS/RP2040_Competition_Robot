@@ -465,17 +465,36 @@ class AIDriver:
 
 def hold_state(seconds):
     """Hold the current state for specified seconds (adjusted by speed multiplier)"""
-    global DEBUG_AIDRIVER
+    global DEBUG_AIDRIVER, _sim_ticks_ms
     import time
     print("[Python] hold_state called with seconds:", seconds)
     if DEBUG_AIDRIVER:
         print("[AIDriver] hold_state:", seconds, "seconds")
+    _sim_ticks_ms = _sim_ticks_ms + (float(seconds) * 1000.0)
     _queue_command("hold_state", {"seconds": float(seconds)})
     # Divide sleep time by speed multiplier so faster speeds = shorter real time
     actual_sleep = float(seconds) / _SPEED_MULTIPLIER
     print("[Python] calling time.sleep with actual_sleep:", actual_sleep)
     time.sleep(actual_sleep)
     print("[Python] time.sleep returned for hold_state:", seconds)
+
+
+# Simulated time, advanced by hold_state. Mirrors MicroPython's time.ticks_*
+# so learner code can measure real loop duration with the same import.
+_sim_ticks_ms = 0
+
+def ticks_ms():
+    """Return the simulated millisecond counter."""
+    return int(_sim_ticks_ms) & 0x3FFFFFFF
+
+def ticks_diff(t1, t2):
+    """Return the signed difference between two ticks_ms() values."""
+    diff = t1 - t2
+    if diff < -0x20000000:
+        diff = diff + 0x40000000
+    elif diff > 0x1FFFFFFF:
+        diff = diff - 0x40000000
+    return diff
 `;
   },
 
