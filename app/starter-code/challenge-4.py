@@ -26,9 +26,9 @@ FRONT_SLOW_DISTANCE = 200  # start slowing when a wall is this close ahead
 FRONT_Kp = 1.0  # how hard to slow down on approach
 
 # --- TURN parameters (your gyro turn PID — reused in every later challenge) ---
-turn_Kp = 0.0  # proportional gain on the heading error
-turn_Kd = 0.0  # derivative gain — damps overshoot
-turn_tolerance = 0.0  # stop within this many degrees of the target
+turn_Kp = 0.0  # proportional gain on the heading error (try 20-40)
+turn_Kd = 0.0  # derivative gain — damps overshoot (try 0.2-0.8)
+turn_tolerance = 0.0  # degrees to settle within (try 1.5-3.0)
 
 # Fixed turn mechanics (no tuning needed):
 TURN_ANGLE = 90  # every corner is a 90 degree turn
@@ -49,7 +49,7 @@ TURN_MAX_NUDGES = 6  # give up correcting after this many pulses
 TURN_CLEAR_TIME = 0.4  # drive on after a turn to leave the trigger zone
 
 # --- Trigger threshold (the logic that moves between states) ---
-FRONT_STOP_DISTANCE = 50  # a front wall this close = reached -> TURN (you set)
+FRONT_STOP_DISTANCE = 0  # front wall this close = reached -> TURN (try 100-200)
 
 # --- Persistent state ---
 state = "FOLLOW_WALL"

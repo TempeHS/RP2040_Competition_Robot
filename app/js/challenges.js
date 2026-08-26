@@ -171,11 +171,12 @@ const Challenges = (function () {
         "When the wall you're following ends abruptly (an outside / convex corner, or a free-standing nib), the side sensor returns -1. Following the left-hand rule, turn LEFT to wrap the corner — reusing the SAME gyro turn PID you wrote in Challenge 4.",
       goal: "Detect the nib, turn left with your held gyro turn PID, and reach the pocket behind it.",
       hints: [
-        "side == -1 means the wall has ended — that's the outside corner / nib",
+        "side == -1 (or past NIB_LOST_DISTANCE) means the wall has ended — the nib",
+        "Debounce it: only trigger NIB_WALL after NIB_CONFIRM_TIME of being lost",
         "Left-hand rule: turn LEFT to wrap a nib (wall_sign == 1 → spin left)",
-        "Reuse the SAME gyro turn PID from C4 — only the direction differs",
+        "Reuse the SAME gyro turn PID from C4 — only the sign of the angle differs",
         "Keep turn_Kp / turn_Kd / turn_tolerance at your tuned C4 values",
-        "Reset side_integral and side_previous_error after the turn",
+        "After the wrap, creep forward until the side sensor finds the new wall",
       ],
       startPosition: { x: 1000, y: 1700, heading: 0 },
       successCriteria: {

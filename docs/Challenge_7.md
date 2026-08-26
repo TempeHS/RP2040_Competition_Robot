@@ -81,12 +81,12 @@ Optional debug edits:
 
 ## Tunables
 
-| Name                  | Unit | Purpose                          | Typical start value | Symptoms when too low | Symptoms when too high |
-| --------------------- | ---- | -------------------------------- | ------------------- | --------------------- | ---------------------- |
-| `BASE_SPEED`          | PWM  | Throughput vs stability tradeoff | 190 to 205          | Slow run              | Late reactions         |
-| `turn_tolerance`      | deg  | Turn completion precision        | 2.0                 | Slow completion       | Incomplete turns       |
-| `FRONT_STOP_DISTANCE` | mm   | Dead-end reaction margin         | 120                 | Wall contact risk     | Premature turn         |
-| `NIB_FORWARD_BEFORE`  | s    | Nib wrap clearance               | 0.25                | Clip corner           | Wide path              |
+| Name                  | Unit | Purpose                          | Typical range | Symptoms when too low    | Symptoms when too high |
+| --------------------- | ---- | -------------------------------- | ------------- | ------------------------ | ---------------------- |
+| `BASE_SPEED`          | PWM  | Throughput vs stability tradeoff | 190-205       | Slow run                 | Late reactions         |
+| `turn_tolerance`      | deg  | Turn completion precision        | 1.5-3.0       | Burns through the nudges | Incomplete turns       |
+| `FRONT_STOP_DISTANCE` | mm   | Dead-end reaction margin         | 100-200       | Wall contact risk        | Premature turn         |
+| `NIB_FORWARD_BEFORE`  | s    | Nib wrap clearance               | 0.2-0.4       | Clip corner              | Wide path              |
 
 ## Tuning Guide
 

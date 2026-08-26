@@ -29,13 +29,15 @@ Unchanged: front-triggered TURN state and side PID follow state.
 
 ## Carry Forward From Previous Challenge
 
-| Group   | Variable                                  | Notes                          |
-| ------- | ----------------------------------------- | ------------------------------ |
-| Reused  | Side PID and front-turn tunables          | Same as Challenge 4.           |
-| New     | `NIB_LOST_DISTANCE`, `NIB_CONFIRM_TIME`   | Side-wall loss detection.      |
-| New     | `NIB_FORWARD_BEFORE`, `NIB_FORWARD_AFTER` | Wrap maneuver distances/times. |
-| New     | `nib_lost_time`                           | Debounce timer.                |
-| Removed | None                                      | Existing states remain.        |
+| Group   | Variable                                  | Notes                                                           |
+| ------- | ----------------------------------------- | --------------------------------------------------------------- |
+| Reused  | Side PID and front-turn tunables          | Same values as Challenge 4.                                     |
+| Reused  | `gyro_turn_pid` and its fixed mechanics   | Unchanged from Challenge 4; only the sign of the angle differs. |
+| New     | `NIB_LOST_DISTANCE`, `NIB_CONFIRM_TIME`   | Side-wall loss detection.                                       |
+| New     | `NIB_FORWARD_BEFORE`, `NIB_FORWARD_AFTER` | Wrap maneuver distances/times.                                  |
+| New     | `NIB_REACQUIRE_MS`                        | Fixed: how long to creep on hunting for the new wall.           |
+| New     | `nib_lost_time`                           | Debounce timer.                                                 |
+| Removed | None                                      | Existing states remain.                                         |
 
 ## Algorithm Flow
 
@@ -50,11 +52,11 @@ stateDiagram-v2
 
 ### State Table
 
-| State name    | Responsibilities                                                 | Exit conditions              |
-| ------------- | ---------------------------------------------------------------- | ---------------------------- |
-| `FOLLOW_WALL` | Run side PID, check front trigger, track side loss timer         | Exit to `TURN` or `NIB_WALL` |
-| `TURN`        | Execute inside-corner 90 deg turn away from wall                 | Exit to `FOLLOW_WALL`        |
-| `NIB_WALL`    | Drive forward, turn toward wall side, drive forward to reacquire | Exit to `FOLLOW_WALL`        |
+| State name    | Responsibilities                                                    | Exit conditions              |
+| ------------- | ------------------------------------------------------------------- | ---------------------------- |
+| `FOLLOW_WALL` | Run side PID, check front trigger, track side loss timer            | Exit to `TURN` or `NIB_WALL` |
+| `TURN`        | Execute inside-corner 90 deg turn away from wall                    | Exit to `FOLLOW_WALL`        |
+| `NIB_WALL`    | Drive forward, turn toward wall side, drive forward, then reacquire | Exit to `FOLLOW_WALL`        |
 
 ### Trigger Table
 
@@ -82,14 +84,31 @@ Optional debug edits:
 
 1. Print `state`, `side`, and `nib_lost_time`.
 
+## The Wrap Maneuver
+
+`NIB_WALL` runs four steps, in order:
+
+1. Drive on for `NIB_FORWARD_BEFORE`, then brake. The side sensor passes the end
+   of the wall before the wheels do, so turning immediately cuts the corner.
+2. `gyro_turn_pid(-TURN_ANGLE)` - the same turn as Challenge 4, negative so it
+   wraps _toward_ the wall being followed.
+3. Drive on for `NIB_FORWARD_AFTER`, then brake, to come alongside the new face.
+4. Reacquire: creep forward for up to `NIB_REACQUIRE_MS` until the side reading
+   is back inside `NIB_LOST_DISTANCE`, so a slightly short `NIB_FORWARD_AFTER`
+   does not lose the run.
+
 ## Tunables
 
-| Name                 | Unit | Purpose                            | Typical start value | Symptoms when too low | Symptoms when too high |
-| -------------------- | ---- | ---------------------------------- | ------------------- | --------------------- | ---------------------- |
-| `NIB_LOST_DISTANCE`  | mm   | Side distance considered wall-lost | 400                 | False nib triggers    | Slow nib detection     |
-| `NIB_CONFIRM_TIME`   | s    | Debounce before nib state          | 0.5                 | Noise-triggered turns | Delayed response       |
-| `NIB_FORWARD_BEFORE` | s    | Clear corner before turning        | 0.25                | Clips corner          | Wrap too wide          |
-| `NIB_FORWARD_AFTER`  | s    | Move alongside new wall after turn | 0.30                | Missed reacquire      | Overshoot past wall    |
+| Name                 | Unit | Purpose                            | Typical range      | Symptoms when too low | Symptoms when too high |
+| -------------------- | ---- | ---------------------------------- | ------------------ | --------------------- | ---------------------- |
+| `NIB_LOST_DISTANCE`  | mm   | Side distance considered wall-lost | 2-4x hold distance | False nib triggers    | Nib is never detected  |
+| `NIB_CONFIRM_TIME`   | s    | Debounce before nib state          | 0.2-0.6            | Noise-triggered turns | Delayed response       |
+| `NIB_FORWARD_BEFORE` | s    | Clear corner before turning        | 0.2-0.4            | Clips corner          | Wrap too wide          |
+| `NIB_FORWARD_AFTER`  | s    | Move alongside new wall after turn | 0.3-0.6            | Missed reacquire      | Overshoot past wall    |
+
+`NIB_LOST_DISTANCE` is relative, not absolute: if the side PID holds 100 mm then
+a reading past roughly 250 mm means the wall has ended. A fixed value copied from
+someone else's robot will either fire constantly or never fire at all.
 
 ## Tuning Guide
 
@@ -106,12 +125,13 @@ Optional debug edits:
 
 ## Common Failure Modes
 
-| Symptom                  | Root cause                                            | Verification step                | Fix                                    |
-| ------------------------ | ----------------------------------------------------- | -------------------------------- | -------------------------------------- |
-| Random nib turns         | `NIB_LOST_DISTANCE` too low or confirm time too short | Plot side reading around trigger | Increase threshold and/or confirm time |
-| Clips outside corner     | `NIB_FORWARD_BEFORE` too low                          | Observe position at turn start   | Increase `NIB_FORWARD_BEFORE`          |
-| Fails to reacquire wall  | `NIB_FORWARD_AFTER` not tuned                         | Observe side reading after wrap  | Adjust `NIB_FORWARD_AFTER`             |
-| Wraps in wrong direction | Wall-side mapping issue                               | Print wall sign and turn command | Fix mapping toward wall side           |
+| Symptom                  | Root cause                                            | Verification step                        | Fix                                    |
+| ------------------------ | ----------------------------------------------------- | ---------------------------------------- | -------------------------------------- |
+| Random nib turns         | `NIB_LOST_DISTANCE` too low or confirm time too short | Plot side reading around trigger         | Increase threshold and/or confirm time |
+| Nib never detected       | `NIB_LOST_DISTANCE` far above the hold distance       | Print the side reading past the wall end | Bring the threshold back to 2-4x hold  |
+| Clips outside corner     | `NIB_FORWARD_BEFORE` too low                          | Observe position at turn start           | Increase `NIB_FORWARD_BEFORE`          |
+| Fails to reacquire wall  | `NIB_FORWARD_AFTER` not tuned                         | Observe side reading after wrap          | Adjust `NIB_FORWARD_AFTER`             |
+| Wraps in wrong direction | Wall-side mapping issue                               | Print wall sign and turn command         | Fix mapping toward wall side           |
 
 ## Exit Check
 

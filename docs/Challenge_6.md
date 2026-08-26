@@ -77,12 +77,15 @@ Optional debug edits:
 
 ## Tunables
 
-| Name                  | Unit | Purpose                | Typical start value | Symptoms when too low | Symptoms when too high |
-| --------------------- | ---- | ---------------------- | ------------------- | --------------------- | ---------------------- |
-| `BASE_SPEED`          | PWM  | Global traversal speed | 190 to 210          | Slow run              | Unstable corners       |
-| `FRONT_STOP_DISTANCE` | mm   | Dead-end trigger       | 120                 | Late turns            | Early turns            |
-| `turn_Kp`             | gain | Turn response strength | 4.5                 | Under-rotation        | Overshoot risk         |
-| `turn_Kd`             | gain | Turn damping           | 0.6                 | Wobble                | Sluggish turn          |
+| Name                  | Unit | Purpose                | Typical range | Symptoms when too low    | Symptoms when too high |
+| --------------------- | ---- | ---------------------- | ------------- | ------------------------ | ---------------------- |
+| `BASE_SPEED`          | PWM  | Global traversal speed | 190-210       | Slow run                 | Unstable corners       |
+| `FRONT_STOP_DISTANCE` | mm   | Dead-end trigger       | 100-200       | Late turns               | Early turns            |
+| `turn_Kp`             | gain | Turn response strength | 20-40         | Crawls, hits the timeout | Slams into the clamp   |
+| `turn_Kd`             | gain | Turn damping           | 0.2-0.8       | Wobble                   | Sluggish turn          |
+
+These are the Challenge 4 turn gains — carry your tuned values forward rather
+than starting again.
 
 ## Tuning Guide
 
@@ -98,12 +101,12 @@ Optional debug edits:
 
 ## Common Failure Modes
 
-| Symptom                  | Root cause               | Verification step                 | Fix                            |
-| ------------------------ | ------------------------ | --------------------------------- | ------------------------------ |
-| Wrong turn type selected | Trigger precedence issue | Log trigger checks per loop       | Enforce front trigger first    |
-| Misses dead-end trigger  | Front threshold too low  | Log front distance at turn point  | Increase `FRONT_STOP_DISTANCE` |
-| Over-rotates at dead end | Turn damping too low     | Log heading error near completion | Increase `turn_Kd`             |
-| Random instability       | Speed too high           | Compare behavior at lower speed   | Reduce `BASE_SPEED`            |
+| Symptom                  | Root cause               | Verification step                 | Fix                                        |
+| ------------------------ | ------------------------ | --------------------------------- | ------------------------------------------ |
+| Wrong turn type selected | Trigger precedence issue | Log trigger checks per loop       | Enforce front trigger first                |
+| Misses dead-end trigger  | Front threshold too low  | Log front distance at turn point  | Increase `FRONT_STOP_DISTANCE`             |
+| Over-rotates at dead end | Coast not accounted for  | Log heading error near completion | Increase `turn_Kd`, then `TURN_COAST_TIME` |
+| Random instability       | Speed too high           | Compare behavior at lower speed   | Reduce `BASE_SPEED`                        |
 
 ## Exit Check
 
