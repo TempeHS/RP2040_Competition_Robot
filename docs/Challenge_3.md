@@ -25,7 +25,7 @@ The robot follows the wall through the corridor and around the L corner, then re
 
 New: integral term and anti-windup clamp.
 
-Unchanged: P and D terms, steering clamp, loop timing.
+Unchanged: P and D terms, `steer()` call, loop timing.
 
 Delta equations:
 
@@ -56,9 +56,8 @@ flowchart TD
     E --> F[Clamp integral +/- side_INTEGRAL_MAX]
     F --> G[Compute derivative]
     G --> H[Compute PID steering]
-    H --> I[Clamp steering]
-    I --> J[Drive differential speeds]
-    J --> K[Update previous error]
+    H --> I["steer(): clamp and drive"]
+    I --> K[Update previous error]
     K --> L
 ```
 
@@ -73,8 +72,8 @@ Safe to edit:
 Do not edit unless instructed:
 
 1. Integral reset when side wall is lost.
-2. Integral clamp and steering clamp.
-3. Loop order of integral, derivative, drive, history update.
+2. The integral clamp and the `my_robot.steer(...)` call.
+3. Loop order of integral, derivative, steer, history update.
 
 Optional debug edits:
 

@@ -1,130 +1,98 @@
-"""Hardware sanity test for the AIDriver robot.
+"""Challenge 4 on real hardware: wall following + corner detection + gyro turn.
 
-Runs a short sequence of movements and sensor readings, mirroring each stage to
-the console AND the SSD1306 OLED so you can watch the code and the robot move in
-step. Most low-level detail is also reported via the AIDriver debug logger.
-
-On the robot this file is the boot script, so main() runs automatically. The
-body lives in main() (instead of running at import) so the host tests in
-tests/test_main.py can import it and drive main() with a fake robot.
+Two states. FOLLOW_WALL holds the side wall with the PID from Challenge 3 and
+slows on the approach to a front wall. TURN spins 90 degrees away from it.
 """
 
 from aidriver import AIDriver, hold_state
-import aidriver
 
-aidriver.DEBUG_AIDRIVER = True
+my_robot = AIDriver("left", "tof")
 
+# --- FOLLOW_WALL tuning ---
+BASE_SPEED = 200  # cruise speed
+TARGET_WALL_DISTANCE = 100  # distance to hold from the side wall (mm)
+MAX_STEERING = 60  # max wheel-speed difference
 
-def main():
-    """Run the full hardware sanity sequence once."""
-    print("Initialising AIDriver hardware test...")
+side_Kp = 0.3  # proportional gain
+side_Kd = 0.5  # derivative gain
+side_Ki = 0.005  # integral gain
+side_INTEGRAL_MAX = 750  # anti-windup clamp
 
-    try:
-        robot = AIDriver(
-            "left"
-        )  # wall_side required; change to "right" if following right wall
-    except Exception as exc:
-        print("Failed to initialise AIDriver:", exc)
-        print("Check that 'aidriver.py' is in the 'lib' folder on the device.")
-        return
+# --- Corner detection ---
+FRONT_SLOW_DISTANCE = 300  # start slowing when a front wall is this close (mm)
+FRONT_STOP_DISTANCE = 150  # front wall this close = corner reached -> TURN
+FRONT_Kp = 1.0  # how hard to slow down on the approach
 
-    def announce(*lines):
-        """Show the current test stage on the console AND the OLED at the same time.
+# --- TURN tuning (the library gyro turn PID; set here so you can tune it) ---
+TURN_ANGLE = 90  # every corner is a 90 degree turn
+my_robot.turn_Kp = 6.0  # proportional gain on heading error
+my_robot.turn_Kd = 0.4  # derivative gain - damps overshoot
+my_robot.turn_tolerance = 2.0  # stop within this many degrees of target
 
-        This is what lets you *watch the code and the robot together*: every
-        stage prints its banner and mirrors it on the SSD1306 OLED, so the
-        screen always names the action the robot is performing right now. Each
-        OLED line shows up to 16 characters and only the first four lines are
-        sent to the display. If no OLED is fitted, show_display() is a harmless
-        no-op and only the console prints.
-        """
-        for line in lines:
-            print(line)
-        robot.show_display(*lines[:4])
+state = "FOLLOW_WALL"
+side_previous_error = 0
+side_integral = 0
 
-    announce("AIDriver OK", "Self test", "Starting in 3s")
-    hold_state(3)
+hold_state(2.0)  # leave the boot CHECK screen up long enough to read
 
-    # Test 1: Drive Forward
-    announce("Test 1 of 7", "Drive FORWARD")
-    robot.drive_forward(200, 200)
-    hold_state(2)
-    robot.brake()
-    announce("Test 1 of 7", "Stopped")
-    hold_state(1)
+while True:
+    if state == "TURN":
+        my_robot.show_display("TURN", "{} deg".format(TURN_ANGLE), "", "", force=True)
+        my_robot.brake()
+        hold_state(0.3)
+        my_robot.turn_degrees(TURN_ANGLE)
+        hold_state(0.3)
+        state = "FOLLOW_WALL"
+        continue
 
-    # Test 2: Drive Backward
-    announce("Test 2 of 7", "Drive BACKWARD")
-    robot.drive_backward(200, 200)
-    hold_state(2)
-    robot.brake()
-    announce("Test 2 of 7", "Stopped")
-    hold_state(1)
+    front = my_robot.read_distance()
 
-    # Test 3: Rotate Right
-    announce("Test 3 of 7", "Rotate RIGHT")
-    robot.rotate_right(200)
-    hold_state(2)
-    robot.brake()
-    announce("Test 3 of 7", "Stopped")
-    hold_state(1)
+    if front != -1 and front <= FRONT_STOP_DISTANCE:
+        side_integral = 0
+        side_previous_error = 0
+        state = "TURN"
+        continue
 
-    # Test 4: Rotate Left
-    announce("Test 4 of 7", "Rotate LEFT")
-    robot.rotate_left(200)
-    hold_state(2)
-    robot.brake()
-    announce("Test 4 of 7", "Stopped")
-    hold_state(1)
+    wall_distance = my_robot.read_distance_2()
 
-    # Test 5: Gyro closed-loop turns (90 degrees each way)
-    if robot.has_gyro:
-        announce("Test 5 of 7", "Gyro turn", "RIGHT 90 deg")
-        turned = robot.turn_90("right")
-        announce("Test 5 of 7", "Right done", "turned " + str(round(turned, 1)))
-        hold_state(1)
-        announce("Test 5 of 7", "Gyro turn", "LEFT 90 deg")
-        turned = robot.turn_90("left")
-        announce("Test 5 of 7", "Left done", "turned " + str(round(turned, 1)))
-        hold_state(1)
+    if wall_distance == -1:
+        my_robot.drive(BASE_SPEED, BASE_SPEED)
+        side_integral = 0  # reset so windup can't build while wall is gone
+        hold_state(0.05)
+        continue
+
+    # Ramp the cruise speed down as the front wall approaches.
+    if front != -1 and front < FRONT_SLOW_DISTANCE:
+        speed = int(FRONT_Kp * (front - FRONT_STOP_DISTANCE))
+        if speed < my_robot.min_approach_speed:
+            speed = my_robot.min_approach_speed
+        if speed > BASE_SPEED:
+            speed = BASE_SPEED
     else:
-        announce("Test 5 of 7", "Gyro SKIPPED", "no IMU found")
-        hold_state(1)
+        speed = BASE_SPEED
 
-    # Test 6: Ultrasonic Sensors
-    announce("Test 6 of 7", "Ultrasonic", "Front + side")
-    for i in range(5):
-        distance_1 = robot.read_distance()
-        distance_2 = robot.read_distance_2()
-        announce(
-            "Test 6 of 7",
-            "Reading " + str(i + 1) + "/5",
-            "S1: " + str(distance_1) + " mm",
-            "S2: " + str(distance_2) + " mm",
-        )
-        hold_state(0.5)
+    error = wall_distance - TARGET_WALL_DISTANCE
 
-    # Test 7: Colour sensor (TCS34725)
-    if robot.has_color:
-        announce("Test 7 of 7", "Colour sensor", "Place a marker")
-        for i in range(5):
-            r, g, b, c = robot.read_color()
-            name = robot.classify_color()
-            print("Reading", i + 1, "- R:", r, "G:", g, "B:", b, "C:", c, "->", name)
-            robot.show_display(
-                "Test 7 of 7",
-                "Reading " + str(i + 1) + "/5",
-                "Clear: " + str(c),
-                "Colour: " + name,
-            )
-            hold_state(0.5)
-        print("  (classify_color uses tunable thresholds — see Challenge 8)")
-    else:
-        announce("Test 7 of 7", "Colour SKIPPED", "no sensor found")
-        hold_state(1)
+    side_integral = side_integral + error
+    if side_integral > side_INTEGRAL_MAX:
+        side_integral = side_INTEGRAL_MAX
+    elif side_integral < -side_INTEGRAL_MAX:
+        side_integral = -side_INTEGRAL_MAX
 
-    announce("All tests", "COMPLETE")
+    side_derivative = error - side_previous_error
 
+    steering = (
+        (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
+    )
 
-if __name__ == "__main__":
-    main()
+    right_speed, left_speed = my_robot.steer(speed, steering, MAX_STEERING)
+
+    my_robot.show_display(
+        "FOLLOW P",
+        "S:{}".format(wall_distance),
+        "e:{}".format(int(error)),
+        "R{}L{}".format(int(right_speed), int(left_speed)),
+    )
+
+    side_previous_error = error
+    hold_state(0.05)

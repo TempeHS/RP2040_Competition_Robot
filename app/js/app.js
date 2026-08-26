@@ -649,7 +649,7 @@ function loadChallenge(challengeId) {
 }
 
 /**
- * Populate the editor with challenge starter code, fetching debug code from project/main.py when needed.
+ * Populate the editor with challenge starter code, fetching debug code from project/hardware_test.py when needed.
  * @param {number|string} challengeId Identifier for the challenge whose starter script should load.
  * @returns {Promise<void>} Resolves once code is applied to the editor.
  */
@@ -2136,7 +2136,7 @@ function hideLoading() {
  */
 function getStarterCodePath(challengeId) {
   const starterCodeFiles = {
-    debug: "../project/main.py",
+    debug: "../project/hardware_test.py",
     1: "starter-code/challenge-1.py",
     2: "starter-code/challenge-2.py",
     3: "starter-code/challenge-3.py",

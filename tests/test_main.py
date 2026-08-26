@@ -3,9 +3,9 @@ import sys
 
 
 def load_main_module():
-    if "project.main" in sys.modules:
-        return sys.modules["project.main"]
-    return importlib.import_module("project.main")
+    if "project.hardware_test" in sys.modules:
+        return sys.modules["project.hardware_test"]
+    return importlib.import_module("project.hardware_test")
 
 
 def test_main_handles_initialisation_failure(monkeypatch, capsys):

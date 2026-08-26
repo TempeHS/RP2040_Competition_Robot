@@ -53,9 +53,8 @@ flowchart TD
     C --> H[hold_state 0.05s]
     B -- Yes --> D[Compute error]
     D --> E[Compute steering P term]
-    E --> F[Clamp steering +/- MAX_STEERING]
-    F --> G[Drive differential speeds]
-    G --> H
+    E --> F["steer(): clamp and drive"]
+    F --> H
 ```
 
 ## Starter Code Contract
@@ -70,9 +69,9 @@ Safe to edit:
 Do not edit unless instructed:
 
 1. Sensor validation branch for `-1`.
-2. Steering clamp logic.
-3. Core drive formula using `wall_sign`.
-4. Loop timing (`hold_state(0.05)`).
+2. The `my_robot.steer(...)` call, which clamps the steering and applies it to
+   the correct wheel for your chosen wall.
+3. Loop timing (`hold_state(0.05)`).
 
 Optional debug edits:
 
@@ -83,7 +82,7 @@ Optional debug edits:
 | Name                   | Unit      | Purpose                 | Typical start value | Symptoms when too low | Symptoms when too high          |
 | ---------------------- | --------- | ----------------------- | ------------------- | --------------------- | ------------------------------- |
 | `BASE_SPEED`           | PWM       | Forward speed baseline  | 200                 | Robot may stall       | Harder to control corners later |
-| `TARGET_WALL_DISTANCE` | mm        | Desired side clearance  | 40                  | Too close to wall     | Too far from wall               |
+| `TARGET_WALL_DISTANCE` | mm        | Desired side clearance  | 100                 | Too close to wall     | Too far from wall               |
 | `MAX_STEERING`         | PWM delta | Max wheel speed split   | 60                  | Weak correction       | One wheel can slow too much     |
 | `side_Kp`              | gain      | Error to steering scale | 0.4                 | Slow drift away       | Zig-zag oscillation             |
 

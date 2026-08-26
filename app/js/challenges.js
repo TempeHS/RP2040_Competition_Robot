@@ -19,7 +19,7 @@ const Challenges = (function () {
    * Consumers should treat this object as immutable runtime configuration.
    */
   const definitions = {
-    // Debug Script: Hardware test from project/main.py
+    // Debug Script: Hardware test from project/hardware_test.py
     debug: {
       id: "debug",
       title: "Debug Script",
@@ -28,7 +28,7 @@ const Challenges = (function () {
       menuGroup: "special",
       difficulty: DIFFICULTY.BEGINNER,
       description:
-        "Run the hardware debug script (project/main.py) to test all robot functions.",
+        "Run the hardware debug script (project/hardware_test.py) to test all robot functions.",
       goal: "Verify motors, sensors, and the drive() method are working correctly.",
       hints: [
         "This script tests all hardware functions",

@@ -17,7 +17,7 @@ my_robot = AIDriver("left")
 
 # --- FOLLOW_WALL parameters ---
 BASE_SPEED = 200  # cruise speed
-TARGET_WALL_DISTANCE = 40  # mm to hold from the side wall
+TARGET_WALL_DISTANCE = 100  # mm to hold from the side wall
 MAX_STEERING = 60  # steering clamp
 
 side_Kp = 0.4  # proportional gain

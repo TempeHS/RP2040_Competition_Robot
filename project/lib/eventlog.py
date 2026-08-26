@@ -23,6 +23,17 @@ _start_ticks = time.ticks_ms()
 _LOG_ENABLED = True
 _initialized = False
 
+# Every flash write on the RP2040 pauses code execution, so a control loop
+# calling hold_state(0.05) would stall the board. Lines are held in RAM and
+# written in batches, and an event repeated back-to-back is counted rather
+# than re-written.
+_BUFFER = []
+_BUFFER_LIMIT = 25
+_FLUSH_INTERVAL_MS = 2000
+_last_flush_ticks = time.ticks_ms()
+_last_message = None
+_repeat_count = 0
+
 
 def _rotate_logs():
     """Rotate current log to previous, then start fresh.
@@ -88,7 +99,10 @@ def _elapsed_s():
 
 def clear_log():
     """Clear both log files and reset timing."""
-    global _start_ticks, _initialized
+    global _start_ticks, _initialized, _last_message, _repeat_count
+    del _BUFFER[:]
+    _last_message = None
+    _repeat_count = 0
     try:
         # Clear current log
         with open(_LOG_PATH, "w") as f:
@@ -114,6 +128,7 @@ def log_separator():
     if not _LOG_ENABLED:
         return
     _rotate_logs()  # Ensure initialized
+    flush()  # Keep buffered events before the separator, not after
     _start_ticks = time.ticks_ms()
     try:
         with open(_LOG_PATH, "a") as f:
@@ -124,16 +139,43 @@ def log_separator():
 
 
 def log_event(message):
-    """Append a single-line, human-readable event to the log."""
+    """Record a single-line, human-readable event.
+
+    Buffered in RAM - call flush() to force it to disk immediately.
+    """
+    global _last_message, _repeat_count
     if not _LOG_ENABLED:
         return
 
     # Rotate logs on first event of each run
     _rotate_logs()
 
-    t = _elapsed_s()
+    if message == _last_message:
+        _repeat_count += 1
+        return
+
+    if _repeat_count:
+        _BUFFER.append("          (repeated {} more times)\n".format(_repeat_count))
+        _repeat_count = 0
+    _last_message = message
+
+    _BUFFER.append("t+{:.2f}s : {}\n".format(_elapsed_s(), message))
+
+    if len(_BUFFER) >= _BUFFER_LIMIT or (
+        time.ticks_diff(time.ticks_ms(), _last_flush_ticks) >= _FLUSH_INTERVAL_MS
+    ):
+        flush()
+
+
+def flush():
+    """Write any buffered events to the log file."""
+    global _last_flush_ticks
+    _last_flush_ticks = time.ticks_ms()
+    if not _BUFFER:
+        return
     try:
         with open(_LOG_PATH, "a") as f:
-            f.write("t+{:.2f}s : {}\n".format(t, message))
+            f.write("".join(_BUFFER))
     except Exception:
         pass
+    del _BUFFER[:]

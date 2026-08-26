@@ -25,7 +25,7 @@ The robot follows the wall smoothly from an off-center, angled start and reaches
 
 New: derivative term and previous-error history.
 
-Unchanged: sensor fail branch, steering clamp, drive mapping.
+Unchanged: sensor fail branch, `steer()` call, loop timing.
 
 Delta equations:
 
@@ -53,9 +53,8 @@ flowchart TD
     B -- Yes --> D[Compute error]
     D --> E[Compute derivative error delta]
     E --> F[Compute PD steering]
-    F --> G[Clamp steering]
-    G --> H[Drive differential speeds]
-    H --> I[Update side_previous_error]
+    F --> G["steer(): clamp and drive"]
+    G --> I[Update side_previous_error]
     I --> J
 ```
 
@@ -72,7 +71,7 @@ Safe to edit:
 Do not edit unless instructed:
 
 1. `side_previous_error = error` update at end of loop.
-2. Steering clamp.
+2. The `my_robot.steer(...)` call.
 3. Sensor fail branch.
 
 Optional debug edits:
@@ -105,7 +104,7 @@ Optional debug edits:
 
 | Symptom                    | Root cause             | Verification step           | Fix                                               |
 | -------------------------- | ---------------------- | --------------------------- | ------------------------------------------------- |
-| No change from Challenge 1 | Missing history update | Print `side_previous_error` | Ensure update after drive call                    |
+| No change from Challenge 1 | Missing history update | Print `side_previous_error` | Ensure update after steer call                    |
 | Strong oscillation remains | `side_Kd` too low      | Observe repeated overshoot  | Increase `side_Kd`                                |
 | Robot becomes lazy         | `side_Kd` too high     | Slow return to target       | Reduce `side_Kd`                                  |
 | Sudden spikes in steering  | Noisy sensor values    | Log side distance sequence  | Lower gains slightly and confirm sensor stability |

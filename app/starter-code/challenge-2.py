@@ -31,21 +31,7 @@ while True:
 
     steering = (side_Kp * error) + (side_Kd * side_derivative)
 
-    # Cap steering so the slower wheel can never fall into the motor dead zone.
-    steer_limit = BASE_SPEED - my_robot.MIN_MOTOR_SPEED
-    if steer_limit < 0:
-        steer_limit = 0
-    if steer_limit > MAX_STEERING:
-        steer_limit = MAX_STEERING
-    if steering > steer_limit:
-        steering = steer_limit
-    elif steering < -steer_limit:
-        steering = -steer_limit
-
-    right_speed = BASE_SPEED - (my_robot.wall_sign * steering)
-    left_speed = BASE_SPEED + (my_robot.wall_sign * steering)
-
-    my_robot.drive(int(right_speed), int(left_speed))
+    my_robot.steer(BASE_SPEED, steering, MAX_STEERING)
 
     side_previous_error = error  # save for next loop (must be last)
     hold_state(0.05)

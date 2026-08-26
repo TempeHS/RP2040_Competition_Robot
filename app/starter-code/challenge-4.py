@@ -14,7 +14,7 @@ my_robot = AIDriver("left")
 
 # --- FOLLOW_WALL parameters ---
 BASE_SPEED = 200  # carry forward
-TARGET_WALL_DISTANCE = 40  # carry forward
+TARGET_WALL_DISTANCE = 100  # carry forward
 MAX_STEERING = 60  # carry forward
 
 side_Kp = 0.4  # carry forward

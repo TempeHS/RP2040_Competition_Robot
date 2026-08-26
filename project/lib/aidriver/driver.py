@@ -138,9 +138,9 @@ class AIDriver:
         display_sda=16,  # GP16 — OLED shares the IMU/colour SoftI2C bus
         display_scl=17,  # GP17 — OLED shares the IMU/colour SoftI2C bus
         display_addr=0x3C,  # SSD1306 I2C address (0x3C or 0x3D)
-        display_width=128,  # OLED pixel width
-        display_height=64,  # OLED pixel height (use 32 for 128x32 panels)
-        display_freq=400_000,  # OLED SoftI2C bus frequency (Hz)
+        display_width=64,  # OLED pixel width (64 = 0.66" Grove panel)
+        display_height=48,  # OLED pixel height (use 64 for a 128x64 panel)
+        display_freq=50_000,  # OLED SoftI2C bus frequency (Hz) - low for noise margin
         kit_servo_pin=None,  # GP for the rescue-kit servo (None = not wired yet)
     ):
         """Initialize RP2040 based AIDriver differential drive robot.
@@ -421,6 +421,7 @@ class AIDriver:
         # never constructed and every display_* method becomes a silent no-op,
         # so the same program runs with or without the screen attached.
         self._display_lines = ["", "", "", ""]  # last text pushed (any mode)
+        self._last_display_ms = ticks_ms() - self.DISPLAY_MIN_INTERVAL_MS
         self.display = None
         self.has_display = False
         if SSD1306_I2C is not None and SoftI2C is not None:
@@ -1225,6 +1226,43 @@ class AIDriver:
     # lower supply voltages; decrease if turns feel sluggish to start.
     ROTATE_RAMP_MS = 80
 
+    # An OLED write is ~1KB over bit-banged I2C, so cap refreshes rather than
+    # let a control loop spend all its time drawing.
+    DISPLAY_MIN_INTERVAL_MS = 200
+
+    def steer(self, base_speed, steering, max_steering=60):
+        """Drive forward at base_speed with a steering correction applied.
+
+        Does the two things every wall-following loop needs and always gets
+        wrong: applies wall_sign so the correction pushes the right way for
+        either wall, and caps the correction so the slower wheel stays above
+        MIN_MOTOR_SPEED instead of stalling into a pivot.
+
+        Args:
+            base_speed: Forward speed both wheels aim for (0-255).
+            steering: PID output. Positive = steer away from the wall.
+            max_steering: Largest wheel-speed difference allowed.
+
+        Returns:
+            tuple: The (right_speed, left_speed) actually sent to the motors.
+        """
+        limit = base_speed - self.MIN_MOTOR_SPEED
+        if limit < 0:
+            limit = 0
+        if limit > max_steering:
+            limit = max_steering
+
+        if steering > limit:
+            steering = limit
+        elif steering < -limit:
+            steering = -limit
+
+        right_speed = int(base_speed - (self.wall_sign * steering))
+        left_speed = int(base_speed + (self.wall_sign * steering))
+
+        self.drive(right_speed, left_speed)
+        return right_speed, left_speed
+
     def drive(self, right_speed, left_speed):
         """
         Drive robot with signed speeds for PID control.
@@ -1360,19 +1398,20 @@ class AIDriver:
         # here means "sensor is erroring", which may or may not mean it's
         # unplugged. has_gyro/has_color/has_display are genuine one-time
         # presence checks done at init, so they use a different fail label.
+        # Short labels are for the OLED, which fits only 8 characters a line.
         checks = [
-            ("Front sensor", self.front_ok, "ERROR"),
-            ("Side sensor", self.side_ok, "ERROR"),
-            ("Gyro/IMU", self.has_gyro, "MISSING"),
-            ("Colour", self.has_color, "MISSING"),
-            ("OLED", self.has_display, "MISSING"),
+            ("Front sensor", "FRONT", self.front_ok, "ERROR"),
+            ("Side sensor", "SIDE", self.side_ok, "ERROR"),
+            ("Gyro/IMU", "GYRO", self.has_gyro, "MISSING"),
+            ("Colour", "COLOUR", self.has_color, "MISSING"),
+            ("OLED", "OLED", self.has_display, "MISSING"),
         ]
-        self.system_issues = [name for name, ok, _fail in checks if not ok]
+        self.system_issues = [name for name, _s, ok, _fail in checks if not ok]
         self.system_ok = not self.system_issues
 
         if verbose:
             print("[AIDriver] ---- System check ----")
-            for name, ok, fail_label in checks:
+            for name, _short, ok, fail_label in checks:
                 print("[AIDriver] {:<12} {}".format(name, "OK" if ok else fail_label))
             if self.system_ok:
                 print("[AIDriver] System check: ALL OK")
@@ -1385,34 +1424,49 @@ class AIDriver:
 
         if self.has_display:
             if self.system_ok:
-                self.show_display("System Check", "All systems", "OK!", "")
+                self.show_display("CHECK", "ALL OK", force=True)
             else:
-                issues = ", ".join(self.system_issues)
-                self.show_display("System Check", "ISSUES:", issues[:16], issues[16:32])
+                bad = [short for _n, short, ok, _f in checks if not ok] + ["", ""]
+                self.show_display("CHECK", "FAIL:", bad[0], bad[1], force=True)
 
         return self.system_ok
 
-    def show_display(self, line1="", line2="", line3="", line4=""):
+    def show_display(self, line1="", line2="", line3="", line4="", force=False):
         """Show up to four text lines on the OLED.
+
+        Safe to call every pass of a control loop: writes are rate-limited to
+        DISPLAY_MIN_INTERVAL_MS internally, because an OLED write is slow I2C
+        and would otherwise dominate the loop. Pass force=True for a message
+        that must appear even if one was just drawn.
 
         Caches the lines on self._display_lines regardless of hardware so the
         last-shown text can be inspected. No-op on hardware if no OLED.
 
         Args:
             line1..line4: Strings to render top-to-bottom (extra text clipped).
+            force: Skip the rate limit.
         """
         lines = [str(line1), str(line2), str(line3), str(line4)]
         self._display_lines = lines
         _d("AIDriver.show_display:", lines)
         if not self.has_display or self.display is None:
             return
+        now = ticks_ms()
+        if not force:
+            if ticks_diff(now, self._last_display_ms) < self.DISPLAY_MIN_INTERVAL_MS:
+                return
+        self._last_display_ms = now
         try:
+            # Font is 8x8, so char count and row pitch come from the panel size:
+            # 16 chars on a 128px panel, 4 evenly spaced rows on 32px or 64px.
+            max_chars = self.display.width // 8
+            row_pitch = self.display.height // 4
             self.display.fill(0)
             row = 0
             for text in lines:
                 if text:
-                    self.display.text(text[:16], 0, row)
-                row += 16
+                    self.display.text(text[:max_chars], 0, row)
+                row += row_pitch
             self.display.show()
         except Exception as exc:
             _d("show_display failed:", type(exc).__name__, str(exc))
@@ -1431,13 +1485,13 @@ class AIDriver:
             score: Estimated running score to display.
             victims: Number of victims found so far.
         """
-        f_status = "OK" if self.front_ok else "ERR"
-        s_status = "OK" if self.side_ok else "ERR"
+        f_status = "OK" if self.front_ok else "XX"
+        s_status = "OK" if self.side_ok else "XX"
         self.show_display(
-            "State:{}".format(str(state)[:9]),
-            "F:{} S:{}".format(f_status, s_status),
-            "Score:{}".format(int(score)),
-            "V:{} C:{}".format(int(victims), self.classify_color()),
+            str(state)[:8],
+            "F{} S{}".format(f_status, s_status),
+            "S:{}".format(int(score)),
+            "V:{} {}".format(int(victims), str(self.classify_color())[:3]),
         )
 
     def clear_display(self):

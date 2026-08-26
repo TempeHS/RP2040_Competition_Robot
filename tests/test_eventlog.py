@@ -18,6 +18,7 @@ def test_log_event_writes_fresh_header_and_message(tmp_path):
     module = reload_eventlog(tmp_path)
 
     module.log_event("Drive forward at normal speed")
+    module.flush()
 
     content = (tmp_path / "event_log.txt").read_text()
     assert "===== RUN START =====" in content
@@ -30,6 +31,7 @@ def test_existing_log_is_rotated_to_previous(tmp_path):
 
     module = reload_eventlog(tmp_path)
     module.log_event("brand new run")
+    module.flush()
 
     prev = tmp_path / "event_log_prev.txt"
     assert prev.read_text() == "t+0.00s : earlier run\n"
@@ -49,8 +51,22 @@ def test_clear_log_starts_a_clean_run(tmp_path):
     module.clear_log()
 
     module.log_event("now active")
+    module.flush()
 
     content = current.read_text()
     assert "===== RUN START =====" in content
     assert "now active" in content
     assert not (tmp_path / "event_log_prev.txt").exists()
+
+
+def test_repeated_events_are_counted_not_rewritten(tmp_path):
+    module = reload_eventlog(tmp_path)
+
+    for _ in range(50):
+        module.log_event("Robot holding state for 0.05 second(s)")
+    module.log_event("Drive forward at normal speed")
+    module.flush()
+
+    content = (tmp_path / "event_log.txt").read_text()
+    assert content.count("holding state") == 1
+    assert "(repeated 49 more times)" in content
