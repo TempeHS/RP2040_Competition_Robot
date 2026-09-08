@@ -92,6 +92,7 @@ const Validator = (function () {
     "read_gyro_z_dps",
     "brake",
     "drive",
+    "steer",
     "read_distance",
     "read_distance_2",
     "read_color",

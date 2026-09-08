@@ -499,6 +499,56 @@ const AIDriverStub = {
           });
 
           /**
+           * Drive forward at base_speed with a steering correction applied.
+           * Applies wall_sign so the correction pushes the right way for either
+           * wall, and caps the correction so the slower wheel stays above
+           * MIN_MOTOR_SPEED instead of stalling into a pivot.
+           * @param {Sk.builtin.int_} baseSpeed Forward speed both wheels aim for.
+           * @param {Sk.builtin.float_} steering PID output; positive = away from wall.
+           * @param {Sk.builtin.int_} [maxSteering] Largest wheel-speed difference (default 60).
+           * @returns {Sk.builtin.tuple} (right_speed, left_speed) actually sent.
+           */
+          $loc.steer = new Sk.builtin.func(function (
+            self,
+            baseSpeed,
+            steering,
+            maxSteering,
+          ) {
+            const MIN_MOTOR_SPEED = 100;
+            const base = Sk.ffi.remapToJs(baseSpeed);
+            let corr = Sk.ffi.remapToJs(steering);
+            let maxSteer = 60;
+            if (
+              maxSteering !== undefined &&
+              !(maxSteering instanceof Sk.builtin.none)
+            ) {
+              maxSteer = Sk.ffi.remapToJs(maxSteering);
+            }
+
+            let limit = base - MIN_MOTOR_SPEED;
+            if (limit < 0) limit = 0;
+            if (limit > maxSteer) limit = maxSteer;
+
+            if (corr > limit) corr = limit;
+            else if (corr < -limit) corr = -limit;
+
+            const wallSign = readTurnGain(self, "wall_sign", -1);
+            const rs = Math.trunc(base - wallSign * corr);
+            const ls = Math.trunc(base + wallSign * corr);
+
+            Sk.misceval.callsimArray($loc.drive, [
+              self,
+              new Sk.builtin.int_(rs),
+              new Sk.builtin.int_(ls),
+            ]);
+
+            return new Sk.builtin.tuple([
+              new Sk.builtin.int_(rs),
+              new Sk.builtin.int_(ls),
+            ]);
+          });
+
+          /**
            * Measure distance using the simulator abstraction.
            * @returns {Sk.builtin.int_} Integer distance in simulated centimeters.
            */

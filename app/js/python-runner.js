@@ -432,6 +432,35 @@ class AIDriver:
         if DEBUG_AIDRIVER:
             print("[AIDriver] drive:", right_speed, left_speed)
 
+    def steer(self, base_speed, steering, max_steering=60):
+        """Drive forward at base_speed with a steering correction applied.
+
+        Applies wall_sign so the correction pushes the right way for either
+        wall, and caps the correction so the slower wheel stays above
+        MIN_MOTOR_SPEED instead of stalling into a pivot.
+
+        Args:
+            base_speed: Forward speed both wheels aim for (0-255).
+            steering: PID output. Positive = steer away from the wall.
+            max_steering: Largest wheel-speed difference allowed.
+
+        Returns:
+            tuple: The (right_speed, left_speed) actually sent to the motors.
+        """
+        limit = base_speed - self.MIN_MOTOR_SPEED
+        if limit < 0:
+            limit = 0
+        if limit > max_steering:
+            limit = max_steering
+        if steering > limit:
+            steering = limit
+        elif steering < -limit:
+            steering = -limit
+        right_speed = int(base_speed - (self.wall_sign * steering))
+        left_speed = int(base_speed + (self.wall_sign * steering))
+        self.drive(right_speed, left_speed)
+        return right_speed, left_speed
+
     def service(self):
         """Run background housekeeping tasks (no-op in simulator)"""
         # In real robot this handles LED heartbeat
