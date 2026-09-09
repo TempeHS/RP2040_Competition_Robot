@@ -1,6 +1,6 @@
 # Building Custom MicroPython Firmware for Raspberry Pi Pico
 
-This guide explains how to build MicroPython firmware for the Raspberry Pi Pico with your custom AIDriver libraries integrated. Libraries are frozen for fast loading, while `main.py` and `config.py` remain on the filesystem for IDE editing. Students retain their tuning and replace main when changing challenges; see the [shared configuration instructions](../app/README.md#shared-configuration).
+This guide explains how to build MicroPython firmware for the Raspberry Pi Pico with your custom AIDriver libraries integrated. Libraries are frozen for fast loading, while `main.py` and `config.py` remain on the filesystem for IDE editing. Students retain their tuning and replace main when changing challenges; see the [shared configuration instructions](README.md#shared-configuration).
 
 ---
 
@@ -38,7 +38,7 @@ The script automatically:
 
 ### **Frozen Modules (Fast Loading):**
 
-- The [AIDriver package](../project/lib/aidriver/__init__.py), peripheral modules and [config checker](../project/lib/config_check.py) are frozen into firmware.
+- The [AIDriver package](https://github.com/TempeHS/AIDriver_MicroPython_Challanges/blob/main/project/lib/aidriver/__init__.py), peripheral modules and [config checker](../project/lib/config_check.py) are frozen into firmware.
 - The build generates `robot_recovery` with bundled main/config defaults. Neither editable file is imported as a frozen module.
 
 **Benefits:** Instant loading, memory efficient, cannot be accidentally corrupted

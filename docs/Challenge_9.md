@@ -11,7 +11,7 @@ Add robust black-zone handling so the robot can detect black floor patches and r
 3. **New Main Behaviour:** Poll black without relying on a bright-marker interrupt, reverse clear, turn toward open space and find a new wall.
 4. **Replace Main:** Use the [Challenge 9 main](../app/starter-code/challenge-9.py) as `main.py`. Keep config and the visible turn helper's gain convention.
 
-Read the [shared configuration instructions](../app/README.md#shared-configuration). Heading, clearance counts and state are runtime values, not config settings. The existing reference uses a direct wall-search threshold; the starter also applies grid compensation.
+Read the [shared configuration instructions](README.md#shared-configuration). Heading, clearance counts and state are runtime values, not config settings. The existing reference uses a direct wall-search threshold; the starter also applies grid compensation.
 
 ## Success Criteria
 

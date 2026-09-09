@@ -19,12 +19,12 @@ def test_each_guide_has_a_two_file_transition(number):
         assert f"**{label}:**" in source
     assert "../project/config.py" in source
     assert f"../app/starter-code/challenge-{number}.py" in source
-    assert "../app/README.md#shared-configuration" in source
+    assert "](README.md#shared-configuration)" in source
     assert "Do not edit unless instructed:" not in source
 
 
 def test_shared_configuration_links_and_fences_are_valid():
-    path = ROOT / "app/README.md"
+    path = ROOT / "docs/README.md"
     source = path.read_text(encoding="utf-8")
     assert "## Shared Configuration" in source
     assert "### Physical Distance Settings" in source
@@ -32,7 +32,7 @@ def test_shared_configuration_links_and_fences_are_valid():
     for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", source):
         parsed = urlsplit(target)
         if not parsed.scheme and not parsed.netloc and parsed.path:
-            assert (path.parent / unquote(parsed.path)).resolve().is_file(), target
+            assert (path.parent / unquote(parsed.path)).resolve().exists(), target
 
 
 def test_simulator_readme_describes_shared_config_and_http_serving():
@@ -77,5 +77,10 @@ def test_hardware_guides_describe_two_file_recovery(filename):
     source = (ROOT / "docs" / filename).read_text(encoding="utf-8")
     assert "config.py" in source
     assert "robot_recovery.restore_config()" in source
-    assert "../app/README.md#shared-configuration" in source
+    target = (
+        "#shared-configuration"
+        if filename == "README.md"
+        else "README.md#shared-configuration"
+    )
+    assert f"]({target})" in source
     assert "AI_Driver_RP2040.uf2" not in source

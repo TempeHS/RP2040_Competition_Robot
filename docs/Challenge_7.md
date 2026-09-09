@@ -11,7 +11,7 @@ Validate full-maze performance using the established three-state controller, foc
 3. **New Main Behaviour:** Apply wall, front, turn and outside-corner decisions across a full maze.
 4. **Replace Main:** Use the [Challenge 7 main](../app/starter-code/challenge-7.py) as `main.py`. Keep your existing config and any deliberate tuning changes.
 
-Read the [shared configuration instructions](../app/README.md#shared-configuration). Replacing main does not automatically merge your algorithm edits into another main.
+Read the [shared configuration instructions](README.md#shared-configuration). Replacing main does not automatically merge your algorithm edits into another main.
 
 ## Success Criteria
 

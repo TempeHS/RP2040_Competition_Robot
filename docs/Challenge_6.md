@@ -11,7 +11,7 @@ Validate robust front-trigger dead-end handling using the existing state-machine
 3. **New Main Behaviour:** Exercise the existing front-first state machine against dead-end geometry.
 4. **Replace Main:** Use the [Challenge 6 main](../app/starter-code/challenge-6.py) as `main.py`. Retain the same config; no new config section is needed.
 
-Read the [shared configuration instructions](../app/README.md#shared-configuration). State, timers and error history reset each run, while tuning remains saved.
+Read the [shared configuration instructions](README.md#shared-configuration). State, timers and error history reset each run, while tuning remains saved.
 
 ## Success Criteria
 

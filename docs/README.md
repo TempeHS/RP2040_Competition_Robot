@@ -161,9 +161,42 @@ Full guide: [Build_Custom_MicroPython_Firmware.md](Build_Custom_MicroPython_Firm
 - The firmware creates a run-scoped `event_log.txt` next to `main.py`.
 - In recovery mode (GPIO2 held low at boot), main and the event log are reset; config is retained.
 
+## Shared Configuration
+
+Keep one editable `config.py` while replacing `main.py` for each challenge.
+Start from the [student config](../project/config.py), then use the same file
+in the simulator and on the robot. Numeric settings start at zero; use the
+comments as starting guidance and tune the settings needed by the current main.
+Main contains algorithms and runtime state, not duplicate tuning.
+
+The simulator has **main.py** and **config.py** tabs in the same editor. Run and
+Step use main with the latest config regardless of which tab is visible. Stop
+before using **Validate config.py**. Validation checks required variable names,
+Python syntax and types only; it does not validate values or calibration.
+Zeroed settings can pass validation without being suitable for motion.
+
+Import, download, copy and reset act on the selected tab. Both files save
+independently in the browser. Transfer both files to the robot initially, then
+replace only main unless you deliberately retune. **Reset Main** and **Reset
+Robot** preserve config; **Reset Config** restores the zeroed template after
+confirmation. See the [firmware guide](Build_Custom_MicroPython_Firmware.md)
+for recovery that preserves config and an explicit config reset.
+
+### Physical Distance Settings
+
+Distance targets use the sensor's reported reading, not a ruler measurement.
+A setting of `50` does not guarantee a physical gap of 50 mm. With the motors
+stopped, compare front and side readings with measured clearances separately;
+different sensors can have different offsets or scales. Set `TARGET_WALL_DISTANCE`
+from the side reading at the desired clearance. Set `FRONT_SLOW_DISTANCE` and
+`FRONT_STOP_DISTANCE` from the front readings at the desired slowdown and safe
+turning positions, allowing space for the chassis and stopping motion. Retest
+at a controlled speed after changing robots or sensors. Do not use `-1` as a
+target. The sensor readings and type-only config validation remain unchanged.
+
 ## Challenges
 
-Students complete stages in order, keeping one purpose-organised config and replacing only main. Algorithms remain visible and editable; there is no need to copy tuning between programs. Start with the [shared configuration instructions](../app/README.md#shared-configuration).
+Students complete stages in order, keeping one purpose-organised config and replacing only main. Algorithms remain visible and editable; there is no need to copy tuning between programs. Start with the [shared configuration instructions](#shared-configuration).
 
 Stage 1: PID wall following
 

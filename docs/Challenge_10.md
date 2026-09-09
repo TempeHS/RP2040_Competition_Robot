@@ -13,7 +13,7 @@ black-zone recovery is a separate extension.
 3. **New Main Behaviour:** The existing scaffold adds counters, a score function and OLED setup. Complete its victim and finish TODO branches in main.
 4. **Replace Main:** Use the [Challenge 10 main](../app/starter-code/challenge-10.py) as `main.py`. Keep config; counters and marker history reset for each run.
 
-Read the [shared configuration instructions](../app/README.md#shared-configuration). The teacher reference implements victim/finish branches; it uses the same config, not separate hidden tuning.
+Read the [shared configuration instructions](README.md#shared-configuration). The teacher reference implements victim/finish branches; it uses the same config, not separate hidden tuning.
 
 ## Success Criteria
 
