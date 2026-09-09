@@ -13,18 +13,40 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(name="settings")
 def settings_fixture():
-    values = runpy.run_path(str(ROOT / "project/config.py"))
+    values = runpy.run_path(str(ROOT / "tests/test-config.py"))
     return types.SimpleNamespace(
         **{name: value for name, value in values.items() if not name.startswith("__")}
     )
 
 
-def test_default_config_is_valid(settings):
+def test_harness_config_is_valid(settings):
     assert validate_config(settings)
 
 
-def test_config_contains_only_unique_constant_assignments():
-    tree = ast.parse((ROOT / "project/config.py").read_text())
+def test_student_numeric_settings_start_at_zero():
+    values = runpy.run_path(str(ROOT / "project/config.py"))
+    numeric = {
+        name: value for name, value in values.items() if type(value) in (int, float)
+    }
+    assert numeric
+    assert all(value == 0 for value in numeric.values()), numeric
+    with pytest.raises(ValueError, match="config\\.BASE_SPEED"):
+        validate_config(types.SimpleNamespace(**values))
+
+
+def test_student_and_test_config_have_the_same_variable_names():
+    names = []
+    for filename in ("project/config.py", "tests/test-config.py"):
+        tree = ast.parse((ROOT / filename).read_text())
+        names.append(
+            {node.targets[0].id for node in tree.body if isinstance(node, ast.Assign)}
+        )
+    assert names[0] == names[1]
+
+
+@pytest.mark.parametrize("filename", ("project/config.py", "tests/test-config.py"))
+def test_config_contains_only_unique_constant_assignments(filename):
+    tree = ast.parse((ROOT / filename).read_text())
     names = []
     allowed = (
         ast.Assign,

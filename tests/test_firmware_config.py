@@ -73,7 +73,7 @@ def test_first_boot_provisions_both_editable_files(firmware):
     firmware.run_boot()
     assert Path("main.py").read_text() == firmware.main_source
     assert Path("config.py").read_text() == firmware.config_source
-    assert load_module("provisioned_main", Path("main.py")).speed == 200
+    assert load_module("provisioned_main", Path("main.py")).speed == 0
 
 
 def test_normal_boot_preserves_existing_tuning_and_main(firmware):
@@ -114,7 +114,7 @@ def test_corrupt_config_is_only_replaced_explicitly_and_backups_are_unique(firmw
 
 def test_edited_filesystem_config_is_loaded(firmware, monkeypatch):
     firmware.run_boot()
-    source = firmware.config_source.replace("BASE_SPEED = 200", "BASE_SPEED = 187")
+    source = firmware.config_source.replace("BASE_SPEED = 0", "BASE_SPEED = 187")
     Path("config.py").write_text(source)
     config = load_module("config", Path("config.py"))
     monkeypatch.setitem(sys.modules, "config", config)

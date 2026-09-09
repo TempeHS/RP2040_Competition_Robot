@@ -171,7 +171,9 @@ def fake_clock():
 
 @pytest.fixture
 def isolated_config(monkeypatch):
-    spec = importlib.util.spec_from_file_location("config", PROJECT_DIR / "config.py")
+    spec = importlib.util.spec_from_file_location(
+        "config", PROJECT_DIR.parent / "tests/test-config.py"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setitem(sys.modules, "config", module)
