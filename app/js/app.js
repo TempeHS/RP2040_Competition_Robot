@@ -345,6 +345,9 @@ function setupEventListeners() {
     Editor.flushSave();
     ConfigStore.download(Editor.getActiveCode(), Editor.activeFile);
   });
+  document.getElementById("btnValidateConfig").addEventListener("click", () => {
+    Editor.validateConfig();
+  });
   const fileTabs = [...document.querySelectorAll("[data-editor-file]")];
   fileTabs.forEach((tab, index) => {
     tab.addEventListener("click", () => {

@@ -149,7 +149,8 @@ def exercise(page, base_url, output):
     expect(page.locator("#mainTab")).to_have_attribute("aria-selected", "true")
     page.locator("#configTab").click()
     wait_config(page)
-    assert page.evaluate("App.isRunning && App.robot === window.originalRobot")
+    assert page.evaluate("App.isRunning && Editor.instance === window.originalEditor")
+    assert page.evaluate("App.robot.y") < start_y - 30
     page.locator("#btnStop").click()
     assert saved(page, CONFIG_KEY) == tuned
     page.locator("#btnReset").click()
@@ -287,14 +288,27 @@ def exercise(page, base_url, output):
     wait_config(page)
 
     page.set_viewport_size({"width": 390, "height": 844})
+    page.wait_for_function(
+        "document.getElementById('editor').getBoundingClientRect().height === 300"
+    )
     check_layout(page)
     page.screenshot(path=str(output / "config-mobile.png"), full_page=True)
     config_bounds = page.locator("#editor").bounding_box()
     page.locator("#mainTab").click()
     expect(page.locator("#mainTab")).to_have_attribute("aria-selected", "true")
     check_layout(page)
-    assert page.locator("#editor").bounding_box() == config_bounds
+    main_bounds = page.locator("#editor").bounding_box()
+    assert main_bounds == config_bounds, (main_bounds, config_bounds)
     page.screenshot(path=str(output / "simulator-mobile.png"), full_page=True)
+    page.set_viewport_size({"width": 320, "height": 740})
+    check_layout(page)
+    page.goto(urljoin(base_url, "config.html?challenge=2&line=14"))
+    page.wait_for_url("**/simulator.html?challenge=2&file=config.py")
+    wait_config(page)
+    wait_main(page, 2)
+    assert page.evaluate("Editor.getActiveCode()") == default
+    assert page.evaluate("Editor.instance.getCursorPosition().row") == 13
+    assert saved(page, MAIN_KEY) == SMOKE_MAIN
 
 
 def main():

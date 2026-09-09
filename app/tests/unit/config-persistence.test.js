@@ -1,6 +1,5 @@
 const ConfigStore = require("../../js/config-store");
 const Editor = require("../../js/editor");
-const ConfigEditor = require("../../js/config-editor");
 
 describe("Separate main and config persistence", () => {
   let saved;
@@ -21,8 +20,11 @@ describe("Separate main and config persistence", () => {
     Editor.mainSession = null;
     Editor.configSession = null;
     Editor.activeFile = "main.py";
+    Editor.configError = null;
     Editor.saveTimeout = null;
     ConfigStore.source = null;
+    document.body.innerHTML =
+      '<button id="btnValidateConfig"></button><span id="configValidation"></span>';
   });
 
   afterEach(() => {
@@ -111,16 +113,106 @@ describe("Separate main and config persistence", () => {
     expect(Editor.instance.scrollToLine).not.toHaveBeenCalled();
   });
 
-  test("config flush preserves comments and unsaved text on navigation", () => {
-    document.body.innerHTML =
-      '<select id="configSection"></select><span id="configSaveStatus"></span><div id="configResult"></div>';
-    const source = "# Wall PID\nside_Kp = 0.72  # measured on my robot\n";
-    ConfigEditor.instance = { getValue: () => source };
-    expect(ConfigEditor.flushSave()).toBe(true);
-    expect(saved.get(ConfigStore.key)).toBe(source);
-    expect(document.getElementById("configSaveStatus").textContent).toBe(
-      "Saved locally",
+  test("tabs identify the active file without a duplicate filename label", async () => {
+    document.body.innerHTML = `
+      <button id="mainTab" data-editor-file="main.py"></button>
+      <button id="configTab" data-editor-file="config.py"></button>
+      <button id="btnDownloadMain"></button><button id="btnCopyCode"></button>
+      <button id="btnImportCode"></button><button id="btnResetCode"></button>
+      <button id="btnValidateConfig" hidden></button><span id="configValidation" hidden></span>
+      <div id="editor"></div>`;
+    Editor.mainSession = { getValue: () => code };
+    Editor.configSession = { getValue: () => "BASE_SPEED = 0\n" };
+    Editor.instance.setSession = jest.fn();
+    Editor.instance.focus = jest.fn();
+    await Editor.showFile("config.py");
+    expect(Editor.instance.setSession).toHaveBeenCalledWith(
+      Editor.configSession,
     );
-    expect(saved.has("aidriver_challenge_1_code_v4")).toBe(false);
+    expect(
+      document.getElementById("configTab").getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(
+      document.getElementById("editor").getAttribute("aria-labelledby"),
+    ).toBe("configTab");
+    expect(document.getElementById("btnDownloadMain").title).toBe(
+      "Download config.py",
+    );
+    expect(document.getElementById("editorFilename")).toBeNull();
+    expect(document.getElementById("btnValidateConfig").hidden).toBe(false);
+    await Editor.showFile("main.py");
+    expect(document.getElementById("btnValidateConfig").hidden).toBe(true);
+  });
+
+  test("Validate checks the config buffer without running main", async () => {
+    const source = "BASE_SPEED = 185\n";
+    Editor.activeFile = "config.py";
+    Editor.configSession = {
+      getValue: () => source,
+      clearAnnotations: jest.fn(),
+    };
+    const validate = jest
+      .spyOn(ConfigStore, "validate")
+      .mockResolvedValue(true);
+    expect(await Editor.validateConfig()).toBe(true);
+    expect(validate).toHaveBeenCalledWith(source);
+    expect(document.getElementById("configValidation").textContent).toBe(
+      "Config valid",
+    );
+    expect(document.getElementById("btnValidateConfig").disabled).toBe(false);
+    expect(App.isRunning).toBeUndefined();
+  });
+
+  test("Validate marks invalid config, not main, and skips running simulations", async () => {
+    const source = "BASE_SPEED = 0\n";
+    Editor.activeFile = "config.py";
+    Editor.mainSession = { setAnnotations: jest.fn() };
+    Editor.configSession = {
+      getValue: () => source,
+      clearAnnotations: jest.fn(),
+      setAnnotations: jest.fn(),
+    };
+    Editor.instance.gotoLine = jest.fn();
+    const validate = jest
+      .spyOn(ConfigStore, "validate")
+      .mockRejectedValue(new Error("Invalid speed"));
+    jest
+      .spyOn(ConfigStore, "errorLocation")
+      .mockReturnValue({ line: 1, message: "Invalid speed" });
+    expect(await Editor.validateConfig()).toBe(false);
+    expect(Editor.configSession.setAnnotations).toHaveBeenCalledWith([
+      { row: 0, column: 0, text: "Invalid speed", type: "error" },
+    ]);
+    expect(Editor.mainSession.setAnnotations).not.toHaveBeenCalled();
+    expect(document.getElementById("configValidation").textContent).toBe(
+      "Invalid config",
+    );
+    App.isRunning = true;
+    expect(await Editor.validateConfig()).toBe(false);
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(document.getElementById("configValidation").textContent).toBe(
+      "Stop before validating",
+    );
+  });
+
+  test("config errors stay in their session and clear after editing", () => {
+    document.body.innerHTML = '<button id="configTab">config.py</button>';
+    Editor.mainSession = { setAnnotations: jest.fn() };
+    Editor.configSession = {
+      setAnnotations: jest.fn(),
+      clearAnnotations: jest.fn(),
+    };
+    Editor.markConfigError({ line: 10, message: "Invalid BASE_SPEED" });
+    expect(Editor.configSession.setAnnotations).toHaveBeenCalledWith([
+      { row: 9, column: 0, text: "Invalid BASE_SPEED", type: "error" },
+    ]);
+    expect(Editor.mainSession.setAnnotations).not.toHaveBeenCalled();
+    expect(document.getElementById("configTab").title).toContain(
+      "config.py:10:",
+    );
+    Editor.clearConfigError();
+    expect(Editor.configError).toBeNull();
+    expect(Editor.configSession.clearAnnotations).toHaveBeenCalled();
+    expect(document.getElementById("configTab").title).toBe("");
   });
 });

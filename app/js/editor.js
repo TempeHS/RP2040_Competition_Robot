@@ -145,7 +145,10 @@ const Editor = {
       tab.setAttribute("aria-selected", String(active));
       tab.tabIndex = active ? 0 : -1;
     });
-    document.getElementById("editorFilename").textContent = filename;
+    document.getElementById("btnValidateConfig").hidden =
+      filename !== "config.py";
+    const validation = document.getElementById("configValidation");
+    validation.hidden = filename !== "config.py" || !validation.textContent;
     document
       .getElementById("editor")
       .setAttribute(
@@ -172,8 +175,46 @@ const Editor = {
     if (targetLine) this.instance.gotoLine(targetLine, 0, true);
   },
 
+  setConfigValidation(message) {
+    const result = document.getElementById("configValidation");
+    if (result) {
+      result.textContent = message;
+      result.hidden = this.activeFile !== "config.py" || !message;
+    }
+  },
+
+  async validateConfig() {
+    if (!this.configSession) return false;
+    if (App.isRunning) {
+      this.setConfigValidation("Stop before validating");
+      return false;
+    }
+    this.flushSave();
+    this.clearConfigError();
+    const source = this.configSession.getValue();
+    const button = document.getElementById("btnValidateConfig");
+    button.disabled = true;
+    this.setConfigValidation("Checking config...");
+    try {
+      await ConfigStore.validate(source);
+      if (this.configSession.getValue() !== source) return false;
+      this.setConfigValidation("Config valid");
+      return true;
+    } catch (error) {
+      if (this.configSession.getValue() !== source) return false;
+      const location = ConfigStore.errorLocation(error, source);
+      this.markConfigError(location);
+      if (this.activeFile === "config.py")
+        this.instance.gotoLine(location.line, 0, true);
+      return false;
+    } finally {
+      button.disabled = false;
+    }
+  },
+
   markConfigError(location) {
     this.configError = location;
+    this.setConfigValidation("Invalid config");
     this.configSession?.setAnnotations([
       {
         row: location.line - 1,
@@ -191,6 +232,7 @@ const Editor = {
 
   clearConfigError() {
     this.configError = null;
+    this.setConfigValidation("");
     this.configSession?.clearAnnotations();
     const tab = document.getElementById("configTab");
     if (tab) {
