@@ -83,15 +83,15 @@ App.onAIDriverInstantiated = function (side) {
   if (canMirror && App.robot && challenge && challenge.startPosition) {
     const spawn =
       (App.session && App.session.startPosition) || challenge.startPosition;
-    const mirrored = Simulator.mirrorPose({
+    const pose = {
       x: spawn.x,
       y: spawn.y,
       heading: spawn.heading || 0,
-    });
-    App.robot.x = mirrored.x;
-    App.robot.y = mirrored.y;
-    App.robot.heading =
-      (mirrored.heading + (App.startHeadingOffset || 0)) % 360;
+    };
+    const aligned = side === "right" ? Simulator.mirrorPose(pose) : pose;
+    App.robot.x = aligned.x;
+    App.robot.y = aligned.y;
+    App.robot.heading = (aligned.heading + (App.startHeadingOffset || 0)) % 360;
     App.robot.trail = [];
   }
 
@@ -103,10 +103,21 @@ App.onAIDriverInstantiated = function (side) {
     challenge.successCriteria &&
     challenge.successCriteria.zone
   ) {
-    challenge.successCriteria.zone = Simulator.mirrorRect(
-      challenge.successCriteria.zone,
-    );
+    if (!challenge._canonicalZone) {
+      challenge._canonicalZone = { ...challenge.successCriteria.zone };
+    }
+    challenge.successCriteria.zone =
+      side === "right"
+        ? Simulator.mirrorRect(challenge._canonicalZone)
+        : { ...challenge._canonicalZone };
   }
+
+  const colorZones = (challenge && challenge.colorZones) || [];
+  Simulator.setColorZones(
+    canMirror && side === "right"
+      ? colorZones.map((zone) => ({ ...zone, ...Simulator.mirrorRect(zone) }))
+      : colorZones,
+  );
 
   if (typeof DebugPanel !== "undefined") {
     if (canMirror) {
@@ -581,6 +592,9 @@ function loadChallenge(challengeId) {
 
   // Store current challenge config
   App.currentChallengeConfig = challenge;
+  if (typeof Simulator !== "undefined") Simulator.setSideSensorSide("left");
+  const sideLabel = document.getElementById("sideSensorLabel");
+  if (sideLabel) sideLabel.textContent = "Left";
 
   // Snapshot the canonical (left-frame) success zone so resetRobot can
   // restore it after a previous run mirrored it for AIDriver("right").
@@ -589,7 +603,10 @@ function loadChallenge(challengeId) {
     challenge.successCriteria &&
     challenge.successCriteria.zone
   ) {
-    challenge._canonicalZone = { ...challenge.successCriteria.zone };
+    if (!challenge._canonicalZone) {
+      challenge._canonicalZone = { ...challenge.successCriteria.zone };
+    }
+    challenge.successCriteria.zone = { ...challenge._canonicalZone };
   }
   if (challenge && challenge.startPosition) {
     challenge._canonicalStart = { ...challenge.startPosition };
@@ -895,12 +912,17 @@ function runCode() {
   const code = Editor.getCode();
 
   // Run with PythonRunner
-  PythonRunner.run(code)
-    .then(() => {
+  const execution = PythonRunner.run(code);
+  const executionId = PythonRunner.executionId;
+  execution
+    .then((completed) => {
+      if (completed === false || PythonRunner.executionId !== executionId)
+        return;
       DebugPanel.success("Execution completed");
       if (typeof Logger !== "undefined") {
         Logger.info("APP", "Execution completed successfully");
       }
+      checkChallengeSuccess();
       if (App.isRunning) {
         stopExecution();
         updateStatus("Completed", "success");
@@ -909,6 +931,7 @@ function runCode() {
       }
     })
     .catch((err) => {
+      if (PythonRunner.executionId !== executionId) return;
       const errorMsg = err.message || String(err);
       DebugPanel.error(`Execution error: ${errorMsg}`);
       if (typeof Logger !== "undefined") {
@@ -948,6 +971,8 @@ function stopExecution() {
   // Stop robot
   App.robot.leftSpeed = 0;
   App.robot.rightSpeed = 0;
+  App.robot.actualLeftV = 0;
+  App.robot.actualRightV = 0;
   App.robot.isMoving = false;
 
   DebugPanel.warning("Execution stopped");
@@ -974,6 +999,7 @@ async function stepCode() {
     }
     return;
   }
+  if (App.isRunning) return;
 
   // Get code from editor
   const code = Editor.getCode();
@@ -1009,11 +1035,15 @@ async function stepCode() {
   App.elements.challengeStatus.className = "badge bg-info";
 
   let executionFailed = false;
+  const execution = PythonRunner.runStepMode(code);
+  const executionId = PythonRunner.executionId;
   try {
     // Run in step mode with trace collection and playback
-    await PythonRunner.runStepMode(code);
+    const completed = await execution;
+    if (completed === false || PythonRunner.executionId !== executionId) return;
     DebugPanel.success("Step mode completed - click Reset to run again");
   } catch (error) {
+    if (PythonRunner.executionId !== executionId) return;
     if (error.message !== "Execution stopped") {
       executionFailed = true;
       DebugPanel.error("Execution error: " + error.message);
@@ -1021,6 +1051,7 @@ async function stepCode() {
   }
 
   // Reset UI
+  stopExecution();
   PythonRunner.stepMode = false;
   App.isRunning = false;
   App.elements.btnRun.disabled = true; // Require reset
@@ -1098,6 +1129,7 @@ function resetRobot() {
   // next AIDriver("right") call will re-apply the mirroring fresh.
   if (typeof Simulator !== "undefined") {
     Simulator.setSideSensorSide("left");
+    Simulator.setColorZones((challenge && challenge.colorZones) || []);
   }
   const sideLabelResetRun =
     typeof document !== "undefined"
@@ -2256,9 +2288,11 @@ function startAnimationLoop() {
 
     // Update robot using Simulator physics if moving
     if (
-      App.robot.isMoving ||
-      App.robot.leftSpeed !== 0 ||
-      App.robot.rightSpeed !== 0
+      !PythonRunner.stepMode &&
+      !PythonRunner.isCollectingTrace &&
+      (App.robot.isMoving ||
+        App.robot.leftSpeed !== 0 ||
+        App.robot.rightSpeed !== 0)
     ) {
       if (typeof Simulator !== "undefined") {
         App.robot = Simulator.step(App.robot, dt);
@@ -2283,11 +2317,10 @@ function startAnimationLoop() {
 
       render();
       updateUltrasonicDisplay(calculateDistance());
+    }
 
-      // Check success criteria if running
-      if (App.isRunning) {
-        checkChallengeSuccess();
-      }
+    if (App.isRunning) {
+      checkChallengeSuccess();
     }
 
     requestAnimationFrame(animate);
@@ -2342,19 +2375,21 @@ function updateSessionTracking() {
  */
 function checkChallengeSuccess() {
   if (!App.currentChallengeConfig || typeof Challenges === "undefined") return;
+  if (!App.isRunning || !App.session || !App.session.startTime) return;
 
   // Don't check success during step mode playback
-  if (PythonRunner.isPlayingTrace) return;
+  if (
+    PythonRunner.stepMode ||
+    PythonRunner.isCollectingTrace ||
+    PythonRunner.isPlayingTrace
+  )
+    return;
 
   // Require at least 2 seconds of running before checking success
   if (App.session && App.session.startTime) {
     const elapsed = Date.now() - App.session.startTime;
     if (elapsed < 2000) return; // Don't check success in first 2 seconds
   }
-
-  // Don't check success while Python code is still actively running
-  // Success should only be checked after code completes naturally
-  if (PythonRunner.isRunning) return;
 
   const result = Challenges.checkSuccess(
     App.currentChallenge,

@@ -107,7 +107,7 @@ const PythonRunner = {
    * @param {boolean} [forTraceCollection=false] Toggle trace-enhanced implementation.
    * @returns {string} Python source string defining the aidriver module.
    */
-  getAIDriverPythonModule(forTraceCollection = false) {
+  getAIDriverPythonModule(forTraceCollection = false, useSensorBridge = false) {
     // Get speed multiplier from App (default to 1)
     const speedMult =
       typeof App !== "undefined" && App.speedMultiplier
@@ -134,7 +134,8 @@ def _step_debug(line_num, line_code):
     _trace.append({
         "line": line_num,
         "code": line_code,
-        "commands": cmds
+      "commands": cmds,
+  ${useSensorBridge ? '        "pose": _trace_pose(),' : ""}
     })
 
 def _get_trace():
@@ -144,7 +145,8 @@ def _get_trace():
         _trace.append({
             "line": 0,
             "code": "[final commands]",
-            "commands": _command_queue[:]
+            "commands": _command_queue[:],
+${useSensorBridge ? '            "pose": _trace_pose(),' : ""}
         })
         _command_queue = []
     return _trace
@@ -176,6 +178,7 @@ _SPEED_MULTIPLIER = ${speedMult}
 _command_queue = []
 
 import time
+${useSensorBridge ? "from _sim_trace import read_sensor as _read_sensor, command as _trace_command, pose as _trace_pose" : ""}
 
 ${stepDebugCode}
 
@@ -185,6 +188,7 @@ def _queue_command(cmd_type, params=None):
     if params is None:
         params = {}
     _command_queue.append({"type": cmd_type, "params": params})
+    ${useSensorBridge ? "_trace_command(cmd_type, params)" : ""}
 
 def _get_commands():
     """Get all queued commands and clear the queue"""
@@ -259,7 +263,7 @@ class AIDriver:
     def read_gyro_z_dps(self):
         """Read simulated gyro Z yaw rate in deg/s (JS overrides value)."""
         _queue_command("read_gyro_z_dps")
-        return 0.0
+        return ${useSensorBridge ? '_read_sensor("gyro")' : "0.0"}
 
     def turn_degrees(self, target_deg, direction=None):
         """Closed-loop gyro turn by target_deg. direction: 'left' or 'right'.
@@ -283,7 +287,7 @@ class AIDriver:
             print("[AIDriver] turn_degrees:", target,
                   "right" if is_right else "left")
         # Give the simulator wall-clock time to render the rotation.
-        time.sleep(0.4 / _SPEED_MULTIPLIER)
+      ${forTraceCollection ? "" : "        time.sleep(0.4 / _SPEED_MULTIPLIER)"}
         self._is_moving = False
         return target
 
@@ -310,7 +314,7 @@ class AIDriver:
         global DEBUG_AIDRIVER
         # This will be overridden by JavaScript
         _queue_command("read_distance")
-        distance_mm = 1000  # Placeholder, JS overrides actual value
+        distance_mm = ${useSensorBridge ? '_read_sensor("front")' : "1000"}
         if DEBUG_AIDRIVER:
             print("[AIDriver] read_distance:", distance_mm, "mm")
         return distance_mm
@@ -320,7 +324,7 @@ class AIDriver:
         global DEBUG_AIDRIVER
         # This will be overridden by JavaScript
         _queue_command("read_distance_2")
-        distance_mm = 1000  # Placeholder, JS overrides actual value
+        distance_mm = ${useSensorBridge ? '_read_sensor("side")' : "1000"}
         if DEBUG_AIDRIVER:
             print("[AIDriver] read_distance_2:", distance_mm, "mm")
         return distance_mm
@@ -338,7 +342,7 @@ class AIDriver:
         """Read the ground colour sensor as (r, g, b, c) raw counts."""
         # JS injects real values during normal runs; placeholder for trace mode.
         _queue_command("read_color")
-        return (0, 0, 0, 0)
+        return ${useSensorBridge ? '_read_sensor("color")' : "(0, 0, 0, 0)"}
 
     def classify_color(self):
         """Classify the floor as 'black' / 'red' / 'green' / 'silver' / 'none'."""
@@ -363,7 +367,7 @@ class AIDriver:
     def color_detected(self):
         """True when the colour interrupt is active (over a marker)."""
         _queue_command("color_detected")
-        return False
+        return ${useSensorBridge ? '_read_sensor("marker")' : "False"}
 
     def clear_color_interrupt(self):
         """Clear a latched colour interrupt (no-op in the simulator)."""
@@ -379,7 +383,7 @@ class AIDriver:
 
     # OLED status display (SSD1306). Output-only API; the simulator queues the
     # text for the trace so it can be inspected, the hardware renders it.
-    def show_display(self, line1="", line2="", line3="", line4=""):
+    def show_display(self, line1="", line2="", line3="", line4="", force=False):
         """Show up to four text lines on the OLED status display."""
         self._display_lines = [str(line1), str(line2), str(line3), str(line4)]
         _queue_command("show_display", {"lines": self._display_lines})
@@ -387,10 +391,10 @@ class AIDriver:
     def display_status(self, state, score=0, victims=0):
         """Show the competition state, sensor health and colour on the OLED."""
         self._display_lines = [
-            "State:" + str(state)[:9],
-            "F:OK S:OK",
-            "Score:" + str(int(score)),
-            "V:" + str(int(victims)) + " C:" + self.classify_color(),
+          str(state)[:8],
+          "FOK SOK",
+          "S:" + str(int(score)),
+          "V:" + str(int(victims)) + " " + self.classify_color()[:3],
         ]
         _queue_command("display_status", {"lines": self._display_lines})
 
@@ -509,7 +513,7 @@ def hold_state(seconds):
     # Divide sleep time by speed multiplier so faster speeds = shorter real time
     actual_sleep = float(seconds) / _SPEED_MULTIPLIER
     print("[Python] calling time.sleep with actual_sleep:", actual_sleep)
-    time.sleep(actual_sleep)
+  ${forTraceCollection ? "" : "    time.sleep(actual_sleep)"}
     print("[Python] time.sleep returned for hold_state:", seconds)
 
 
@@ -816,7 +820,14 @@ def ticks_diff(t1, t2):
 
     this.isRunning = true;
     this.shouldStop = false;
-    this.executionId++; // Increment to invalidate stale callbacks
+    const executionId = ++this.executionId;
+    const ensureActive = () => {
+      if (this.shouldStop || this.executionId !== executionId) {
+        const error = new Error("Execution stopped");
+        error.isStopExecution = true;
+        throw error;
+      }
+    };
 
     // Clear command queue
     AIDriverStub.clearQueue();
@@ -832,10 +843,12 @@ def ticks_diff(t1, t2):
       // Store reference to this for callbacks
       const self = this;
 
-      this.configSnapshot =
+      const configSnapshot =
         typeof ConfigStore !== "undefined"
           ? await ConfigStore.snapshot()
           : null;
+      ensureActive();
+      this.configSnapshot = configSnapshot;
 
       console.log(
         "[PythonRunner] run() - Before Sk.configure, Sk.setTimeout:",
@@ -886,11 +899,7 @@ def ticks_diff(t1, t2):
             );
             console.log("[PythonRunner] susp.data.promise:", susp.data.promise);
 
-            if (self.shouldStop) {
-              const err = new Error("Execution stopped");
-              err.isStopExecution = true;
-              throw err;
-            }
+            ensureActive();
 
             // Process any queued commands BEFORE the sleep starts
             self.processCommandQueue();
@@ -902,6 +911,7 @@ def ticks_diff(t1, t2):
                   // After resume, continue with original promise then call resume()
                   susp.data.promise
                     .then((result) => {
+                      ensureActive();
                       susp.data.result = result;
                       try {
                         resolve(susp.resume());
@@ -922,6 +932,7 @@ def ticks_diff(t1, t2):
               "[PythonRunner] Returning promise from Sk.promise handler",
             );
             return susp.data.promise.then((result) => {
+              ensureActive();
               console.log(
                 "[PythonRunner] Sleep promise resolved with:",
                 result,
@@ -936,11 +947,7 @@ def ticks_diff(t1, t2):
           },
           "*": function () {
             // Check if we should stop
-            if (self.shouldStop) {
-              const err = new Error("Execution stopped");
-              err.isStopExecution = true;
-              throw err;
-            }
+            ensureActive();
             // Process commands on each yield
             self.processCommandQueue();
 
@@ -956,6 +963,7 @@ def ticks_diff(t1, t2):
 
       this.executionPromise = promise;
       await promise;
+      ensureActive();
       this.processCommandQueue();
 
       console.log(
@@ -965,8 +973,10 @@ def ticks_diff(t1, t2):
       if (typeof DebugPanel !== "undefined") {
         DebugPanel.log("[Python] Execution completed", "success");
       }
+      return true;
     } catch (error) {
       console.log("[PythonRunner] Execution threw error:", error);
+      if (this.executionId !== executionId) return false;
       this.handleError(error);
       if (
         !this.shouldStop &&
@@ -975,11 +985,14 @@ def ticks_diff(t1, t2):
       ) {
         throw error;
       }
+      return false;
     } finally {
       console.log("[PythonRunner] Stopped (finally block)");
-      this.isRunning = false;
-      this.stepMode = false;
-      this.executionPromise = null;
+      if (this.executionId === executionId) {
+        this.isRunning = false;
+        this.stepMode = false;
+        this.executionPromise = null;
+      }
     }
   },
 
@@ -1045,6 +1058,9 @@ def ticks_diff(t1, t2):
    * @returns {Promise<void>} Resolves after playback finishes or the run is cancelled.
    */
   async runStepMode(code) {
+    if (this.isRunning || this.stepMode) return false;
+    const executionId = ++this.executionId;
+    this.isRunning = true;
     this.sourceCode = code;
     this.sourceLines = code.split("\n");
     this.stepMode = true;
@@ -1059,26 +1075,34 @@ def ticks_diff(t1, t2):
       DebugPanel.info("Collecting execution trace...");
     }
 
-    let traceCollected;
     try {
-      traceCollected = await this.collectTrace(code);
+      const traceCollected = await this.collectTrace(code);
+      if (
+        !traceCollected ||
+        this.shouldStop ||
+        this.executionId !== executionId
+      ) {
+        return false;
+      }
+
+      if (typeof DebugPanel !== "undefined") {
+        DebugPanel.info(`Trace collected: ${this.executionTrace.length} steps`);
+        DebugPanel.info("Starting step-by-step playback...");
+      }
+
+      await this.playTrace(executionId);
+      return this.executionId === executionId && !this.shouldStop;
     } catch (error) {
+      if (this.executionId !== executionId) return false;
       this.handleError(error);
-      this.stepMode = false;
       throw error;
+    } finally {
+      if (this.executionId === executionId) {
+        this.isRunning = false;
+        this.stepMode = false;
+        this.isPlayingTrace = false;
+      }
     }
-
-    if (!traceCollected || this.shouldStop) {
-      return;
-    }
-
-    if (typeof DebugPanel !== "undefined") {
-      DebugPanel.info(`Trace collected: ${this.executionTrace.length} steps`);
-      DebugPanel.info("Starting step-by-step playback...");
-    }
-
-    // Phase 2: Play back the trace with delays
-    await this.playTrace();
   },
 
   /**
@@ -1087,23 +1111,139 @@ def ticks_diff(t1, t2):
    * metadata, making it possible to replay the run deterministically.
    *
    * @param {string} code Learner Python source.
-   * @returns {Promise<boolean>} Resolves true when a trace (even partial) is gathered, false on fatal errors.
+   * @returns {Promise<boolean>} Resolves true when a trace is gathered; rejects on fatal errors.
    */
+  getTraceSensorModule() {
+    let robot =
+      typeof App !== "undefined" && App.robot
+        ? { ...App.robot, trail: [...(App.robot.trail || [])] }
+        : {};
+    let side =
+      typeof Simulator.getSideSensorSide === "function"
+        ? Simulator.getSideSensorSide()
+        : "left";
+    let colorZones =
+      typeof Simulator.getColorZones === "function"
+        ? Simulator.getColorZones()
+        : [];
+    const runner = this;
+    return function () {
+      return {
+        command: new Sk.builtin.func(function (commandType, commandParams) {
+          const command = {
+            type: Sk.ffi.remapToJs(commandType),
+            params: Sk.ffi.remapToJs(commandParams),
+          };
+          if (command.type === "init") {
+            const requestedSide = command.params.side;
+            if (
+              requestedSide !== side &&
+              typeof Simulator.mirrorPose === "function" &&
+              (!App.currentChallengeConfig ||
+                App.currentChallengeConfig.symmetric !== false)
+            ) {
+              robot = { ...robot, ...Simulator.mirrorPose(robot) };
+              colorZones = colorZones.map((zone) => ({
+                ...zone,
+                ...Simulator.mirrorRect(zone),
+              }));
+            }
+            side = requestedSide;
+          } else if (command.type === "hold_state") {
+            const seconds = command.params.seconds;
+            if (!Number.isFinite(seconds) || seconds < 0) {
+              throw new Sk.builtin.ValueError(
+                "sleep length must be finite and non-negative",
+              );
+            }
+            if (typeof Simulator.step === "function" && seconds > 0) {
+              robot = Simulator.step(
+                robot,
+                seconds / (App.speedMultiplier || 1),
+              );
+            }
+          } else {
+            runner.executeRobotCommand(command, robot, true);
+          }
+          return Sk.builtin.none.none$;
+        }),
+        pose: new Sk.builtin.func(function () {
+          const pose = { ...robot };
+          delete pose.trail;
+          return Sk.ffi.remapToPy(pose);
+        }),
+        read_sensor: new Sk.builtin.func(function (sensorName) {
+          const sensor = Sk.ffi.remapToJs(sensorName);
+          if (sensor === "front") {
+            return new Sk.builtin.int_(Simulator.simulateUltrasonic(robot));
+          }
+          if (sensor === "side") {
+            if (typeof Simulator.getSideSensorSide !== "function") {
+              return new Sk.builtin.int_(
+                Simulator.simulateUltrasonicSide(robot),
+              );
+            }
+            const previousSide = Simulator.getSideSensorSide();
+            try {
+              Simulator.setSideSensorSide(side);
+              return new Sk.builtin.int_(
+                Simulator.simulateUltrasonicSide(robot),
+              );
+            } finally {
+              Simulator.setSideSensorSide(previousSide);
+            }
+          }
+          if (sensor === "gyro") {
+            return new Sk.builtin.float_(Simulator.simulateGyroZ(robot));
+          }
+          let color;
+          if (typeof Simulator.getColorZones === "function") {
+            const previousZones = Simulator.getColorZones();
+            try {
+              Simulator.setColorZones(colorZones);
+              color = Simulator.simulateColor(robot);
+            } finally {
+              Simulator.setColorZones(previousZones);
+            }
+          } else {
+            color = Simulator.simulateColor(robot);
+          }
+          if (sensor === "marker") {
+            return new Sk.builtin.bool(
+              ["red", "green", "silver", "black"].includes(color.name),
+            );
+          }
+          return new Sk.builtin.tuple(
+            [color.r, color.g, color.b, color.c].map(
+              (value) => new Sk.builtin.int_(value),
+            ),
+          );
+        }),
+      };
+    };
+  },
+
   async collectTrace(code) {
-    this.configSnapshot =
+    const executionId = this.executionId;
+    const configSnapshot =
       typeof ConfigStore !== "undefined" ? await ConfigStore.snapshot() : null;
+    if (this.executionId !== executionId) return false;
+    this.configSnapshot = configSnapshot;
     this.isCollectingTrace = true;
     this.executionTrace = [];
     this.traceOutputs = [];
 
     // Get the trace collection version of the module
-    const traceModule = this.getAIDriverPythonModule(true);
+    const traceModule = this.getAIDriverPythonModule(true, true);
 
     // Temporarily remove the JS module so Skulpt falls through to the Python trace module
     Sk.builtinFiles = Sk.builtinFiles || { files: {} };
     const savedJsModule = Sk.builtinFiles["files"]["src/lib/aidriver.js"];
     delete Sk.builtinFiles["files"]["src/lib/aidriver.js"];
     Sk.builtinFiles["files"]["src/lib/aidriver.py"] = traceModule;
+    window.__aidriverTraceModuleFactory = this.getTraceSensorModule();
+    Sk.builtinFiles["files"]["src/lib/_sim_trace.js"] =
+      "var $builtinmodule = function() { return window.__aidriverTraceModuleFactory(); };";
 
     // Clear any cached aidriver module to force reimport with trace version
     if (Sk.sysmodules && Sk.sysmodules.mp$ass_subscript) {
@@ -1153,15 +1293,15 @@ def ticks_diff(t1, t2):
 
     if (this.configSnapshot) ConfigStore.register(this.configSnapshot);
 
-    // Inject debug calls and add trace retrieval
-    const instrumentedCode =
-      this.injectDebugCalls(code) + "\n_final_trace = _get_trace()";
-    console.log("[PythonRunner] Trace collection code:", instrumentedCode);
-
     try {
+      // Inject debug calls and add trace retrieval
+      const instrumentedCode =
+        this.injectDebugCalls(code) + "\n_final_trace = _get_trace()";
+      console.log("[PythonRunner] Trace collection code:", instrumentedCode);
       const module = await Sk.misceval.asyncToPromise(() =>
         Sk.importMainWithBody("<stdin>", false, instrumentedCode, true),
       );
+      if (this.executionId !== executionId) return false;
 
       // Get the trace from Python - now includes commands
       const traceVar = module.$d._final_trace;
@@ -1175,6 +1315,7 @@ def ticks_diff(t1, t2):
             line: item.line || 0,
             code: item.code || "",
             commands: item.commands || [],
+            pose: item.pose || null,
           };
         });
         console.log(
@@ -1186,12 +1327,26 @@ def ticks_diff(t1, t2):
       this.isCollectingTrace = false;
       return true;
     } catch (error) {
+      if (this.executionId !== executionId) return false;
       this.isCollectingTrace = false;
       const errStr = error.toString();
 
       if (errStr.includes("MAX_STEPS_EXCEEDED")) {
+        const traceModule = Sk.sysmodules.mp$subscript(
+          new Sk.builtin.str("aidriver"),
+        );
+        const traceVar = Sk.misceval.callsimArray(
+          traceModule.$d._get_trace,
+          [],
+        );
+        this.executionTrace = Sk.ffi.remapToJs(traceVar).map((item) => ({
+          line: item.line || 0,
+          code: item.code || "",
+          commands: item.commands || [],
+          pose: item.pose || null,
+        }));
         if (typeof DebugPanel !== "undefined") {
-          DebugPanel.warn(
+          DebugPanel.warning(
             `Trace limit reached (${this.maxTraceSteps} steps) - possible infinite loop`,
           );
           DebugPanel.info("Partial trace will be played back");
@@ -1208,20 +1363,24 @@ def ticks_diff(t1, t2):
             }s) - infinite loop detected`,
           );
         }
-        return false;
+        throw error;
       } else {
         if (typeof DebugPanel !== "undefined") {
           DebugPanel.error("Error during trace collection: " + errStr);
         }
         console.error("[PythonRunner] Trace collection error:", error);
-        return false;
+        throw error;
       }
     } finally {
+      if (this.executionId === executionId) this.isCollectingTrace = false;
       // Restore the JS module registration for normal run mode
-      if (savedJsModule) {
-        Sk.builtinFiles["files"]["src/lib/aidriver.js"] = savedJsModule;
+      if (this.executionId === executionId || this.shouldStop) {
+        if (savedJsModule) {
+          Sk.builtinFiles["files"]["src/lib/aidriver.js"] = savedJsModule;
+        }
+        delete Sk.builtinFiles["files"]["src/lib/aidriver.py"];
+        delete Sk.builtinFiles["files"]["src/lib/_sim_trace.js"];
       }
-      delete Sk.builtinFiles["files"]["src/lib/aidriver.py"];
     }
   },
 
@@ -1233,7 +1392,7 @@ def ticks_diff(t1, t2):
    *
    * @returns {Promise<void>} Resolves after playback completes, pauses, or a stop request occurs.
    */
-  async playTrace() {
+  async playTrace(executionId = this.executionId) {
     this.isPlayingTrace = true;
     this.currentTraceStep = 0;
 
@@ -1245,7 +1404,8 @@ def ticks_diff(t1, t2):
 
     while (
       this.currentTraceStep < this.executionTrace.length &&
-      !this.shouldStop
+      !this.shouldStop &&
+      this.executionId === executionId
     ) {
       console.log(
         "[PythonRunner] Loop iteration:",
@@ -1257,13 +1417,17 @@ def ticks_diff(t1, t2):
       );
 
       // Check for pause
-      while (this.stepPaused && !this.shouldStop) {
+      while (
+        this.stepPaused &&
+        !this.shouldStop &&
+        this.executionId === executionId
+      ) {
         await new Promise((resolve) => {
           this.stepResumeResolve = resolve;
         });
       }
 
-      if (this.shouldStop) break;
+      if (this.shouldStop || this.executionId !== executionId) break;
 
       const step = this.executionTrace[this.currentTraceStep];
 
@@ -1291,6 +1455,21 @@ def ticks_diff(t1, t2):
         }
       }
 
+      if (step.pose && typeof App !== "undefined") {
+        const trail = (App.robot.trail || []).slice(-499);
+        if (App.robot.x !== step.pose.x || App.robot.y !== step.pose.y) {
+          trail.push({ x: step.pose.x, y: step.pose.y });
+        }
+        App.robot = { ...step.pose, trail };
+        if (typeof render === "function") render();
+        if (
+          typeof updateUltrasonicDisplay === "function" &&
+          typeof calculateDistance === "function"
+        ) {
+          updateUltrasonicDisplay(calculateDistance());
+        }
+      }
+
       this.currentTraceStep++;
 
       // Wait before next step
@@ -1302,6 +1481,8 @@ def ticks_diff(t1, t2):
       await new Promise((resolve) => setTimeout(resolve, this.stepDelay));
       console.log("[PythonRunner] Delay complete, continuing");
     }
+
+    if (this.executionId !== executionId) return;
 
     // Clear line highlight
     if (typeof Editor !== "undefined" && Editor.clearHighlight) {
@@ -1363,8 +1544,12 @@ def ticks_diff(t1, t2):
    *
    * @param {{type: string, params: object}} cmd Command describing the robot action to perform.
    */
-  executeRobotCommand(cmd) {
-    if (typeof App === "undefined" || !App.robot) {
+  executeRobotCommand(
+    cmd,
+    robot = typeof App !== "undefined" ? App.robot : null,
+    forTrace = false,
+  ) {
+    if (!robot) {
       console.log("[PythonRunner] Cannot execute command - no App.robot");
       return;
     }
@@ -1373,30 +1558,30 @@ def ticks_diff(t1, t2):
 
     switch (cmd.type) {
       case "drive_forward":
-        App.robot.leftSpeed = cmd.params.leftSpeed;
-        App.robot.rightSpeed = cmd.params.rightSpeed;
-        App.robot.isMoving = true;
+        robot.leftSpeed = cmd.params.leftSpeed;
+        robot.rightSpeed = cmd.params.rightSpeed;
+        robot.isMoving = true;
         break;
 
       case "drive_backward":
-        App.robot.leftSpeed = -cmd.params.leftSpeed;
-        App.robot.rightSpeed = -cmd.params.rightSpeed;
-        App.robot.isMoving = true;
+        robot.leftSpeed = -cmd.params.leftSpeed;
+        robot.rightSpeed = -cmd.params.rightSpeed;
+        robot.isMoving = true;
         break;
 
       case "rotate_left":
         // Left wheel backward, right wheel forward → counter-clockwise
         // (matches simulator kinematics where right > left rotates CCW = LEFT)
-        App.robot.leftSpeed = -cmd.params.turnSpeed;
-        App.robot.rightSpeed = cmd.params.turnSpeed;
-        App.robot.isMoving = true;
+        robot.leftSpeed = -cmd.params.turnSpeed;
+        robot.rightSpeed = cmd.params.turnSpeed;
+        robot.isMoving = true;
         break;
 
       case "rotate_right":
         // Left wheel forward, right wheel backward → clockwise
-        App.robot.leftSpeed = cmd.params.turnSpeed;
-        App.robot.rightSpeed = -cmd.params.turnSpeed;
-        App.robot.isMoving = true;
+        robot.leftSpeed = cmd.params.turnSpeed;
+        robot.rightSpeed = -cmd.params.turnSpeed;
+        robot.isMoving = true;
         break;
 
       case "gyro_turn": {
@@ -1404,12 +1589,12 @@ def ticks_diff(t1, t2):
         // target angle. Clockwise/right increases heading.
         const t = (cmd.params && cmd.params.target) || 0;
         const right = !!(cmd.params && cmd.params.right);
-        App.robot.heading += right ? t : -t;
-        App.robot.leftSpeed = 0;
-        App.robot.rightSpeed = 0;
-        App.robot.actualLeftV = 0;
-        App.robot.actualRightV = 0;
-        App.robot.isMoving = false;
+        robot.heading += right ? t : -t;
+        robot.leftSpeed = 0;
+        robot.rightSpeed = 0;
+        robot.actualLeftV = 0;
+        robot.actualRightV = 0;
+        robot.isMoving = false;
         break;
       }
 
@@ -1417,11 +1602,11 @@ def ticks_diff(t1, t2):
         // Active brake — H-bridge shorts both motor leads, wheels stop
         // immediately. We zero actualV here so the centre doesn't keep
         // coasting (or rotating, in the case of a spin-then-brake U-turn).
-        App.robot.leftSpeed = 0;
-        App.robot.rightSpeed = 0;
-        App.robot.actualLeftV = 0;
-        App.robot.actualRightV = 0;
-        App.robot.isMoving = false;
+        robot.leftSpeed = 0;
+        robot.rightSpeed = 0;
+        robot.actualLeftV = 0;
+        robot.actualRightV = 0;
+        robot.isMoving = false;
         break;
 
       case "init":
@@ -1429,6 +1614,7 @@ def ticks_diff(t1, t2):
         // string to the App hook so the simulator mounts the side sensor
         // and mirrors the spawn pose if needed.
         if (
+          !forTrace &&
           typeof App !== "undefined" &&
           typeof App.onAIDriverInstantiated === "function"
         ) {
@@ -1442,9 +1628,9 @@ def ticks_diff(t1, t2):
 
       case "drive":
         // Signed-speed PID method: positive = forward, negative = backward
-        App.robot.leftSpeed = cmd.params.leftSpeed;
-        App.robot.rightSpeed = cmd.params.rightSpeed;
-        App.robot.isMoving = true;
+        robot.leftSpeed = cmd.params.leftSpeed;
+        robot.rightSpeed = cmd.params.rightSpeed;
+        robot.isMoving = true;
         break;
 
       case "read_distance":
@@ -1462,6 +1648,7 @@ def ticks_diff(t1, t2):
       case "display_status":
         // Mirror the OLED text onto the simulated SSD1306 panel.
         if (
+          !forTrace &&
           typeof OLEDPanel !== "undefined" &&
           cmd.params &&
           cmd.params.lines
@@ -1471,7 +1658,7 @@ def ticks_diff(t1, t2):
         break;
 
       case "clear_display":
-        if (typeof OLEDPanel !== "undefined") {
+        if (!forTrace && typeof OLEDPanel !== "undefined") {
           OLEDPanel.clear();
         }
         break;
@@ -1486,7 +1673,7 @@ def ticks_diff(t1, t2):
 
     // Note: Physics updates are handled by startAnimationLoop() which calls Simulator.step()
     // Just trigger a render to show the updated state
-    if (typeof render === "function") {
+    if (!forTrace && typeof render === "function") {
       render();
     }
   },
@@ -1516,12 +1703,16 @@ def ticks_diff(t1, t2):
     console.log("[PythonRunner] stop() called - stack trace:");
     console.trace();
 
+    this.executionId++;
     this.shouldStop = true;
     this.isRunning = false;
     this.stepMode = false;
     this.stepPaused = false;
     this.isCollectingTrace = false;
     this.isPlayingTrace = false;
+    if (typeof Editor !== "undefined" && Editor.clearHighlight) {
+      Editor.clearHighlight();
+    }
     if (this.stepResumeResolve) {
       this.stepResumeResolve();
       this.stepResumeResolve = null;
@@ -1534,6 +1725,8 @@ def ticks_diff(t1, t2):
     if (typeof App !== "undefined" && App.robot) {
       App.robot.leftSpeed = 0;
       App.robot.rightSpeed = 0;
+      App.robot.actualLeftV = 0;
+      App.robot.actualRightV = 0;
       App.robot.isMoving = false;
     }
 

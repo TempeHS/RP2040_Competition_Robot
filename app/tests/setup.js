@@ -226,7 +226,7 @@ global.DebugPanel = {
   init: jest.fn(),
   log: jest.fn(),
   info: jest.fn(),
-  warn: jest.fn(),
+  warning: jest.fn(),
   error: jest.fn(),
   success: jest.fn(),
   clear: jest.fn(),

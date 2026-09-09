@@ -295,6 +295,10 @@ const AIDriverStub = {
            * @returns {Sk.misceval.Suspension} Resolves when the turn completes.
            */
           function runGyroTurn(self, target, isRight) {
+            const executionId =
+              typeof PythonRunner !== "undefined"
+                ? PythonRunner.executionId
+                : null;
             const Kp = readTurnGain(self, "turn_Kp", 6.0);
             const Ki = readTurnGain(self, "turn_Ki", 0.0);
             const Kd = readTurnGain(self, "turn_Kd", 0.4);
@@ -341,6 +345,14 @@ const AIDriverStub = {
                 }
 
                 function tick() {
+                  if (
+                    executionId !== null &&
+                    PythonRunner.executionId !== executionId
+                  ) {
+                    self.isMoving = false;
+                    resolve(Sk.builtin.none.none$);
+                    return;
+                  }
                   const now = performance.now();
                   let dt = ((now - last) / 1000) * (App.speedMultiplier || 1);
                   last = now;
@@ -747,12 +759,13 @@ const AIDriverStub = {
            * for the trace/logger so students can see what the screen would say.
            * @returns {null}
            */
-          $loc.show_display = new Sk.builtin.func(function (
+          const showDisplay = function (
             self,
             line1,
             line2,
             line3,
             line4,
+            force,
           ) {
             const toStr = (v) =>
               v === undefined || v instanceof Sk.builtin.none
@@ -770,7 +783,23 @@ const AIDriverStub = {
               params: { lines },
             });
             return Sk.builtin.none.none$;
-          });
+          };
+          showDisplay.co_varnames = [
+            "self",
+            "line1",
+            "line2",
+            "line3",
+            "line4",
+            "force",
+          ];
+          showDisplay.$defaults = [
+            new Sk.builtin.str(""),
+            new Sk.builtin.str(""),
+            new Sk.builtin.str(""),
+            new Sk.builtin.str(""),
+            Sk.builtin.bool.false$,
+          ];
+          $loc.show_display = new Sk.builtin.func(showDisplay);
 
           /**
            * Blank the (simulated) OLED. On hardware this also frees the shared
@@ -810,19 +839,17 @@ const AIDriverStub = {
               victims === undefined || victims instanceof Sk.builtin.none
                 ? 0
                 : Sk.ffi.remapToJs(victims);
-            let colorName = "none";
-            if (
-              typeof Simulator !== "undefined" &&
-              typeof App !== "undefined" &&
-              App.robot
-            ) {
-              colorName = Simulator.simulateColor(App.robot).name;
-            }
+            const colorName = Sk.ffi.remapToJs(
+              Sk.misceval.callsimArray(
+                self.tp$getattr(new Sk.builtin.str("classify_color")),
+                [],
+              ),
+            );
             const lines = [
-              "State:" + String(stateStr).slice(0, 9),
-              "F:OK S:OK",
-              "Score:" + Math.trunc(scoreVal),
-              "V:" + Math.trunc(victimVal) + " C:" + colorName,
+              String(stateStr).slice(0, 8),
+              "FOK SOK",
+              "S:" + Math.trunc(scoreVal),
+              "V:" + Math.trunc(victimVal) + " " + colorName.slice(0, 3),
             ];
             self.displayLines = lines;
             AIDriverStub.queueCommand({

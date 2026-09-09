@@ -440,7 +440,6 @@
     <script>
       // Docs base URL — relative so it works regardless of repo owner
       const DOCS_BASE = "docs/";
-      const DOCS_IMAGES_BASE = "docs/images/";
 
       // Configure marked
       marked.setOptions({
@@ -456,11 +455,34 @@
       }
 
       // Fix image URLs in markdown to use relative docs path
-      function fixImageUrls(html) {
-        // Replace relative image paths with docs images path
-        return html
-          .replace(/src="images\//g, `src="${DOCS_IMAGES_BASE}`)
-          .replace(/src="\.\/images\//g, `src="${DOCS_IMAGES_BASE}`);
+      function fixDocumentUrls(html, documentUrl, docsRoot) {
+        const parsed = new DOMParser().parseFromString(html, "text/html");
+        parsed.querySelectorAll("a[href], img[src]").forEach((element) => {
+          const attribute = element.tagName === "A" ? "href" : "src";
+          const reference = element.getAttribute(attribute);
+          if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(reference)) return;
+          let target = reference.startsWith("docs.html")
+            ? new URL(reference, window.location.href)
+            : reference.startsWith("../app/")
+              ? new URL(reference.slice(7), window.location.href)
+              : new URL(reference, documentUrl);
+          if (
+            attribute === "href" &&
+            target.origin === docsRoot.origin &&
+            target.pathname.startsWith(docsRoot.pathname) &&
+            target.pathname.endsWith(".md")
+          ) {
+            const nextDocument = decodeURIComponent(
+              target.pathname.slice(docsRoot.pathname.length, -3),
+            );
+            const viewer = new URL("docs.html", window.location.href);
+            viewer.searchParams.set("doc", nextDocument);
+            viewer.hash = target.hash;
+            target = viewer;
+          }
+          element.setAttribute(attribute, target.href);
+        });
+        return parsed.body.innerHTML;
       }
 
       // Convert GitHub-style alerts to the same HTML structure GitHub renders
@@ -522,8 +544,15 @@
         errorDiv.style.display = "none";
 
         try {
-          const url = `${DOCS_BASE}${docName}.md`;
-          const response = await fetch(url);
+          let response;
+          let documentUrl;
+          let docsRoot;
+          for (const base of [DOCS_BASE, "../" + DOCS_BASE]) {
+            docsRoot = new URL(base, window.location.href);
+            documentUrl = new URL(`${docName}.md`, docsRoot);
+            response = await fetch(documentUrl.href);
+            if (response.status !== 404) break;
+          }
 
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -535,7 +564,7 @@
           let html = marked.parse(markdown);
 
           // Fix image URLs
-          html = fixImageUrls(html);
+          html = fixDocumentUrls(html, documentUrl, docsRoot);
 
           // Convert GitHub-style alerts
           html = transformMarkdownAlerts(html);
