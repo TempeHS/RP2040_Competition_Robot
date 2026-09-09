@@ -1,6 +1,6 @@
 # Building Custom MicroPython Firmware for Raspberry Pi Pico
 
-This guide explains how to build MicroPython firmware for the Raspberry Pi Pico with your custom AIDriver libraries integrated. Libraries are frozen for fast loading, while `main.py` and `config.py` remain on the filesystem for IDE editing. Students retain their tuning and replace main when changing challenges; see the [shared workflow](Shared_Config_Workflow.md).
+This guide explains how to build MicroPython firmware for the Raspberry Pi Pico with your custom AIDriver libraries integrated. Libraries are frozen for fast loading, while `main.py` and `config.py` remain on the filesystem for IDE editing. Students retain their tuning and replace main when changing challenges; see the [shared configuration instructions](../app/README.md#shared-configuration).
 
 ---
 
@@ -75,7 +75,7 @@ The previous file is backed up as `config.py.bak`, then `config.py.bak.1`, and s
 
 **Console output during recovery:**
 
-```
+```text
 Restored main.py; config.py preserved
 ```
 
@@ -121,10 +121,12 @@ Just copies modules without building firmware. Useful for testing module syntax.
 1. **Connect your Raspberry Pi Pico** to your computer while holding the **BOOTSEL** button
 2. **Pico mounts as USB drive** (RPI-RP2)
 3. **Copy firmware file:**
+
    ```bash
    # From: /workspaces/RP2040_Competition_Robot/_Firmware/THS_Comp_RP2040.uf2
    # To: RPI-RP2 USB drive
    ```
+
 4. **Pico reboots automatically** and runs your integrated code
 
 ### **What Happens After Flashing:**
@@ -281,4 +283,4 @@ If you need help:
 
 ---
 
-**Happy Building! 🚀**
+Happy Building! 🚀

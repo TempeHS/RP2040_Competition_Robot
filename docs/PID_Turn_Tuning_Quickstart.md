@@ -5,7 +5,7 @@ corridor. The turn is **closed-loop**: your `gyro_turn_pid()` loop reads the rob
 rate from the onboard LSM6DS3 gyroscope and stops itself at the target angle. There is no turn-time
 to guess.
 
-You write and tune this turn in [Challenge 4](docs.html?doc=Challenge_4); every later challenge
+You write and tune this turn in [Challenge 4](Challenge_4.md); every later challenge
 reuses the **same** gains.
 
 ---
@@ -51,7 +51,7 @@ Three plain variables at the top of your challenge code. Start in the middle of 
 > The turn **mechanics** are fixed for you, not tuned: `TURN_ANGLE = 90`, the step time `TURN_DT`,
 > the speed clamps (`TURN_MAX_SPEED`, `MIN_TURN_SPEED`), `TURN_COAST_TIME`, the `NUDGE_*` pulse
 > settings, and `TURN_TIMEOUT_MS`. They are physics of this chassis, so leave them alone.
-
+>
 > The loop can't drive the wheels below `MIN_TURN_SPEED`, which is why the last few degrees are
 > closed with pulses instead of by slowing down. Don't set `turn_tolerance` below ~`1.5`.
 

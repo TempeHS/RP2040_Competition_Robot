@@ -11,7 +11,7 @@ Extend Challenge 1 by adding derivative damping so the robot settles faster and 
 3. **New Main Behaviour:** Add per-loop error-change damping. I remains inactive.
 4. **Replace Main:** Use the [Challenge 2 main](../app/starter-code/challenge-2.py) as `main.py`. Keep config without copying values.
 
-Read the [shared workflow](Shared_Config_Workflow.md). Settings live in config; previous error remains in main and resets for a new run.
+Read the [shared configuration instructions](../app/README.md#shared-configuration). Settings live in config; previous error remains in main and resets for a new run.
 
 ## Success Criteria
 

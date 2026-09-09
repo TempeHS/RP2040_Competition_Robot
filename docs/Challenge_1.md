@@ -11,7 +11,7 @@ Build a clean baseline wall follower using only the side sensor and a proportion
 3. **New Main Behaviour:** Proportional side-distance steering only. D and I remain inactive.
 4. **Replace Main:** Use the [Challenge 1 main](../app/starter-code/challenge-1.py) as `main.py`. Keep config and tune there, not in main.
 
-Read the [shared workflow](Shared_Config_Workflow.md) for saving, transfer and recovery. Runtime state belongs in main; table setting names below refer to config.
+Read the [shared configuration instructions](../app/README.md#shared-configuration) for saving and transfer, and the [firmware guide](Build_Custom_MicroPython_Firmware.md) for recovery. Runtime state belongs in main; table setting names below refer to config.
 
 ## Success Criteria
 
@@ -108,7 +108,7 @@ These are suggested starting values to enter and tune, not prefilled settings.
 ## Tuning Guide
 
 1. Verify `BASE_SPEED` and `MAX_STEERING` so `BASE_SPEED - MAX_STEERING` stays above motor deadband.
-2. Set `TARGET_WALL_DISTANCE` from your side sensor's reading at the desired physical clearance. A setting of 50 does not guarantee a 50 mm gap; follow the [per-robot distance check](Shared_Config_Workflow.md#set-distances-on-your-robot).
+2. Set `TARGET_WALL_DISTANCE` from your side sensor's reading at the desired physical clearance. A setting of 50 does not guarantee a 50 mm gap; follow the [per-robot distance check](../app/README.md#physical-distance-settings).
 3. Adjust `side_Kp` until drift is controlled, then reduce slightly if oscillation starts.
 
 ## Debug Checklist

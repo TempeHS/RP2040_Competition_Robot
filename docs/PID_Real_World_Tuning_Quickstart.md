@@ -1,6 +1,6 @@
 # Real-World Side-Wall PID Tuning Quickstart (On-Robot)
 
-Use this checklist to tune the **side-wall PID** on the real robot. The variables match the [Challenge starter code](docs.html?doc=Challenge_3) (`side_` prefix everywhere) so values you find here paste straight into Challenges 1–7.
+Use this checklist to tune the **side-wall PID** on the real robot. The variables match the [Challenge starter code](Challenge_3.md) (`side_` prefix everywhere) so values you find here paste straight into Challenges 1–7.
 
 > [!Tip]
 > Tune in the simulator first to learn the workflow, then re-tune on the real robot. Real motors and sensors behave differently — expect smaller `side_Kp` and `side_Ki` values on hardware than in the simulator.
@@ -95,7 +95,7 @@ Typical final `side_Ki`: **0.001 – 0.015**. Simulator-tuned answer key: `0.001
 
 Aim for an I-term contribution of about **5–16 steering units** at the clamp:
 
-```
+```python
 I_term_max = side_Ki * side_INTEGRAL_MAX
 ```
 
@@ -129,7 +129,7 @@ Tune against a single outside corner — the **Challenge 5 maze** is purpose-bui
 | Robot drifts past the new wall before re-locking            | `-0.05` to `NIB_FORWARD_AFTER`                                                                |
 | Robot spins at random mid-corridor                          | `NIB_LOST_DISTANCE` is too low for your `TARGET_WALL_DISTANCE` — keep it at the pre-set `400` |
 
-> `NIB_LOST_DISTANCE` (400 mm) and `NIB_CONFIRM_TIME` (0.5 s) are pre-set because they depend on the maze, not your driving. Leave them unless a real maze has unusually wide corridors. See [Challenge 5](docs.html?doc=Challenge_5).
+> `NIB_LOST_DISTANCE` (400 mm) and `NIB_CONFIRM_TIME` (0.5 s) are pre-set because they depend on the maze, not your driving. Leave them unless a real maze has unusually wide corridors. See [Challenge 5](Challenge_5.md).
 
 Typical final wrap times on the real robot: `NIB_FORWARD_BEFORE` **0.25 – 0.40 s**, `NIB_FORWARD_AFTER` **0.35 – 0.55 s**. Simulator-tuned answer key: `0.30` and `0.45`.
 

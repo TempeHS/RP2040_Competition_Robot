@@ -11,7 +11,7 @@ Extend the state machine to handle outside corners where the side wall disappear
 3. **New Main Behaviour:** Debounce wall loss, turn toward the followed wall and search for the new wall.
 4. **Replace Main:** Use the [Challenge 5 main](../app/starter-code/challenge-5.py) as `main.py`. No tuning values need copying.
 
-Read the [shared workflow](Shared_Config_Workflow.md). `nib_lost_time` and PID history stay in main. Debounce uses `config.LOOP_DT`.
+Read the [shared configuration instructions](../app/README.md#shared-configuration). `nib_lost_time` and PID history stay in main. Debounce uses `config.LOOP_DT`.
 
 ## Success Criteria
 

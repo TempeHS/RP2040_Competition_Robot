@@ -19,8 +19,6 @@
 
 **Slide the omni wheel onto the middle of the axel.**
 
-![Animation of omni wheel sliding onto the axel](images/attach_motors.gif "Animation of omni wheel sliding onto the axel")
-
 **Assemble the main chassis.**
 
 ![Step 2 Visual](images/step_2.png "Step 2 Visual")
@@ -34,8 +32,6 @@
 ## Step 4
 
 **First insert the two motors into the 3D motor clip.**
-
-![Animation of the motors being attached](images/attach_motors.gif "Animation of the motors being attached")
 
 **Second attach the motor clip to the chassis.**
 
@@ -66,10 +62,10 @@
 3. Sign in with Google (use your @education.nsw.gov.au account).
 4. Follow these instructions to connect:
 
-![Animated connection instructions](images/instructions.gif "Animated connection instructions")
+   ![Animated connection instructions](images/instructions.gif "Animated connection instructions")
 
 5. Copy and paste this code into `main.py`
-6. Click <kbd>SAVE</KDB>
+6. Click <kbd>SAVE</kbd>
 7. Disconnect your robot from your computer
 
 > [!Caution]

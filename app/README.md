@@ -56,8 +56,20 @@ configuration checker. The checked-in UF2 may predate that helper.
 confirmation and restores the zeroed template. Existing saved mains are preserved and are not automatically
 rewritten; reset a main explicitly to load its new template.
 
-See the [shared workflow](../docs/Shared_Config_Workflow.md) for section meanings,
-import/export, validation, timing conventions and recovery.
+See the [config source](../project/config.py) for section meanings and the
+[firmware guide](../docs/Build_Custom_MicroPython_Firmware.md) for recovery.
+
+### Physical Distance Settings
+
+Distance targets use the sensor's reported reading, not a ruler measurement.
+A setting of `50` does not guarantee a physical gap of 50 mm. With the motors
+stopped, compare front and side readings with measured clearances separately;
+different sensors can have different offsets or scales. Set `TARGET_WALL_DISTANCE`
+from the side reading at the desired clearance. Set `FRONT_SLOW_DISTANCE` and
+`FRONT_STOP_DISTANCE` from the front readings at the desired slowdown and safe
+turning positions, allowing space for the chassis and stopping motion. Retest
+at a controlled speed after changing robots or sensors. Do not use `-1` as a
+target. The sensor readings and type-only config validation remain unchanged.
 
 ## AIDriver API (Simulated)
 
@@ -126,7 +138,7 @@ sources and guides requires HTTP; opening an HTML file directly is insufficient.
 python -m http.server 8000
 ```
 
-Then open http://localhost:8000/app/simulator.html?challenge=1.
+Then open <http://localhost:8000/app/simulator.html?challenge=1>.
 
 For host and simulator checks:
 
@@ -187,7 +199,7 @@ from the repository root. Serve the resulting directory over HTTP.
 
 ## File Structure
 
-```
+```text
 app/
 ├── index.html          # Main HTML page
 ├── simulator.html      # Main editor and simulator

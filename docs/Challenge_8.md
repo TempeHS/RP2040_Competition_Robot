@@ -11,7 +11,7 @@ Introduce color-marker handling so the robot reacts to red and green markers and
 3. **New Main Behaviour:** Drive the marker corridor, pause on new red/green markers and distinguish silver start from finish.
 4. **Replace Main:** Use the [Challenge 8 main](../app/starter-code/challenge-8.py) as `main.py`. Keep config; do not replace it with colour-only settings.
 
-Read the [shared workflow](Shared_Config_Workflow.md). Marker history and the started flag stay in main. This main does not include the full maze controller.
+Read the [shared configuration instructions](../app/README.md#shared-configuration). Marker history and the started flag stay in main. This main does not include the full maze controller.
 
 ## Success Criteria
 
@@ -105,7 +105,7 @@ Colour settings must come from the fitted sensor at its working height and light
 
 ## Tuning Guide
 
-1. Record raw floor and marker counts using the `sensors` check in the [real-world worksheet](Real_World_Check_Worksheet.md). Keep sensor height and lighting consistent.
+1. Record raw floor and marker counts using the `sensors` check in the [real-world diagnostic](../project/real_world_check.py). Keep sensor height and lighting consistent.
 2. Keep `color_min_clear` below the dimmest red/green marker, with some margin. Do not assume markers are brighter than the normal floor: the recorded white floor was much brighter than both.
 3. Calculate red and green fractions using `R+G+B`, not the clear channel. Choose each threshold above the other surfaces' fractions and below its target marker's fraction. Lowering a ratio makes that colour easier to detect and can increase false positives.
 4. Set `color_silver_clear` above the brightest normal-floor reading and below the dimmest silver reading. Check ratios as well, because silver must not classify as red or green. If the readings overlap, improve lighting or sensor placement and measure again.

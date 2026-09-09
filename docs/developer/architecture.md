@@ -4,7 +4,7 @@
 
 The simulator lives entirely in the `app/` directory. Static assets load directly in the browser, so there is no runtime bundling step.
 
-```
+```text
 app/
   index.html          # Entry point that bootstraps modules from /js
   js/                 # Main simulator modules

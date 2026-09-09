@@ -1,6 +1,6 @@
 # Real-World Front-Sensor P-Controller Tuning Quickstart (On-Robot)
 
-Use this checklist to tune the **front-sensor P-controlled deceleration** that triggers a corner or dead-end turn. Variables match the canonical `FRONT_CONFIG` block in [Challenges 4–6](docs.html?doc=Challenge_4).
+Use this checklist to tune the **front-sensor P-controlled deceleration** that triggers a corner or dead-end turn. Variables match the canonical `FRONT_CONFIG` block in [Challenges 4–6](Challenge_4.md).
 
 > [!Note]
 > The front controller is **P-only** (not full PID). The robot needs a **smooth, predictable stop** at a fixed distance — not a tracking loop — so a single proportional gain on `(front − FRONT_STOP_DISTANCE)` is enough.
@@ -114,4 +114,4 @@ FRONT_STOP_DISTANCE = 150   # mm — stop and turn
 FRONT_Kp            = 1.0   # deceleration gain
 ```
 
-When this is solid, move on to the [Turn Tuning Quickstart](docs.html?doc=PID_Turn_Tuning_Quickstart) to dial in the gyro turn gains (`turn_Kp`, `turn_Kd`) used by the `TURN` and `NIB_WALL` states.
+When this is solid, move on to the [Turn Tuning Quickstart](PID_Turn_Tuning_Quickstart.md) to dial in the gyro turn gains (`turn_Kp`, `turn_Kd`) used by the `TURN` and `NIB_WALL` states.

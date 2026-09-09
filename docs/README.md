@@ -4,8 +4,8 @@ This project is a low-cost differential-drive robot platform built for students 
 
 ## Quick Links
 
-- Web Simulator: https://tempehs.github.io/AIDriver_MicroPython_Challanges/
-- MicroPython Lab: https://lab-micropython.arduino.cc/
+- Web Simulator: <https://tempehs.github.io/AIDriver_MicroPython_Challanges/>
+- MicroPython Lab: <https://lab-micropython.arduino.cc/>
 
 ## Build the Robot
 
@@ -163,7 +163,7 @@ Full guide: [Build_Custom_MicroPython_Firmware.md](Build_Custom_MicroPython_Firm
 
 ## Challenges
 
-Students complete stages in order, keeping one purpose-organised config and replacing only main. Algorithms remain visible and editable; there is no need to copy tuning between programs. Start with the [Shared Config Workflow](Shared_Config_Workflow.md).
+Students complete stages in order, keeping one purpose-organised config and replacing only main. Algorithms remain visible and editable; there is no need to copy tuning between programs. Start with the [shared configuration instructions](../app/README.md#shared-configuration).
 
 Stage 1: PID wall following
 
@@ -185,7 +185,7 @@ Stage 3: Rescue sensors and competition behavior
 3. [Challenge_10.md](Challenge_10.md) - Competition run, victims, score, OLED
 
 Use the web simulator to test before uploading to hardware:
-https://tempehs.github.io/AIDriver_MicroPython_Challanges/
+<https://tempehs.github.io/AIDriver_MicroPython_Challanges/>
 
 ## Competition
 

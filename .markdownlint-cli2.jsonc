@@ -1,0 +1,16 @@
+{
+  "globs": ["**/*.{md,MD}"],
+  "ignores": [
+    "micropython/**",
+    "**/node_modules/**",
+    ".venv/**",
+    "**/.pytest_cache/**",
+    "build/**",
+    "_site/**",
+  ],
+  "config": {
+    "MD013": false,
+    "MD033": { "allowed_elements": ["kbd"] },
+    "MD060": { "style": "aligned" },
+  },
+}

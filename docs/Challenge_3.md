@@ -11,7 +11,7 @@ Complete the wall-follow controller by adding the integral term so small persist
 3. **New Main Behaviour:** Accumulate bounded integral error and clear it when the wall is lost.
 4. **Replace Main:** Use the [Challenge 3 main](../app/starter-code/challenge-3.py) as `main.py`. Config stays unchanged until you tune it.
 
-Read the [shared workflow](Shared_Config_Workflow.md). Integral and derivative history remain in main, not in saved config.
+Read the [shared configuration instructions](../app/README.md#shared-configuration). Integral and derivative history remain in main, not in saved config.
 
 ## Success Criteria
 

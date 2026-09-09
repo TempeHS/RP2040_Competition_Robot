@@ -262,7 +262,7 @@ Python cannot find the `aidriver` library file.
 
 Upload and run the steering direction test from your Pico:
 
-```
+```text
 tests/test_pid_steer_direction.py
 ```
 
@@ -303,7 +303,7 @@ The raw HC-SR04 ultrasonic sensor can jump ±20–50 mm between readings even wh
 
 Upload and run the sensor noise diagnostic from your Pico:
 
-```
+```text
 tests/test_pid_sensor_noise.py
 ```
 

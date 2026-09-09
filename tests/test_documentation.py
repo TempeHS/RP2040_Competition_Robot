@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+from urllib.parse import unquote, urlsplit
 
 import pytest
 
@@ -18,21 +19,25 @@ def test_each_guide_has_a_two_file_transition(number):
         assert f"**{label}:**" in source
     assert "../project/config.py" in source
     assert f"../app/starter-code/challenge-{number}.py" in source
-    assert "Shared_Config_Workflow.md" in source
+    assert "../app/README.md#shared-configuration" in source
     assert "Do not edit unless instructed:" not in source
 
 
-def test_shared_workflow_links_and_fences_are_valid():
-    path = ROOT / "docs/Shared_Config_Workflow.md"
+def test_shared_configuration_links_and_fences_are_valid():
+    path = ROOT / "app/README.md"
     source = path.read_text(encoding="utf-8")
+    assert "## Shared Configuration" in source
+    assert "### Physical Distance Settings" in source
     assert source.count("```") % 2 == 0
     for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", source):
-        assert (path.parent / target).resolve().is_file(), target
+        parsed = urlsplit(target)
+        if not parsed.scheme and not parsed.netloc and parsed.path:
+            assert (path.parent / unquote(parsed.path)).resolve().is_file(), target
 
 
 def test_simulator_readme_describes_shared_config_and_http_serving():
     source = (ROOT / "app/README.md").read_text(encoding="utf-8")
-    assert "Shared_Config_Workflow.md" in source
+    assert "../docs/Build_Custom_MicroPython_Firmware.md" in source
     assert "http://localhost:8000/app/simulator.html?challenge=1" in source
     assert "No server required" not in source
     assert "project/hardware_test.py" in source
@@ -51,11 +56,8 @@ def test_browser_check_is_documented_as_optional_and_repeatable():
     assert "playwright" not in (ROOT / "requirements.txt").read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize(
-    "filename", ["app/README.md", "docs/Shared_Config_Workflow.md"]
-)
-def test_config_guides_describe_tabs_zero_defaults_and_test_settings(filename):
-    source = (ROOT / filename).read_text(encoding="utf-8")
+def test_config_guide_describes_tabs_zero_defaults_and_test_settings():
+    source = (ROOT / "app/README.md").read_text(encoding="utf-8")
     assert "**main.py**" in source and "**config.py**" in source
     assert "Validate config.py" in source
     assert "Numeric settings start at zero" in source
@@ -75,5 +77,5 @@ def test_hardware_guides_describe_two_file_recovery(filename):
     source = (ROOT / "docs" / filename).read_text(encoding="utf-8")
     assert "config.py" in source
     assert "robot_recovery.restore_config()" in source
-    assert "Shared_Config_Workflow.md" in source
+    assert "../app/README.md#shared-configuration" in source
     assert "AI_Driver_RP2040.uf2" not in source
