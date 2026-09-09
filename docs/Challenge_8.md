@@ -93,20 +93,49 @@ Optional debug edits:
 
 ## Tunables
 
-| Name                 | Unit         | Purpose                        | Typical start value | Symptoms when too low             | Symptoms when too high |
-| -------------------- | ------------ | ------------------------------ | ------------------- | --------------------------------- | ---------------------- |
-| `color_min_clear`    | clear counts | Separate floor from marker     | 180                 | False marker detection            | Missed markers         |
-| `color_red_ratio`    | fraction     | Red classification threshold   | 0.55                | Red misread as none/green         | Red rarely detected    |
-| `color_green_ratio`  | fraction     | Green classification threshold | 0.55                | Green misread as none/red         | Green rarely detected  |
-| `color_silver_clear` | clear counts | Silver brightness threshold    | 500                 | Silver confused with color marker | Silver never detected  |
-| `COLOR_PAUSE_TIME`   | s            | Pause duration at marker       | 1.0                 | Pause too short                   | Slow run               |
+Colour settings must come from the fitted sensor at its working height and lighting. The student template remains zeroed; the example below is not a universal preset.
+
+| Name                 | Unit         | Purpose                           | Starting point                        | Symptoms when too low              | Symptoms when too high   |
+| -------------------- | ------------ | --------------------------------- | ------------------------------------- | ---------------------------------- | ------------------------ |
+| `color_min_clear`    | clear counts | Reject very low-light readings    | Below dimmest red/green sample        | Low-light noise reaches classifier | Missed red/green markers |
+| `color_red_ratio`    | fraction     | Red classification threshold      | Measure R/(R+G+B)                     | Other surfaces called red          | Red rarely detected      |
+| `color_green_ratio`  | fraction     | Green classification threshold    | Measure G/(R+G+B)                     | Other surfaces called green        | Green rarely detected    |
+| `color_silver_clear` | clear counts | Separate silver from normal floor | Between floor and silver clear counts | Floor called silver; early finish  | Silver never detected    |
+| `COLOR_PAUSE_TIME`   | s            | Pause duration at marker          | 1.0                                   | Pause too short                    | Slow run                 |
 
 ## Tuning Guide
 
-1. Verify raw floor and marker counts first.
-2. Adjust `color_min_clear` above floor.
-3. Adjust color ratios to separate red and green confidently.
-4. Adjust the silver threshold high enough to avoid false finish.
+1. Record raw floor and marker counts using the `sensors` check in the [real-world worksheet](Real_World_Check_Worksheet.md). Keep sensor height and lighting consistent.
+2. Keep `color_min_clear` below the dimmest red/green marker, with some margin. Do not assume markers are brighter than the normal floor: the recorded white floor was much brighter than both.
+3. Calculate red and green fractions using `R+G+B`, not the clear channel. Choose each threshold above the other surfaces' fractions and below its target marker's fraction. Lowering a ratio makes that colour easier to detect and can increase false positives.
+4. Set `color_silver_clear` above the brightest normal-floor reading and below the dimmest silver reading. Check ratios as well, because silver must not classify as red or green. If the readings overlap, improve lighting or sensor placement and measure again.
+5. For black-zone detection in Challenge 9, set `color_black_clear` above black and below all non-black surfaces. Zero disables black classification. Keep this value in the same shared config.
+
+### Recorded Hardware Example
+
+The worksheet's recorded samples give these fractions, rounded to three decimal places:
+
+| Surface     | Clear | Red / (R+G+B) | Green / (R+G+B) |
+| ----------- | ----- | ------------- | --------------- |
+| White floor | 3491  | 0.180         | 0.314           |
+| Black       | 191   | 0.256         | 0.296           |
+| Red         | 730   | 0.489         | 0.217           |
+| Green       | 981   | 0.167         | 0.392           |
+| Silver      | 4070  | 0.198         | 0.309           |
+
+These provisional entries separate the five recorded samples with the existing classifier. Update only the corresponding Colour Detection entries in your own shared config after checking your measurements; do not replace the rest of the file.
+
+```python
+color_min_clear = 300
+color_red_ratio = 0.40
+color_green_ratio = 0.35
+color_silver_clear = 3800
+color_black_clear = 300
+```
+
+White then classifies as `none`, followed by `black`, `red`, `green` and `silver` for the other samples. The old 0.55 ratios miss these red/green samples, and a silver threshold of 500 admits this white floor. Raising the low-light gate above the white floor's 3491 would also reject red (730) and green (981).
+
+Only one sample per surface is recorded, so these are starting points, not a completed calibration. Repeat readings on each robot and under its working lighting, especially across white/silver and white/green boundaries. This checks classification, not the interrupt, marker timing or victim-counting behaviour during a moving run.
 
 ## Debug Checklist
 
@@ -117,12 +146,12 @@ Optional debug edits:
 
 ## Common Failure Modes
 
-| Symptom             | Root cause                  | Verification step                     | Fix                         |
-| ------------------- | --------------------------- | ------------------------------------- | --------------------------- |
-| Pauses on floor     | `color_min_clear` too low   | Print clear channel on floor          | Raise threshold             |
-| Misses red/green    | Ratio thresholds too strict | Compare marker channel fractions      | Lower target ratio slightly |
-| Finishes too early  | Silver threshold too low    | Log clear value where finish triggers | Raise `color_silver_clear`  |
-| Double-count marker | No marker edge guard        | Log previous vs current marker        | Add new-marker check        |
+| Symptom             | Root cause                  | Verification step                          | Fix                                                   |
+| ------------------- | --------------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| Pauses on floor     | Red/green ratio too low     | Compare floor and marker channel fractions | Raise the relevant ratio without excluding its marker |
+| Misses red/green    | Ratio thresholds too strict | Compare marker channel fractions           | Lower target ratio slightly                           |
+| Finishes too early  | Silver threshold too low    | Log clear value where finish triggers      | Raise `color_silver_clear`                            |
+| Double-count marker | No marker edge guard        | Log previous vs current marker             | Add new-marker check                                  |
 
 ## Exit Check
 

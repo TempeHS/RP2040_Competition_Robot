@@ -12,7 +12,9 @@ LOOP_DT = 0.0  # Normal loop pause, seconds; suggested start 0.02-0.05.
 STARTUP_PAUSE_TIME = 0.0  # Hardware main's startup display pause, seconds; try 1-2.
 
 # Wall PID
-TARGET_WALL_DISTANCE = 0  # Side clearance, mm; suggested start 80-120.
+TARGET_WALL_DISTANCE = (
+    0  # Side sensor target, nominal mm; measure your desired clearance.
+)
 MAX_STEERING = 0  # Maximum correction, PWM; suggested start 40-80.
 side_Kp = 0.0  # PWM per mm of error; suggested start 0.2-0.8.
 side_Kd = 0.0  # Gain on error change per loop; suggested start 0.1-0.5 in C2.
@@ -20,8 +22,10 @@ side_Ki = 0.0  # Gain on accumulated error; suggested start 0.0005-0.005 in C3.
 side_INTEGRAL_MAX = 0  # Accumulated mm of error; suggested start 50-200.
 
 # Front Distance Control
-FRONT_SLOW_DISTANCE = 0  # Slowdown distance, mm; suggested start 250-350.
-FRONT_STOP_DISTANCE = 0  # Turn distance, mm; suggested start 120-180, below SLOW.
+FRONT_SLOW_DISTANCE = (
+    0  # Front reading at desired slowdown point; calibrate on your robot.
+)
+FRONT_STOP_DISTANCE = 0  # Front reading at safe turn clearance; calibrate below SLOW.
 FRONT_Kp = 0.0  # PWM per mm remaining; suggested start 0.5-1.5.
 MIN_APPROACH_SPEED = 0  # Minimum approach PWM; suggested start 120-150, <= BASE_SPEED.
 
@@ -65,11 +69,15 @@ NIB_PAUSE_TIME = 0.0  # Stationary pause before wrapping, seconds; try 0.1-0.3.
 NIB_REACQUIRE_MS = 0  # Maximum wall search, ms; suggested start 1000-2000.
 
 # Colour Detection
-color_min_clear = 0  # Bright-marker clear counts; suggested start 150-200.
-color_red_ratio = 0.0  # Red fraction of R+G+B; suggested start 0.5-0.6.
-color_green_ratio = 0.0  # Green fraction of R+G+B; suggested start 0.5-0.6.
-color_silver_clear = 0  # Silver clear counts; suggested start 450-550.
-color_black_clear = 0  # Black clear counts; try 40-80, zero disables detection.
+color_min_clear = (
+    0  # Low-light rejection; keep below the dimmest red/green clear count.
+)
+color_red_ratio = 0.0  # R/(R+G+B); separate measured red from the other surfaces.
+color_green_ratio = 0.0  # G/(R+G+B); separate measured green from the other surfaces.
+color_silver_clear = 0  # Clear threshold above normal floor and below silver.
+color_black_clear = (
+    0  # Clear threshold above black and below other surfaces; 0 disables.
+)
 COLOR_PAUSE_TIME = 0.0  # Red/green marker pause, seconds; suggested start 1-2.
 
 # Heading Hold

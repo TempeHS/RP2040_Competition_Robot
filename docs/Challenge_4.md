@@ -131,7 +131,7 @@ Start in the middle of each range and move one gain at a time.
 
 ## Tuning Guide
 
-1. Verify front approach behavior so corner entry is controlled.
+1. Measure your front sensor at the desired slowdown and safe turn clearances before setting `FRONT_SLOW_DISTANCE` and `FRONT_STOP_DISTANCE`. Do not reuse the side sensor's offset; follow the [per-robot distance check](Shared_Config_Workflow.md#set-distances-on-your-robot), then verify controlled corner entry.
 2. Adjust turn gains for reliable 90 deg behavior.
 3. Verify side PID after turn because corner exit speed affects reacquisition.
 

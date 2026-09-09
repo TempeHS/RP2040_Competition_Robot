@@ -105,13 +105,15 @@ Optional debug edits:
 
 ## Tunables
 
-| Name                 | Unit         | Purpose                     | Typical start value | Symptoms when too low | Symptoms when too high    |
-| -------------------- | ------------ | --------------------------- | ------------------- | --------------------- | ------------------------- |
-| `color_min_clear`    | clear counts | Marker gate threshold       | 180                 | False markers         | Missed markers            |
-| `color_red_ratio`    | fraction     | Red victim classification   | 0.55                | Red misses            | Red over-classification   |
-| `color_green_ratio`  | fraction     | Green victim classification | 0.55                | Green misses          | Green over-classification |
-| `color_silver_clear` | clear counts | Finish marker detection     | 500                 | Early finish          | Missed finish             |
-| `VICTIM_PAUSE_TIME`  | s            | Pause on victim marker      | 1.0                 | Insufficient pause    | Slow run                  |
+Carry forward your measured [Challenge 8 colour settings](Challenge_8.md#tuning-guide) in the same config. Do not replace them with generic ratios or brightness counts when loading this main.
+
+| Name                 | Unit         | Purpose                     | Starting point          | Symptoms when too low             | Symptoms when too high |
+| -------------------- | ------------ | --------------------------- | ----------------------- | --------------------------------- | ---------------------- |
+| `color_min_clear`    | clear counts | Reject very low light       | Retain measured setting | Low-light noise admitted          | Missed markers         |
+| `color_red_ratio`    | fraction     | Red victim classification   | Retain measured setting | Other surfaces called red         | Red victims missed     |
+| `color_green_ratio`  | fraction     | Green victim classification | Retain measured setting | Other surfaces called green       | Green victims missed   |
+| `color_silver_clear` | clear counts | Finish marker detection     | Retain measured setting | Floor called silver; early finish | Missed finish          |
+| `VICTIM_PAUSE_TIME`  | s            | Pause on victim marker      | 1.0                     | Insufficient pause                | Slow run               |
 
 ## Tuning Guide
 

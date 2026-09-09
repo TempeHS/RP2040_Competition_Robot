@@ -1106,13 +1106,15 @@ class AIDriver:
         """Return the bias-corrected gyro Z yaw rate in deg/s.
 
         Mirrors the simulator API so the same learner code runs on both. A
-        positive value is a clockwise/right rotation. Returns 0.0 when no gyro
-        is available rather than raising, so polling code degrades gracefully.
+        positive value is a clockwise/right rotation. The fitted LSM6DS3 reports
+        counter-clockwise-positive Z, so reverse its sign after bias correction.
+        Returns 0.0 when no gyro is available rather than raising, so polling
+        code degrades gracefully.
         """
         if not self.has_gyro:
             return 0.0
         try:
-            return self.imu.read_gyro_z_dps() - self._gyro_bias_dps
+            return -(self.imu.read_gyro_z_dps() - self._gyro_bias_dps)
         except Exception:
             return 0.0
 

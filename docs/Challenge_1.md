@@ -108,7 +108,7 @@ These are suggested starting values to enter and tune, not prefilled settings.
 ## Tuning Guide
 
 1. Verify `BASE_SPEED` and `MAX_STEERING` so `BASE_SPEED - MAX_STEERING` stays above motor deadband.
-2. Adjust `TARGET_WALL_DISTANCE` for safe clearance.
+2. Set `TARGET_WALL_DISTANCE` from your side sensor's reading at the desired physical clearance. A setting of 50 does not guarantee a 50 mm gap; follow the [per-robot distance check](Shared_Config_Workflow.md#set-distances-on-your-robot).
 3. Adjust `side_Kp` until drift is controlled, then reduce slightly if oscillation starts.
 
 ## Debug Checklist
