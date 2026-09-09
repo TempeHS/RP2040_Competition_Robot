@@ -289,44 +289,92 @@
         <div class="col-lg-7">
           <div class="card bg-dark border-secondary" id="editorCard">
             <div
-              class="card-header bg-secondary text-white d-flex justify-content-between align-items-center"
+              class="card-header bg-secondary text-white d-flex flex-wrap gap-2 justify-content-between align-items-center"
             >
-              <span><i class="bi bi-code-slash me-2"></i>main.py</span>
-              <div class="btn-group btn-group-sm">
-                <a
-                  class="btn btn-outline-light"
-                  href="config.html?challenge=1"
-                  id="configLink"
-                  ><i class="bi bi-sliders me-1"></i>Config</a
+              <span class="text-nowrap"
+                ><i class="bi bi-code-slash me-2"></i
+                ><span id="editorFilename">main.py</span></span
+              >
+              <div
+                id="editorTools"
+                class="d-flex align-items-center gap-2 ms-auto"
+              >
+                <div
+                  class="nav nav-tabs editor-tabs"
+                  role="tablist"
+                  aria-label="Python files"
                 >
-                <button
-                  class="btn btn-outline-light"
-                  id="btnDownloadMain"
-                  title="Download main.py"
-                  aria-label="Download main.py"
-                >
-                  <i class="bi bi-download"></i>
-                </button>
-                <button
-                  class="btn btn-outline-light"
-                  id="btnCopyCode"
-                  data-bs-toggle="tooltip"
-                  title="Copy code to clipboard"
-                >
-                  <i class="bi bi-clipboard"></i>
-                </button>
-                <button
-                  class="btn btn-outline-light"
-                  id="btnResetCode"
-                  data-bs-toggle="tooltip"
-                  title="Reset to starter code"
-                >
-                  <i class="bi bi-arrow-counterclockwise"></i>
-                </button>
+                  <button
+                    class="nav-link active"
+                    id="mainTab"
+                    type="button"
+                    role="tab"
+                    data-editor-file="main.py"
+                    aria-selected="true"
+                    aria-controls="editor"
+                  >
+                    main.py
+                  </button>
+                  <button
+                    class="nav-link"
+                    id="configTab"
+                    type="button"
+                    role="tab"
+                    data-editor-file="config.py"
+                    aria-selected="false"
+                    aria-controls="editor"
+                    tabindex="-1"
+                  >
+                    config.py
+                  </button>
+                </div>
+                <div class="btn-group btn-group-sm">
+                  <button
+                    class="btn btn-outline-light"
+                    id="btnImportCode"
+                    title="Import main.py"
+                    aria-label="Import main.py"
+                  >
+                    <i class="bi bi-upload"></i>
+                  </button>
+                  <button
+                    class="btn btn-outline-light"
+                    id="btnDownloadMain"
+                    title="Download main.py"
+                    aria-label="Download main.py"
+                  >
+                    <i class="bi bi-download"></i>
+                  </button>
+                  <button
+                    class="btn btn-outline-light"
+                    id="btnCopyCode"
+                    title="Copy main.py"
+                    aria-label="Copy main.py"
+                  >
+                    <i class="bi bi-clipboard"></i>
+                  </button>
+                  <button
+                    class="btn btn-outline-light"
+                    id="btnResetCode"
+                    title="Reset main.py"
+                    aria-label="Reset main.py"
+                  >
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                </div>
               </div>
+              <input
+                id="editorFile"
+                type="file"
+                accept=".py,text/x-python,text/plain"
+                class="visually-hidden"
+                aria-label="Import Python file"
+              />
             </div>
             <div class="card-body p-0">
-              <div id="editor"># Loading editor...</div>
+              <div id="editor" role="tabpanel" aria-labelledby="mainTab">
+                # Loading editor...
+              </div>
             </div>
           </div>
 

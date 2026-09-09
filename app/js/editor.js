@@ -7,6 +7,11 @@ const STARTER_VERSION = "v4";
 
 const Editor = {
   instance: null,
+  mainSession: null,
+  configSession: null,
+  activeFile: "main.py",
+  requestedFile: "main.py",
+  configError: null,
   markers: [],
   executingLine: null,
   saveTimeout: null,
@@ -17,6 +22,11 @@ const Editor = {
    */
   init() {
     this.instance = ace.edit("editor");
+    this.mainSession = this.instance.session;
+    this.configSession = null;
+    this.activeFile = "main.py";
+    this.requestedFile = "main.py";
+    this.configError = null;
 
     // Configure theme and mode
     this.instance.setTheme("ace/theme/monokai");
@@ -39,7 +49,8 @@ const Editor = {
     // Set up auto-save and validation on change (debounced)
     this.instance.on("change", () => {
       this.debouncedSave();
-      this.debouncedValidate();
+      if (this.activeFile === "main.py") this.debouncedValidate();
+      else this.clearConfigError();
     });
 
     // Add custom key bindings
@@ -82,7 +93,135 @@ const Editor = {
    * @returns {string} Full editor contents.
    */
   getCode() {
+    return this.mainSession
+      ? this.mainSession.getValue()
+      : this.instance.getValue();
+  },
+
+  getActiveCode() {
     return this.instance.getValue();
+  },
+
+  getMainSession() {
+    return this.mainSession || this.instance.session;
+  },
+
+  switchFile(filename) {
+    const session =
+      filename === "main.py"
+        ? this.mainSession
+        : filename === "config.py"
+          ? this.configSession
+          : null;
+    if (!session) throw new Error("File is not loaded: " + filename);
+    this.flushSave();
+    this.activeFile = filename;
+    this.instance.setSession(session);
+    this.instance.focus();
+  },
+
+  async loadConfig() {
+    if (this.configSession) return;
+    await ConfigStore.init();
+    if (this.configSession) return;
+    this.configSession = ace.createEditSession(
+      ConfigStore.source,
+      "ace/mode/python",
+    );
+    this.configSession.setTabSize(4);
+    this.configSession.setUseSoftTabs(true);
+    this.configSession.setUseWrapMode(true);
+    if (this.configError) this.markConfigError(this.configError);
+  },
+
+  async showFile(filename, line = null) {
+    this.requestedFile = filename;
+    if (filename === "config.py") await this.loadConfig();
+    if (this.requestedFile !== filename) return;
+    this.switchFile(filename);
+    document.querySelectorAll("[data-editor-file]").forEach((tab) => {
+      const active = tab.dataset.editorFile === filename;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
+    document.getElementById("editorFilename").textContent = filename;
+    document
+      .getElementById("editor")
+      .setAttribute(
+        "aria-labelledby",
+        filename === "main.py" ? "mainTab" : "configTab",
+      );
+    for (const [id, command] of [
+      ["btnDownloadMain", "Download"],
+      ["btnCopyCode", "Copy"],
+      ["btnImportCode", "Import"],
+      ["btnResetCode", "Reset"],
+    ]) {
+      const button = document.getElementById(id);
+      button.title = `${command} ${filename}`;
+      button.setAttribute("aria-label", button.title);
+    }
+    const url = new URL(window.location.href);
+    if (filename === "config.py") url.searchParams.set("file", filename);
+    else url.searchParams.delete("file");
+    url.searchParams.delete("line");
+    window.history.replaceState(null, "", url);
+    const targetLine =
+      line || (filename === "config.py" && this.configError?.line);
+    if (targetLine) this.instance.gotoLine(targetLine, 0, true);
+  },
+
+  markConfigError(location) {
+    this.configError = location;
+    this.configSession?.setAnnotations([
+      {
+        row: location.line - 1,
+        column: 0,
+        text: location.message,
+        type: "error",
+      },
+    ]);
+    const tab = document.getElementById("configTab");
+    if (tab) {
+      tab.classList.add("text-warning");
+      tab.title = `config.py:${location.line}: ${location.message}`;
+    }
+  },
+
+  clearConfigError() {
+    this.configError = null;
+    this.configSession?.clearAnnotations();
+    const tab = document.getElementById("configTab");
+    if (tab) {
+      tab.classList.remove("text-warning");
+      tab.removeAttribute("title");
+    }
+  },
+
+  async importFile(file) {
+    if (!file) return;
+    const filename = this.activeFile;
+    try {
+      if (file.size > 65536) throw new Error("File exceeds 64 KB");
+      const source = await file.text();
+      if (App.isRunning)
+        throw new Error("Stop the simulator before importing a file");
+      if (filename === "config.py") await ConfigStore.validate(source);
+      if (!window.confirm(`Replace ${filename} with ${file.name}?`)) return;
+      if (filename === "config.py") {
+        this.configSession.setValue(source);
+        this.clearConfigError();
+        this.debouncedSave();
+      } else {
+        this.setCode(source);
+      }
+      this.flushSave();
+    } catch (error) {
+      DebugPanel.error(`Could not import ${filename}: ${String(error)}`);
+    } finally {
+      document.getElementById("editorFile").value = "";
+    }
   },
 
   /**
@@ -92,7 +231,13 @@ const Editor = {
    * @returns {void}
    */
   setCode(code, moveCursor = -1) {
-    this.instance.setValue(code, moveCursor);
+    if (this.activeFile === "config.py") {
+      this.mainSession.setValue(code);
+      this.debouncedSave();
+      this.debouncedValidate();
+    } else {
+      this.instance.setValue(code, moveCursor);
+    }
     this.clearAllMarkers();
   },
 
@@ -101,8 +246,7 @@ const Editor = {
    * @returns {void}
    */
   clear() {
-    this.instance.setValue("", -1);
-    this.clearAllMarkers();
+    this.setCode("");
   },
 
   /**
@@ -113,20 +257,21 @@ const Editor = {
    */
   markError(line, message) {
     const lineIndex = line - 1; // ACE uses 0-indexed lines
+    const session = this.getMainSession();
 
     // Add annotation (shows in gutter)
-    const annotations = this.instance.session.getAnnotations();
+    const annotations = session.getAnnotations();
     annotations.push({
       row: lineIndex,
       column: 0,
       text: message,
       type: "error",
     });
-    this.instance.session.setAnnotations(annotations);
+    session.setAnnotations(annotations);
 
     // Add line highlight marker
     const Range = ace.require("ace/range").Range;
-    const markerId = this.instance.session.addMarker(
+    const markerId = session.addMarker(
       new Range(lineIndex, 0, lineIndex, 1),
       "ace_error-line",
       "fullLine",
@@ -143,15 +288,16 @@ const Editor = {
    */
   markWarning(line, message) {
     const lineIndex = line - 1;
+    const session = this.getMainSession();
 
-    const annotations = this.instance.session.getAnnotations();
+    const annotations = session.getAnnotations();
     annotations.push({
       row: lineIndex,
       column: 0,
       text: message,
       type: "warning",
     });
-    this.instance.session.setAnnotations(annotations);
+    session.setAnnotations(annotations);
   },
 
   /**
@@ -160,9 +306,10 @@ const Editor = {
    * @returns {void}
    */
   highlightExecutingLine(line) {
+    const session = this.getMainSession();
     // Remove previous highlight
     if (this.executingLine !== null) {
-      this.instance.session.removeMarker(this.executingLine);
+      session.removeMarker(this.executingLine);
     }
 
     if (line === null) {
@@ -172,7 +319,7 @@ const Editor = {
 
     const lineIndex = line - 1;
     const Range = ace.require("ace/range").Range;
-    this.executingLine = this.instance.session.addMarker(
+    this.executingLine = session.addMarker(
       new Range(lineIndex, 0, lineIndex, 1),
       "ace_executing-line",
       "fullLine",
@@ -180,7 +327,9 @@ const Editor = {
     );
 
     // Scroll to line if not visible
-    this.instance.scrollToLine(lineIndex, true, true);
+    if (this.activeFile === "main.py") {
+      this.instance.scrollToLine(lineIndex, true, true);
+    }
   },
 
   /**
@@ -205,12 +354,13 @@ const Editor = {
    * @returns {void}
    */
   clearAllMarkers() {
+    const session = this.getMainSession();
     // Clear annotations
-    this.instance.session.setAnnotations([]);
+    session.setAnnotations([]);
 
     // Clear markers
     this.markers.forEach((markerId) => {
-      this.instance.session.removeMarker(markerId);
+      session.removeMarker(markerId);
     });
     this.markers = [];
 
@@ -260,6 +410,7 @@ const Editor = {
    * @returns {{errors:Array, warnings:Array}} Aggregated validator output.
    */
   validateCode() {
+    if (typeof App !== "undefined" && App.isRunning) return;
     if (typeof Validator === "undefined") {
       console.log("[Editor] Validator not available");
       return;
@@ -293,7 +444,7 @@ const Editor = {
     }
 
     // Update validation status in UI
-    if (typeof App !== "undefined" && App.elements) {
+    if (typeof App !== "undefined" && App.elements && !App.hasRun) {
       const statusEl = App.elements.challengeStatus;
       const runBtn = App.elements.btnRun;
 
@@ -341,6 +492,9 @@ const Editor = {
     const code = this.getCode();
     const key = `aidriver_challenge_${App.currentChallenge}_code_${STARTER_VERSION}`;
     localStorage.setItem(key, code);
+    if (this.configSession) {
+      ConfigStore.save(this.configSession.getValue());
+    }
     console.log(`[Editor] Code saved for challenge ${App.currentChallenge}`);
   },
 
@@ -406,7 +560,7 @@ const Editor = {
    * @returns {number} Active line count.
    */
   getLineCount() {
-    return this.instance.session.getLength();
+    return this.getMainSession().getLength();
   },
 
   /**
@@ -415,7 +569,7 @@ const Editor = {
    * @returns {string} Line contents without trailing newline.
    */
   getLine(line) {
-    return this.instance.session.getLine(line - 1);
+    return this.getMainSession().getLine(line - 1);
   },
 };
 

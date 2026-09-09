@@ -19,6 +19,24 @@ body {
 }
 
 /* Editor Styling */
+.editor-tabs {
+  flex-wrap: nowrap;
+  border-bottom: 0;
+}
+
+.editor-tabs .nav-link {
+  padding: 0.25rem 0.5rem;
+  color: var(--bs-white);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.editor-tabs .nav-link.active {
+  color: var(--bs-white);
+  background-color: var(--bs-dark);
+  border-color: var(--bs-light);
+}
+
 .config-page {
   padding-bottom: 0;
 }

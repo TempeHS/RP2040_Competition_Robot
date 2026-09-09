@@ -127,6 +127,36 @@ npm install
 npm test -- --runInBand
 ```
 
+### Optional Browser Check
+
+The [Chromium workflow check](tests/browser/shared_config.py) is separate from
+pytest and Jest. It uses an isolated browser profile and checks pending saves,
+challenge changes, fresh config on Run and Step, invalid-config diagnostics,
+import/export, independent resets, robot movement, and desktop/mobile layout.
+It saves screenshots and downloaded Python files under the selected output
+directory without touching your browser's saved work.
+
+With the repository-root HTTP server above still running, use another terminal:
+
+```bash
+# From the repository root
+python -m pip install -r app/tests/browser/requirements.txt
+python -m playwright install --with-deps --only-shell chromium
+python app/tests/browser/shared_config.py \
+    --url http://127.0.0.1:8000/app/ \
+    --output build/browser-checks/development
+
+node app/scripts/stage-site.js build/shared-config-site
+python app/tests/browser/shared_config.py \
+    --url http://127.0.0.1:8000/build/shared-config-site/ \
+    --output build/browser-checks/staged
+```
+
+Installing Chromium's Linux system dependencies may require administrator
+access. The check needs network access to the same CDN assets as the app.
+It verifies the browser workflow, not physical robot calibration or live sensor
+feedback in trace mode.
+
 ## Deployment to GitHub Pages
 
 Use the [Pages workflow](../.github/workflows/deploy-pages.yml) with repository

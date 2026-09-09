@@ -43,9 +43,10 @@ def saved(page, key):
 
 def wait_config(page):
     page.wait_for_function(
-        "typeof ConfigEditor !== 'undefined' && ConfigEditor.instance && "
-        "document.getElementById('configResult').textContent.length > 0"
+        "typeof Editor !== 'undefined' && Editor.configSession && "
+        "Editor.activeFile === 'config.py'"
     )
+    expect(page.locator("#configTab")).to_have_attribute("aria-selected", "true")
 
 
 def wait_main(page, number=1):
@@ -54,16 +55,6 @@ def wait_main(page, number=1):
         "App.currentChallenge === number && Editor.getCode().includes('import config')",
         arg=number,
     )
-
-
-def return_to_main_with_edit(page, source):
-    page.evaluate(
-        "source => { ConfigEditor.instance.setValue(source, -1); "
-        "document.getElementById('backToMain').click(); }",
-        source,
-    )
-    page.wait_for_url("**/simulator.html?challenge=1")
-    wait_main(page)
 
 
 def download_text(page, button, output, filename):
@@ -86,35 +77,37 @@ def check_layout(page):
         arena = page.locator("#canvasContainer").bounding_box()
         assert status and arena
         assert status["y"] >= arena["y"] + arena["height"], (status, arena)
-    if page.locator(".config-toolbar").count():
-        assert (
-            page.locator(".config-toolbar").evaluate(
-                "element => getComputedStyle(element).display"
-            )
-            == "flex"
-        )
-        elements = page.locator(".config-toolbar > *:not(.visually-hidden)")
-        bounds = [element.bounding_box() for element in elements.all()]
-        for index, first in enumerate(bounds):
-            assert first and first["width"] > 0
-            for second in bounds[index + 1 :]:
-                assert second
-                overlap_x = min(
-                    first["x"] + first["width"], second["x"] + second["width"]
-                ) - max(first["x"], second["x"])
-                overlap_y = min(
-                    first["y"] + first["height"], second["y"] + second["height"]
-                ) - max(first["y"], second["y"])
-                assert overlap_x <= 1 or overlap_y <= 1, (first, second)
+    bounds = [
+        element.bounding_box() for element in page.locator("#editorTools button").all()
+    ]
+    for index, first in enumerate(bounds):
+        assert first and first["width"] > 0
+        assert 0 <= first["x"] <= dimensions["width"] - first["width"]
+        for second in bounds[index + 1 :]:
+            assert second
+            overlap_x = min(
+                first["x"] + first["width"], second["x"] + second["width"]
+            ) - max(first["x"], second["x"])
+            overlap_y = min(
+                first["y"] + first["height"], second["y"] + second["height"]
+            ) - max(first["y"], second["y"])
+            assert overlap_x <= 1 or overlap_y <= 1, (first, second)
 
 
-def run_once(page, speed):
+def run_once(page, speed, source=None):
     page.locator("#btnReset").click()
     page.locator("#btnClearDebug").click()
-    page.locator("#btnRun").click()
+    if source is None:
+        page.locator("#btnRun").click()
+    else:
+        page.evaluate(
+            "source => { Editor.instance.setValue(source, -1); document.getElementById('btnRun').click(); }",
+            source,
+        )
     expect(page.locator("#challengeStatus")).to_have_text("Completed", timeout=20000)
     expect(page.locator("#debugConsole")).to_contain_text("Config speed: " + str(speed))
     assert page.evaluate("[App.robot.rightSpeed, App.robot.leftSpeed]") == [0, 0]
+    wait_config(page)
 
 
 def exercise(page, base_url, output):
@@ -123,78 +116,110 @@ def exercise(page, base_url, output):
         default.replace("BASE_SPEED = 200", "BASE_SPEED = 185")
         + "\n# Browser round-trip tuning\n"
     )
-    page.goto(urljoin(base_url, "config.html?challenge=1"))
+    page.goto(urljoin(base_url, "simulator.html?challenge=1"))
+    wait_main(page)
+    page.evaluate(
+        "window.originalEditor = Editor.instance; window.originalRobot = App.robot"
+    )
+    page.locator("#configTab").click()
     wait_config(page)
-    expect(page.locator("#configResult")).to_have_text("Configuration valid")
-    assert page.evaluate("ConfigEditor.instance.getValue()") == default
+    assert page.evaluate("Editor.getActiveCode()") == default
+    expect(page.locator("#arenaCanvas")).to_be_visible()
+    expect(page.locator("#btnRun")).to_be_visible()
+    assert page.evaluate(
+        "Editor.instance === window.originalEditor && App.robot === window.originalRobot"
+    )
     check_layout(page)
     page.screenshot(path=str(output / "config-desktop.png"), full_page=True)
-    page.locator("#foldConfig").click()
-    assert page.evaluate("ConfigEditor.instance.session.getAllFolds().length") >= 12
-    page.locator("#expandConfig").click()
-    assert page.evaluate("ConfigEditor.instance.session.getAllFolds().length") == 0
-    page.locator("#configSection").select_option(label="Wall PID")
-    assert page.evaluate(
-        "ConfigEditor.instance.getCursorPosition().row"
-    ) == default.splitlines().index("# Wall PID")
-
-    return_to_main_with_edit(page, tuned)
-    assert saved(page, CONFIG_KEY) == tuned
-    check_layout(page)
     pixels = page.locator("#arenaCanvas").evaluate(
         "canvas => { const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data; "
         "const colors = new Set(); for (let index = 0; index < data.length; index += 64) "
         "colors.add(data[index] + ',' + data[index + 1] + ',' + data[index + 2]); return colors.size; }"
     )
     assert pixels > 10, "Arena canvas is blank"
-    page.screenshot(path=str(output / "simulator-desktop.png"), full_page=True)
     start_y = page.evaluate("App.robot.y")
-    page.locator("#btnRun").click()
+    page.evaluate(
+        "source => { Editor.instance.setValue(source, -1); document.getElementById('btnRun').click(); }",
+        tuned,
+    )
     page.wait_for_function("start => App.robot.y < start - 30", arg=start_y)
+    wait_config(page)
+    assert saved(page, CONFIG_KEY) == tuned
+    page.locator("#mainTab").click()
+    expect(page.locator("#mainTab")).to_have_attribute("aria-selected", "true")
+    page.locator("#configTab").click()
+    wait_config(page)
+    assert page.evaluate("App.isRunning && App.robot === window.originalRobot")
     page.locator("#btnStop").click()
     assert saved(page, CONFIG_KEY) == tuned
     page.locator("#btnReset").click()
     assert saved(page, CONFIG_KEY) == tuned
+    assert download_text(page, "#btnDownloadMain", output, "config.py") == tuned
+    page.locator("#btnCopyCode").click()
+    assert page.evaluate("navigator.clipboard.readText()") == tuned
+    page.evaluate("Editor.instance.gotoLine(22, 0, true)")
+    config_position = page.evaluate("Editor.instance.getCursorPosition()")
+    page.locator("#mainTab").click()
+    page.evaluate("Editor.instance.gotoLine(8, 0, true)")
+    page.locator("#configTab").click()
+    wait_config(page)
+    assert page.evaluate("Editor.instance.getCursorPosition()") == config_position
+    page.locator("#mainTab").click()
+    expect(page.locator("#mainTab")).to_have_attribute("aria-selected", "true")
+    page.screenshot(path=str(output / "simulator-desktop.png"), full_page=True)
 
     current_main = page.evaluate("Editor.getCode()")
     assert download_text(page, "#btnDownloadMain", output, "main.py") == current_main
     retained_main = current_main + "\n# Retained algorithm edit\n"
     page.evaluate(
-        "source => { Editor.setCode(source); document.querySelector('[data-challenge=\"2\"]').click(); }",
+        "source => { Editor.setCode(source); document.getElementById('configTab').click(); }",
         retained_main,
     )
+    wait_config(page)
+    assert saved(page, MAIN_KEY) == retained_main
+    page.evaluate("document.querySelector('[data-challenge=\"2\"]').click()")
     wait_main(page, 2)
+    wait_config(page)
+    assert page.evaluate("Editor.getActiveCode()") == tuned
     assert saved(page, MAIN_KEY) == retained_main
     assert saved(page, CONFIG_KEY) == tuned
     page.evaluate("document.querySelector('[data-challenge=\"1\"]').click()")
     wait_main(page)
     assert page.evaluate("Editor.getCode()") == retained_main
+    page.locator("#mainTab").click()
     page.locator("#btnResetCode").click()
+    expect(page.locator("#resetCodeModal .modal-title")).to_have_text("Reset main.py?")
     page.locator("#btnConfirmReset").click()
     page.wait_for_function("!Editor.getCode().includes('Retained algorithm edit')")
     assert saved(page, CONFIG_KEY) == tuned
 
     page.evaluate("source => Editor.setCode(source)", SMOKE_MAIN)
-    run_once(page, 185)
-    page.locator("#configLink").click()
+    page.locator("#configTab").click()
     wait_config(page)
+    run_once(page, 185)
     fresh = tuned.replace("BASE_SPEED = 185", "BASE_SPEED = 190")
-    return_to_main_with_edit(page, fresh)
-    run_once(page, 190)
+    run_once(page, 190, fresh)
     page.locator("#btnReset").click()
+    page.locator("#btnClearDebug").click()
+    step_source = fresh.replace("BASE_SPEED = 190", "BASE_SPEED = 195")
     page.evaluate(
         "const slider = document.getElementById('speedSlider'); slider.value = '5'; slider.dispatchEvent(new Event('input'))"
     )
-    page.locator("#btnStep").click()
+    page.evaluate(
+        "source => { Editor.instance.setValue(source, -1); document.getElementById('btnStep').click(); }",
+        step_source,
+    )
     expect(page.locator("#challengeStatus")).to_have_text("Completed", timeout=30000)
     assert page.evaluate("PythonRunner.executionTrace.length") > 0
-    expect(page.locator("#debugConsole")).to_contain_text("Config speed: 190")
-
-    page.locator("#configLink").click()
+    expect(page.locator("#debugConsole")).to_contain_text("Config speed: 195")
     wait_config(page)
+
+    page.locator("#btnReset").click()
     invalid = fresh.replace("BASE_SPEED = 190", "BASE_SPEED = 0")
-    return_to_main_with_edit(page, invalid)
-    page.locator("#btnRun").click()
+    page.evaluate(
+        "source => { Editor.instance.setValue(source, -1); document.getElementById('btnRun').click(); }",
+        invalid,
+    )
     expect(page.locator("#challengeStatus")).to_have_text("Error", timeout=20000)
     line = next(
         index + 1
@@ -205,7 +230,7 @@ def exercise(page, base_url, output):
     assert page.evaluate("[App.robot.rightSpeed, App.robot.leftSpeed]") == [0, 0]
     assert (
         page.evaluate(
-            "Editor.instance.session.getAnnotations().filter(item => item.type === 'error')"
+            "Editor.mainSession.getAnnotations().filter(item => item.type === 'error')"
         )
         == []
     )
@@ -218,42 +243,57 @@ def exercise(page, base_url, output):
     assert page.evaluate("PythonRunner.executionTrace.length") == 0
     assert (
         page.evaluate(
-            "Editor.instance.session.getAnnotations().filter(item => item.type === 'error')"
+            "Editor.mainSession.getAnnotations().filter(item => item.type === 'error')"
         )
         == []
     )
-    page.locator("#configLink").click()
+    page.locator("#configTab").click()
     wait_config(page)
-    expect(page.locator("#configResult")).to_contain_text(f"config.py:{line}:")
+    expect(page.locator("#configTab")).to_have_attribute(
+        "title", f"config.py:{line}: " + page.evaluate("Editor.configError.message")
+    )
+    assert page.evaluate("Editor.configSession.getAnnotations()[0].row") == line - 1
     page.wait_for_function(
-        "line => ConfigEditor.instance.getCursorPosition().row === line - 1", arg=line
+        "line => Editor.instance.getCursorPosition().row === line - 1", arg=line
     )
 
     page.once("dialog", lambda dialog: dialog.accept())
-    page.locator("#configFile").set_input_files(
+    page.locator("#editorFile").set_input_files(
         {"name": "config.py", "mimeType": "text/x-python", "buffer": fresh.encode()}
     )
-    expect(page.locator("#configResult")).to_have_text("Configuration valid")
-    assert page.evaluate("ConfigEditor.instance.getValue()") == fresh
-    assert download_text(page, "#downloadConfig", output, "config.py") == fresh
+    page.wait_for_function("source => Editor.getActiveCode() === source", arg=fresh)
+    assert page.evaluate("Editor.configError") is None
+    assert download_text(page, "#btnDownloadMain", output, "config.py") == fresh
     assert saved(page, MAIN_KEY) == SMOKE_MAIN
-    page.locator("#resetConfig").click()
-    page.locator("#resetConfigModal button", has_text="Cancel").click()
+    page.locator("#btnResetCode").click()
+    expect(page.locator("#resetCodeModal .modal-title")).to_have_text(
+        "Reset config.py?"
+    )
+    page.locator("#resetCodeModal button", has_text="Cancel").click()
     assert saved(page, CONFIG_KEY) == fresh
-    page.locator("#resetConfig").click()
-    page.locator("#confirmResetConfig").click()
-    expect(page.locator("#configResult")).to_have_text("Configuration valid")
+    page.locator("#btnResetCode").click()
+    page.locator("#btnConfirmReset").click()
+    page.wait_for_function("source => Editor.getActiveCode() === source", arg=default)
+    assert saved(page, MAIN_KEY) == SMOKE_MAIN
     page.reload()
     wait_config(page)
-    assert page.evaluate("ConfigEditor.instance.getValue()") == default
+    wait_main(page)
+    assert page.evaluate("Editor.getActiveCode()") == default
     assert saved(page, MAIN_KEY) == SMOKE_MAIN
+    page.locator("#configTab").focus()
+    page.keyboard.press("ArrowLeft")
+    expect(page.locator("#mainTab")).to_have_attribute("aria-selected", "true")
+    page.keyboard.press("ArrowRight")
+    wait_config(page)
 
     page.set_viewport_size({"width": 390, "height": 844})
     check_layout(page)
     page.screenshot(path=str(output / "config-mobile.png"), full_page=True)
-    page.locator("#backToMain").click()
-    wait_main(page)
+    config_bounds = page.locator("#editor").bounding_box()
+    page.locator("#mainTab").click()
+    expect(page.locator("#mainTab")).to_have_attribute("aria-selected", "true")
     check_layout(page)
+    assert page.locator("#editor").bounding_box() == config_bounds
     page.screenshot(path=str(output / "simulator-mobile.png"), full_page=True)
 
 
@@ -267,7 +307,9 @@ def main():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         context = browser.new_context(
-            viewport={"width": 1440, "height": 1000}, accept_downloads=True
+            viewport={"width": 1440, "height": 1000},
+            accept_downloads=True,
+            permissions=["clipboard-read", "clipboard-write"],
         )
         page = context.new_page()
         page.set_default_timeout(20000)
@@ -279,14 +321,14 @@ def main():
             page.screenshot(path=str(args.output / "failure.png"), full_page=True)
             print("Failed page:", page.url)
             print("Browser errors:", errors)
-            for selector in ("#configResult", "#debugConsole"):
+            for selector in ("#editorFilename", "#debugConsole"):
                 if page.locator(selector).count():
                     print(page.locator(selector).inner_text())
             raise
         finally:
             browser.close()
     print(
-        "PASS: shared config persistence, Run/Step, downloads, import, diagnostics, resets and responsive layout"
+        "PASS: in-place tabs, config-visible Run/Step, persistence, downloads, import, diagnostics, resets and responsive layout"
     )
     print("Screenshots:", args.output)
 

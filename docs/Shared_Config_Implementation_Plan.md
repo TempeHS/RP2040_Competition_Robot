@@ -1,6 +1,6 @@
 # Shared Configuration and Challenge Progression Plan
 
-Status: implemented in source, with host and Skulpt contract tests. Documentation and final browser/release checks are being completed. Physical deployment and calibration remain unverified; the checked-in UF2 has not been rebuilt for this change. See the [student workflow](Shared_Config_Workflow.md).
+Status: source implementation, documentation, host tests, Skulpt contracts, and Chromium workflow checks are complete. Physical deployment and calibration remain unverified; the checked-in UF2 has not been rebuilt for this change. See the [student workflow](Shared_Config_Workflow.md).
 
 ## Goal
 
@@ -230,6 +230,14 @@ Extend the existing Jest suite and add focused browser checks for responsibiliti
 
 Run controlled simulator exercises with one carried-forward configuration, explicitly recording any tuning changes between challenges. Reaching a goal zone alone is not proof of correct pauses, recovery, or scoring.
 
+### Verification Results
+
+- The host pytest suite passes, including all twenty challenge programs, configuration consumption, progression logic, documentation, and generated filesystem provisioning/recovery.
+- The complete Jest suite passes, including real Skulpt execution of all twenty programs in both normal and trace paths with test-owned limits. P/PD/PID trajectory comparisons use the same canonical configuration without per-challenge rewrites.
+- The [optional Chromium check](../app/tests/browser/shared_config.py) passes against both the repository-root development server and the staged project-site URL. It verifies independent persistence, immediate navigation saves, imports/downloads, Run/Step config errors, and reset isolation. It deliberately changes `BASE_SPEED` from 185 to 190 to check fresh imports and rejects 0 before movement.
+- Desktop (1440 by 1000) and mobile (390 by 844) screenshots were inspected. Canvas pixel and movement checks pass; controls do not overflow horizontally, and the mobile status bar does not cover the arena. Reproduction commands are in the [simulator README](../app/README.md#optional-browser-check).
+- No board was flashed and no physical calibration was performed. The checked-in UF2 is unchanged. Downloaded mains require a firmware build containing `config_check` or deployment of that helper; the new recovery module requires the updated firmware build.
+
 ## Implementation Phases
 
 1. **Contract and test baseline:** inventory tunables, settle default values and timing conventions, document the cumulative-navigation decision, and establish scoped pytest collection.
@@ -242,17 +250,17 @@ Run controlled simulator exercises with one carried-forward configuration, expli
 
 ## Acceptance Checklist
 
-- [ ] One purpose-based config supplies every learner-facing tuning value.
-- [ ] Students replace main without copying or losing prior tuning.
-- [ ] Algorithms remain visible and editable.
-- [ ] Configuration persists independently of challenge and template versions.
-- [ ] P, D, and I become active only in the intended main programs.
-- [ ] Normal and step execution load fresh configuration and identify errors by file.
+- [x] One purpose-based config supplies every learner-facing tuning value.
+- [x] Students replace main without copying or losing prior tuning.
+- [x] Algorithms remain visible and editable.
+- [x] Configuration persists independently of challenge and template versions.
+- [x] P, D, and I become active only in the intended main programs.
+- [x] Normal and step execution load fresh configuration and identify errors by file.
 - [ ] Downloaded `config.py` and `main.py` run together on supported hardware.
-- [ ] Both device files remain editable without rebuilding firmware.
-- [ ] Recovery preserves existing tuning or backs it up before explicit replacement.
-- [ ] Pytest collection is scoped, deterministic, and does not start hardware scripts or infinite loops.
-- [ ] Tests cover configuration consumption and progression behavior, not only matching variable names.
-- [ ] Browser persistence, imports, exports, diagnostics, and responsive layout are verified separately.
-- [ ] Documentation consistently states what stays, what is newly tuned, and what main behavior changes.
-- [ ] Remaining physical calibration and trace-mode limitations are documented, not presented as verified parity.
+- [x] Both device files remain editable without rebuilding firmware (filesystem staging and provisioning verified on the host).
+- [x] Recovery preserves existing tuning or backs it up before explicit replacement (generated recovery code tested on the host).
+- [x] Pytest collection is scoped, deterministic, and does not start hardware scripts or infinite loops.
+- [x] Tests cover configuration consumption and progression behavior, not only matching variable names.
+- [x] Browser persistence, imports, exports, diagnostics, and responsive layout are verified separately.
+- [x] Documentation consistently states what stays, what is newly tuned, and what main behavior changes.
+- [x] Remaining physical calibration and trace-mode limitations are documented, not presented as verified parity.

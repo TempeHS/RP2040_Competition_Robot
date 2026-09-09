@@ -252,6 +252,12 @@ function initEditor() {
   // Use the Editor module for full functionality
   Editor.init();
   App.editor = Editor.instance;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("file") === "config.py") {
+    Editor.showFile("config.py", Number(params.get("line")) || null).catch(
+      (error) => DebugPanel.error(String(error)),
+    );
+  }
 
   console.log("[App] ACE Editor initialized via Editor module");
 }
@@ -317,7 +323,7 @@ function setupEventListeners() {
   // Copy code button
   App.elements.btnCopyCode.addEventListener("click", () => {
     Editor.flushSave();
-    const code = Editor.getCode();
+    const code = Editor.getActiveCode();
     navigator.clipboard
       .writeText(code)
       .then(() => {
@@ -337,24 +343,69 @@ function setupEventListeners() {
 
   document.getElementById("btnDownloadMain").addEventListener("click", () => {
     Editor.flushSave();
-    ConfigStore.download(Editor.getCode(), "main.py");
+    ConfigStore.download(Editor.getActiveCode(), Editor.activeFile);
   });
-  document
-    .getElementById("configLink")
-    .addEventListener("click", () => Editor.flushSave());
+  const fileTabs = [...document.querySelectorAll("[data-editor-file]")];
+  fileTabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => {
+      Editor.showFile(tab.dataset.editorFile).catch((error) =>
+        DebugPanel.error(String(error)),
+      );
+    });
+    tab.addEventListener("keydown", async (event) => {
+      const nextIndex = {
+        ArrowLeft: 1 - index,
+        ArrowRight: 1 - index,
+        Home: 0,
+        End: 1,
+      }[event.key];
+      if (nextIndex === undefined) return;
+      event.preventDefault();
+      try {
+        await Editor.showFile(fileTabs[nextIndex].dataset.editorFile);
+        fileTabs[nextIndex].focus();
+      } catch (error) {
+        DebugPanel.error(String(error));
+      }
+    });
+  });
+  document.getElementById("btnImportCode").addEventListener("click", () => {
+    document.getElementById("editorFile").click();
+  });
+  document.getElementById("editorFile").addEventListener("change", (event) => {
+    Editor.importFile(event.target.files[0]);
+  });
   window.addEventListener("pagehide", () => Editor.flushSave());
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) Editor.flushSave();
+  });
 
   // Reset code button - show modal
   App.elements.btnResetCode.addEventListener("click", () => {
-    const modal = new bootstrap.Modal(
-      document.getElementById("resetCodeModal"),
-    );
+    const element = document.getElementById("resetCodeModal");
+    element.dataset.filename = Editor.activeFile;
+    element.querySelector(".modal-title").textContent =
+      `Reset ${Editor.activeFile}?`;
+    element.querySelector(".modal-body").textContent =
+      Editor.activeFile === "config.py"
+        ? "Replace shared config.py with the defaults? Saved main programs will be kept."
+        : "Replace this challenge's main.py with its starter code? Shared config will be kept.";
+    const modal = new bootstrap.Modal(element);
     modal.show();
   });
 
   // Confirm reset code
   App.elements.btnConfirmReset.addEventListener("click", () => {
-    resetToStarterCode();
+    if (
+      document.getElementById("resetCodeModal").dataset.filename === "config.py"
+    ) {
+      Editor.configSession.setValue(ConfigStore.defaultSource);
+      Editor.clearConfigError();
+      Editor.debouncedSave();
+      Editor.flushSave();
+    } else {
+      resetToStarterCode();
+    }
     bootstrap.Modal.getInstance(
       document.getElementById("resetCodeModal"),
     ).hide();
@@ -478,10 +529,6 @@ function handleKeyboardShortcuts(e) {
 function loadChallenge(challengeId) {
   Editor.flushSave();
   App.currentChallenge = challengeId;
-  const configLink = document.getElementById("configLink");
-  if (configLink)
-    configLink.href =
-      "config.html?challenge=" + encodeURIComponent(challengeId);
 
   // Log challenge load event
   if (typeof Logger !== "undefined") {

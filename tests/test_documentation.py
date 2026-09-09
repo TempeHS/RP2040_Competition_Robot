@@ -39,6 +39,18 @@ def test_simulator_readme_describes_shared_config_and_http_serving():
     assert "placeholder sensor values" in source
 
 
+def test_browser_check_is_documented_as_optional_and_repeatable():
+    source = (ROOT / "app/README.md").read_text(encoding="utf-8")
+    assert "### Optional Browser Check" in source
+    assert "python -m pip install -r app/tests/browser/requirements.txt" in source
+    assert "python -m playwright install --with-deps --only-shell chromium" in source
+    assert "python app/tests/browser/shared_config.py" in source
+    assert "--url http://127.0.0.1:8000/app/" in source
+    assert "--url http://127.0.0.1:8000/build/shared-config-site/" in source
+    assert (ROOT / "app/tests/browser/shared_config.py").is_file()
+    assert "playwright" not in (ROOT / "requirements.txt").read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize(
     "filename", ["README.md", "Build_Custom_MicroPython_Firmware.md"]
 )

@@ -1789,12 +1789,8 @@ def ticks_diff(t1, t2):
           `[Error] ${location.filename}:${location.line}: ${location.message}`,
           "error",
         );
-        const link = document.getElementById("configLink");
-        if (link) {
-          link.href = `config.html?challenge=${encodeURIComponent(App.currentChallenge)}&line=${location.line}`;
-          link.classList.add("btn-outline-danger");
-          link.title = `${location.filename}:${location.line}: ${location.message}`;
-        }
+        if (typeof Editor !== "undefined" && Editor.markConfigError)
+          Editor.markConfigError(location);
         return;
       }
 
