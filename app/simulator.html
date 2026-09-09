@@ -417,17 +417,17 @@
           <!-- Arena Canvas -->
           <div class="card bg-dark border-secondary mb-3">
             <div
-              class="card-header bg-secondary text-white d-flex justify-content-between align-items-center py-2"
+              class="card-header bg-secondary text-white d-flex flex-wrap gap-2 justify-content-between align-items-center py-2"
             >
               <span
                 ><i class="bi bi-grid-3x3-gap me-2"></i
                 ><span id="arenaSizeLabel">Arena (2030×2030mm)</span></span
               >
-              <div class="d-flex align-items-center gap-3">
+              <div class="d-flex flex-wrap align-items-center gap-2">
                 <!-- Rotate Car Button -->
                 <div class="d-flex align-items-center">
                   <button
-                    class="btn btn-sm btn-outline-light"
+                    class="btn btn-sm btn-outline-light text-nowrap"
                     id="btnRotateCar"
                     data-bs-toggle="tooltip"
                     title="Rotate car start direction by 90°"
@@ -446,7 +446,7 @@
                 <!-- Side Sensor Display and Toggle -->
                 <div class="d-flex align-items-center ms-2">
                   <button
-                    class="btn btn-sm btn-outline-light me-1"
+                    class="btn btn-sm btn-outline-light text-nowrap me-1"
                     id="btnToggleSideSensor"
                     data-bs-toggle="tooltip"
                     title="Toggle side sensor between left and right"
@@ -478,7 +478,7 @@
     </div>
 
     <!-- Status Bar -->
-    <div class="fixed-bottom">
+    <div class="fixed-bottom simulator-status">
       <div
         id="statusBar"
         class="alert alert-info mb-0 rounded-0 py-2 d-flex align-items-center"
@@ -512,10 +512,19 @@
         <pre
           class="bg-light border rounded p-2 small mb-3"
         ><code>from aidriver import AIDriver, hold_state
-import aidriver
+      from config_check import validate_config
+      import aidriver
+      import config
 
-aidriver.DEBUG_AIDRIVER = False    # set True for verbose logs
-my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
+      # Inside main(), before movement:
+      validate_config(config, AIDriver.MIN_MOTOR_SPEED)
+      aidriver.DEBUG_AIDRIVER = config.DEBUG_AIDRIVER
+      my_robot = AIDriver(
+          config.WALL_SIDE,
+          distance_sensor=config.DISTANCE_SENSOR,
+          min_approach_speed=config.MIN_APPROACH_SPEED,
+          kit_servo_pin=config.KIT_SERVO_PIN,
+      )</code></pre>
 
         <h6>Sensors</h6>
         <div class="list-group list-group-flush mb-3">
@@ -542,7 +551,7 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
             <small class="text-muted d-block"
               ><strong>Preferred for PID.</strong> Signed speeds (-255…255):
               positive = forward, negative = backward. Anything with
-              <code>abs(speed) &lt; 100</code> stops that wheel (<code
+              <code>abs(speed) &lt; 120</code> stops that wheel (<code
                 >MIN_MOTOR_SPEED</code
               >
               dead zone).</small
@@ -604,14 +613,6 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
               powered.</small
             >
           </div>
-          <div class="list-group-item">
-            <code>my_robot.service()</code>
-            <small class="text-muted d-block"
-              >Tick the safety heartbeat. Called for you by
-              <code>hold_state()</code> — only call it directly if you write
-              your own busy loop.</small
-            >
-          </div>
         </div>
 
         <h6>Module Helpers</h6>
@@ -619,23 +620,16 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
           <div class="list-group-item">
             <code>hold_state(seconds)</code>
             <small class="text-muted d-block"
-              >Pause for <code>seconds</code> while servicing the heartbeat and
-              logging current state. Use this — never
-              <code>time.sleep()</code>.</small
+              >Pause for <code>seconds</code> while retaining the current motor
+              outputs. Use <code>config.LOOP_DT</code> for the normal control
+              loop.</small
             >
           </div>
           <div class="list-group-item">
-            <code>aidriver.DEBUG_AIDRIVER = True / False</code>
+            <code>config.DEBUG_AIDRIVER = True / False</code>
             <small class="text-muted d-block"
               >Toggle verbose <code>[AIDriver]</code> log output. Off by default
               in answers; turn it on while debugging your own code.</small
-            >
-          </div>
-          <div class="list-group-item">
-            <code>aidriver.heartbeat(period_ms=1000)</code>
-            <small class="text-muted d-block"
-              >Manual LED + safety heartbeat tick (advanced — normally handled
-              automatically by <code>hold_state</code>).</small
             >
           </div>
         </div>
@@ -643,8 +637,9 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
         <h6>Constants</h6>
         <ul class="small">
           <li>
-            <code>MIN_MOTOR_SPEED = 100</code> — wheels below this stall. Any
-            <code>BASE_SPEED - MAX_STEERING</code> must stay <code>≥ 100</code>.
+            <code>MIN_MOTOR_SPEED = 120</code> — library-owned motor floor.
+            <code>steer()</code> limits correction to keep the slower wheel at
+            or above that floor.
           </li>
           <li>
             Ultrasonic range: <strong>20 mm – 2000 mm</strong>. Outside this
@@ -655,8 +650,8 @@ my_robot = AIDriver("left")        # or AIDriver("right")</code></pre>
 
         <h6>Speed Guidelines</h6>
         <ul class="small">
-          <li><strong>0–99:</strong> Below dead zone — wheel stops</li>
-          <li><strong>100–140:</strong> Slow / careful</li>
+          <li><strong>0–119:</strong> Below dead zone — wheel stops</li>
+          <li><strong>120–140:</strong> Slow / careful</li>
           <li><strong>141–200:</strong> Normal cruise</li>
           <li><strong>201–255:</strong> Fast — watch for slip on turns</li>
         </ul>

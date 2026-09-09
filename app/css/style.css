@@ -292,6 +292,10 @@ body {
 
 /* Responsive adjustments */
 @media (max-width: 991.98px) {
+  .simulator-status {
+    position: static;
+  }
+
   #editor {
     height: 300px;
     min-height: 300px;

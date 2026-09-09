@@ -253,9 +253,6 @@ function initEditor() {
   Editor.init();
   App.editor = Editor.instance;
 
-  // Set placeholder content
-  Editor.setCode("# Select a challenge to load starter code\n");
-
   console.log("[App] ACE Editor initialized via Editor module");
 }
 
@@ -961,12 +958,14 @@ async function stepCode() {
   App.elements.challengeStatus.textContent = "Stepping";
   App.elements.challengeStatus.className = "badge bg-info";
 
+  let executionFailed = false;
   try {
     // Run in step mode with trace collection and playback
     await PythonRunner.runStepMode(code);
     DebugPanel.success("Step mode completed - click Reset to run again");
   } catch (error) {
     if (error.message !== "Execution stopped") {
+      executionFailed = true;
       DebugPanel.error("Execution error: " + error.message);
     }
   }
@@ -978,9 +977,16 @@ async function stepCode() {
   App.elements.btnStep.disabled = true; // Require reset
   App.elements.btnStep.textContent = "Step";
   App.elements.btnStop.disabled = true;
-  updateStatus("Completed", "success");
-  App.elements.challengeStatus.textContent = "Completed";
-  App.elements.challengeStatus.className = "badge bg-success";
+  updateStatus(
+    executionFailed ? "Error - check debug output" : "Completed",
+    executionFailed ? "danger" : "success",
+  );
+  App.elements.challengeStatus.textContent = executionFailed
+    ? "Error"
+    : "Completed";
+  App.elements.challengeStatus.className = executionFailed
+    ? "badge bg-danger"
+    : "badge bg-success";
 }
 
 /**
