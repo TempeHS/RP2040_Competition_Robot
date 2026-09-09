@@ -47,6 +47,7 @@ The script automatically:
 
 - [project/main.py](../project/main.py) and [project/config.py](../project/config.py) are created on the device filesystem when missing.
 - Existing files are preserved, even across a firmware update. Missing or invalid settings must be fixed explicitly; firmware does not silently replace student tuning.
+- Numeric settings in the bundled config start at zero, with suggested ranges in comments. Fill in required settings before running main. The tuned test fixture is not bundled into firmware.
 
 **Benefits:** Visible in IDE, editable, preserves user changes across reboots
 
@@ -70,7 +71,7 @@ import robot_recovery
 robot_recovery.restore_config()
 ```
 
-The previous file is backed up as `config.py.bak`, then `config.py.bak.1`, and so on without overwriting earlier backups. Restart the robot afterward. A normal boot never executes this reset automatically.
+The previous file is backed up as `config.py.bak`, then `config.py.bak.1`, and so on without overwriting earlier backups. Recovery writes the zeroed student template; restore or tune required values before restarting main. A normal boot never executes this reset automatically.
 
 **Console output during recovery:**
 

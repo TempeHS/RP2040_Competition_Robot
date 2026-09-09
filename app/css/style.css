@@ -19,22 +19,74 @@ body {
 }
 
 /* Editor Styling */
+.editor-header {
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  padding: 0;
+  border-bottom: 0;
+}
+
 .editor-tabs {
+  flex: 0 0 auto;
   flex-wrap: nowrap;
+  align-items: stretch;
   border-bottom: 0;
 }
 
 .editor-tabs .nav-link {
-  padding: 0.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 1rem;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
   color: var(--bs-white);
   font-size: 0.875rem;
   white-space: nowrap;
 }
 
+.editor-tabs .nav-link:first-child {
+  border-top-left-radius: var(--bs-card-inner-border-radius, 0.375rem);
+}
+
+.editor-tabs .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 .editor-tabs .nav-link.active {
   color: var(--bs-white);
-  background-color: var(--bs-dark);
-  border-color: var(--bs-light);
+  background-color: #272822;
+  box-shadow: inset 0 3px 0 var(--bs-primary);
+}
+
+.editor-tabs .nav-link:focus-visible {
+  outline: 2px solid var(--bs-light);
+  outline-offset: -4px;
+}
+
+#editorTools {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+#editorTools .btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+@media (max-width: 575.98px) {
+  .editor-tabs .nav-link {
+    padding: 0 6px;
+  }
+
+  #editorTools .btn {
+    width: 28px;
+  }
 }
 
 #editor {

@@ -288,19 +288,46 @@
         <!-- Left Column: Code Editor -->
         <div class="col-lg-7">
           <div class="card bg-dark border-secondary" id="editorCard">
-            <div
-              class="card-header bg-secondary text-white d-flex flex-wrap gap-2 justify-content-between align-items-center"
-            >
-              <span
-                id="configValidation"
-                class="small"
-                role="status"
-                hidden
-              ></span>
+            <div class="card-header editor-header bg-secondary text-white">
+              <div
+                class="nav nav-tabs editor-tabs"
+                role="tablist"
+                aria-label="Python files"
+              >
+                <button
+                  class="nav-link active"
+                  id="mainTab"
+                  type="button"
+                  role="tab"
+                  data-editor-file="main.py"
+                  aria-selected="true"
+                  aria-controls="editor"
+                >
+                  main.py
+                </button>
+                <button
+                  class="nav-link"
+                  id="configTab"
+                  type="button"
+                  role="tab"
+                  data-editor-file="config.py"
+                  aria-selected="false"
+                  aria-controls="editor"
+                  tabindex="-1"
+                >
+                  config.py
+                </button>
+              </div>
               <div
                 id="editorTools"
                 class="d-flex flex-wrap justify-content-end align-items-center gap-2 ms-auto"
               >
+                <span
+                  id="configValidation"
+                  class="small"
+                  role="status"
+                  hidden
+                ></span>
                 <div class="btn-group btn-group-sm">
                   <button
                     class="btn btn-outline-light"
@@ -342,35 +369,6 @@
                     aria-label="Reset main.py"
                   >
                     <i class="bi bi-arrow-counterclockwise"></i>
-                  </button>
-                </div>
-                <div
-                  class="nav nav-tabs editor-tabs"
-                  role="tablist"
-                  aria-label="Python files"
-                >
-                  <button
-                    class="nav-link active"
-                    id="mainTab"
-                    type="button"
-                    role="tab"
-                    data-editor-file="main.py"
-                    aria-selected="true"
-                    aria-controls="editor"
-                  >
-                    main.py
-                  </button>
-                  <button
-                    class="nav-link"
-                    id="configTab"
-                    type="button"
-                    role="tab"
-                    data-editor-file="config.py"
-                    aria-selected="false"
-                    aria-controls="editor"
-                    tabindex="-1"
-                  >
-                    config.py
                   </button>
                 </div>
               </div>

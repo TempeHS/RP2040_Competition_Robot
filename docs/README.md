@@ -136,6 +136,10 @@ See [Assembly_Instructions.md](Assembly_Instructions.md) for full assembly and h
 
 The build system freezes AIDriver libraries for fast import while keeping `main.py` and `config.py` editable on the device filesystem. Existing files are preserved; missing files are provisioned from bundled defaults.
 
+The bundled config starts with zero numeric values and commented starting ranges.
+Fill in required settings before running; provisioning does not install the
+tuned test-only config or make an unfinished configuration runnable.
+
 Quick build:
 
 ```bash
@@ -147,7 +151,7 @@ Recovery mode:
 
 - If `main.py` is corrupted, hold GPIO2 low (connect GP2 to GND) during boot.
 - Recovery restores default `main.py` and clears `event_log.txt`, but preserves `config.py`.
-- To explicitly reset config, call `robot_recovery.restore_config()` from the MicroPython REPL. It backs up the old source before replacement; restart afterward.
+- To explicitly reset config, call `robot_recovery.restore_config()` from the MicroPython REPL. It backs up the old source before restoring the zeroed template; recover or tune required settings before restarting main.
 
 Full guide: [Build_Custom_MicroPython_Firmware.md](Build_Custom_MicroPython_Firmware.md)
 

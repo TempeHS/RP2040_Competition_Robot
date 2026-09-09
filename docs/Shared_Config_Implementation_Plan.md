@@ -12,8 +12,10 @@ The algorithms remain visible and editable. Most student work is tuning configur
 
 - Use two Python files on the robot: `config.py` and `main.py`.
 - Use one shared configuration for the simulator and physical robot, not separate profiles.
-- Provide a simulator Config page with a Python editor and purpose-based section headings.
-- Include every configuration section from the start with usable starting values. These are baselines for tuning, not guarantees of successful hardware runs.
+- Provide left-aligned `main.py` and `config.py` tabs spanning the grey editor header's full height, without a duplicate filename label or a separate Config screen. Keep file actions on the right and the simulator available while config is visible.
+- Include every configuration section from the start with numeric values set to zero and suggested starting ranges in comments/notes. Keep hardware-selection strings, booleans and optional pins correctly typed.
+- Show an explicit Validate action on the config tab. Run and Step always execute main using the latest config snapshot.
+- Keep runnable test values in `tests/test-config.py`. Test the two configs' variable-name parity, not value equality. Never silently load test tuning into a student's configuration.
 - Changing challenges or resetting a challenge program must not replace configuration.
 - Students may edit the algorithms in each main program.
 - Later programs consume more configuration as the robot becomes more functional.
@@ -29,7 +31,7 @@ The algorithms remain visible and editable. Most student work is tuning configur
 
 ## Configuration Contract
 
-The canonical default is [project/config.py](../project/config.py). The simulator loads or stages this same source; there is no second manually maintained set of browser defaults.
+The canonical student template is [project/config.py](../project/config.py). The simulator loads or stages this same zeroed source; there is no second manually maintained set of browser defaults. The host, Skulpt and browser test harnesses explicitly load [test-config.py](../tests/test-config.py) for runnable values. That fixture is excluded from published assets and firmware.
 
 Use flat Python assignments and explicit `import config` in each main. Preserve existing tuning names where practical so students can recognise the equations in the current guides. Do not use wildcard imports, configuration classes, nested settings dictionaries, or challenge-specific configuration files.
 
@@ -40,7 +42,7 @@ Configuration contains scalar settings and simple expressions based on other set
 | Section                              | Configuration names                                                                                                      | Meaning and units                                                                                                  |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Robot Setup                          | `WALL_SIDE`, `DISTANCE_SENSOR`, `DEBUG_AIDRIVER`, `KIT_SERVO_PIN`                                                        | Left/right wall, ultrasonic/ToF backend, debug flag, optional servo GPIO or `None`.                                |
-| Driving                              | `BASE_SPEED`, `LOOP_DT`                                                                                                  | Forward PWM baseline and normal loop interval in seconds.                                                          |
+| Driving                              | `BASE_SPEED`, `LOOP_DT`, `STARTUP_PAUSE_TIME`                                                                            | Forward PWM, loop interval, and the hardware main's startup display pause in seconds.                              |
 | Wall PID                             | `TARGET_WALL_DISTANCE`, `MAX_STEERING`, `side_Kp`, `side_Ki`, `side_Kd`, `side_INTEGRAL_MAX`                             | Side-wall distance in mm, steering limit, gains, and integral anti-windup limit.                                   |
 | Front Distance Control               | `FRONT_SLOW_DISTANCE`, `FRONT_STOP_DISTANCE`, `FRONT_Kp`, `MIN_APPROACH_SPEED`                                           | Slowdown/stop thresholds in mm, proportional approach gain, and minimum approach PWM.                              |
 | Turn Control                         | `turn_Kp`, `turn_Kd`, `turn_tolerance`, `TURN_ANGLE`, `TURN_MAX_SPEED`, `MIN_TURN_SPEED`, `TURN_TIMEOUT_MS`              | Heading gains, tolerance/angle in degrees, spin PWM limits, and timeout in ms.                                     |
@@ -59,7 +61,7 @@ The three Turn Mechanics rows are subsections of one advanced section. Recovery 
 
 The front controller currently implements proportional slowdown, and the student turn controller uses P and D. Do not add unused front or turn integral gains merely to label these sections PID.
 
-Each setting needs a short purpose and unit comment. Distinguish normal tuning settings from fixed chassis mechanics and safety limits. Final numeric baselines must be checked against the current algorithms; copying unrelated gains from different timing conventions is not acceptable.
+Each setting needs a short purpose, unit, and suggested starting range in a comment. Distinguish normal tuning settings from fixed algorithm operations and library safety limits. Tuned test values must be checked against the current algorithms; copying unrelated gains from different timing conventions is not acceptable. Fresh student config is deliberately invalid until required positive settings are filled in; validation checks the complete config rather than substituting fixture values.
 
 ### State That Remains in Main
 
@@ -114,13 +116,14 @@ Convert both learner templates and teacher references to this contract. Preserve
 
 ## Simulator Work
 
-### Config Page and Persistence
+### Config Tabs and Persistence
 
-- Add a Config page using the existing ACE Python editor and visual conventions.
-- Provide purpose-based headings/folding, a save indicator, import/download, and an explicitly confirmed reset-to-default action.
+- Use two ACE sessions in the existing editor for main and config, preserving the arena, run controls, cursor positions and undo history while switching tabs.
+- Provide purpose-based config headings, a Config-only validation button, selected-file import/download/copy, and an explicitly confirmed reset. Config reset restores the zeroed template.
+- Redirect legacy Config-page URLs into the simulator's config tab.
 - Preserve formatting and comments by storing the actual Python source.
 - Store configuration once per browser origin, independently of challenge IDs and `STARTER_VERSION`. This is local browser storage, not account-based syncing.
-- Flush pending saves before navigation, challenge changes, exports, and runs. Switching pages must not lose edits waiting for the autosave debounce.
+- Flush pending saves before tab switches, navigation, challenge changes, exports, and runs. Hidden-file edits must not be saved under the wrong challenge.
 - Reset Main affects only the selected program; Reset Robot affects only runtime state. Neither resets configuration.
 - Preserve existing student programs during rollout. Offer explicit template replacement and config creation without attempting a destructive, regex-based migration of arbitrary Python.
 - Later default/template updates must not overwrite saved values. Any missing-setting migration must be explicit and preserve the student's original source.
@@ -131,6 +134,7 @@ Convert both learner templates and teacher references to this contract. Preserve
 - Clear stale module caches at run boundaries so edits are reflected in the next run.
 - Extend the import allowlist for `config`, while preserving existing restrictions on unrelated modules.
 - Validate configuration without main-program warnings such as a missing AIDriver instance. Use parsing rather than regex rewriting to inspect Python structure.
+- Manual validation never starts main and is blocked during execution so it cannot reconfigure an active Skulpt run.
 - Attribute syntax and runtime errors to the correct source file and line, and open the relevant editor.
 - Check types, units, positive timing/budget values, front slow/stop ordering, and motor ranges. Do not require an unused PID term to be nonzero.
 - Accept the selected distance backend and optional hardware settings in both simulator AIDriver implementations. Do not silently reinterpret the ToF argument as minimum approach speed.
@@ -169,7 +173,7 @@ Add a root `pytest.ini` with `testpaths = tests` so ordinary host test discovery
 
 - `fake_clock`: implements `hold_state`, `ticks_ms`, and wrap-aware `ticks_diff` without real sleeping; permits deterministic timeout and wraparound tests.
 - `recording_robot`: records motor, brake, display, and kit commands and supplies scripted distance, gyro, colour, and interrupt results.
-- `isolated_config`: loads a fresh configuration/module namespace per test and restores `sys.modules` afterward. Parameterized tests must not leak settings into one another.
+- `isolated_config`: loads a fresh `tests/test-config.py` module namespace per test and restores `sys.modules` afterward. Parameterized tests must not leak settings into one another.
 - `challenge_loader`: loads each main without starting an infinite loop or touching hardware. Introduce a guarded `main()` entry point while keeping algorithms visible and test helpers out of learner configuration.
 - Execute state functions directly where possible. Bound whole-program tests with a test-owned stop sentinel and operation budget; do not rely on wall-clock waits or unbounded imports.
 - Use temporary directories for exports, logs, boot simulation, and filesystem fixtures. Tests must not overwrite a student's configuration or generated firmware.
@@ -177,6 +181,11 @@ Add a root `pytest.ini` with `testpaths = tests` so ordinary host test discovery
 ### New Test Modules
 
 The following files now exist and test the configuration contract and progression behavior.
+
+The config checks enforce zero numeric student values, valid tuned test values,
+and identical variable-name sets without requiring equal values. All twenty
+challenge programs and the hardware main are checked for local tuning copies,
+unresolved config references, config mutation, and literal pause durations.
 
 | Proposed file                         | Required coverage                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -223,7 +232,7 @@ Extend the existing Jest suite and add focused browser checks for responsibiliti
 - Both Skulpt paths can import the latest config, including a second run after changing a value.
 - Invalid config produces a config-file diagnostic, not a misleading main-file highlight.
 - Import/export round-trips preserve source and comments; downloaded programs import the downloaded config without rewriting tuning.
-- Config-page reset requires confirmation and leaves saved mains intact.
+- Config-tab reset requires confirmation, restores zeros and leaves saved mains intact.
 - Legacy saved mains remain accessible during migration.
 - API consistency checks cover the configuration-facing constructor/settings as well as public method names.
 - The Config editor and controls work at desktop and mobile sizes, and the deployed default-config asset loads successfully.
@@ -233,8 +242,8 @@ Run controlled simulator exercises with one carried-forward configuration, expli
 ### Verification Results
 
 - The host pytest suite passes, including all twenty challenge programs, configuration consumption, progression logic, documentation, and generated filesystem provisioning/recovery.
-- The complete Jest suite passes, including real Skulpt execution of all twenty programs in both normal and trace paths with test-owned limits. P/PD/PID trajectory comparisons use the same canonical configuration without per-challenge rewrites.
-- The [optional Chromium check](../app/tests/browser/shared_config.py) passes against both the repository-root development server and the staged project-site URL. It verifies independent persistence, immediate navigation saves, imports/downloads, Run/Step config errors, and reset isolation. It deliberately changes `BASE_SPEED` from 185 to 190 to check fresh imports and rejects 0 before movement.
+- The complete Jest suite passes, including real Skulpt execution of all twenty programs in both normal and trace paths with test-owned limits. P/PD/PID trajectory comparisons use the same test-config fixture without per-challenge rewrites.
+- The [optional Chromium check](../app/tests/browser/shared_config.py) passes against both the repository-root development server and the staged project-site URL. It verifies full-height left-aligned tabs, Config-only validation, the zeroed first load, independent persistence, imports/downloads, Run/Step errors, and reset isolation. Runnable cases explicitly load the test fixture, changing `BASE_SPEED` to 185, 190 and 195 to check fresh imports while config remains visible, and reject 0 before movement.
 - Desktop (1440 by 1000) and mobile (390 by 844) screenshots were inspected. Canvas pixel and movement checks pass; controls do not overflow horizontally, and the mobile status bar does not cover the arena. Reproduction commands are in the [simulator README](../app/README.md#optional-browser-check).
 - No board was flashed and no physical calibration was performed. The checked-in UF2 is unchanged. Downloaded mains require a firmware build containing `config_check` or deployment of that helper; the new recovery module requires the updated firmware build.
 
@@ -251,6 +260,8 @@ Run controlled simulator exercises with one carried-forward configuration, expli
 ## Acceptance Checklist
 
 - [x] One purpose-based config supplies every learner-facing tuning value.
+- [x] Student numeric defaults are zero; test-only tuned values have matching variable names without requiring matching values.
+- [x] Full-height left-aligned main/config tabs replace the duplicate filename label and retain the simulator view, with explicit Config-only validation.
 - [x] Students replace main without copying or losing prior tuning.
 - [x] Algorithms remain visible and editable.
 - [x] Configuration persists independently of challenge and template versions.

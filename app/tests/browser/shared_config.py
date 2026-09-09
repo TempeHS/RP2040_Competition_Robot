@@ -73,10 +73,17 @@ def check_layout(page):
     )
     assert dimensions["scroll"] <= dimensions["width"], dimensions
     assert page.locator("#editorFilename").count() == 0
+    header = page.locator(".editor-header").bounding_box()
     tools = page.locator("#editorTools").bounding_box()
     tabs = page.locator(".editor-tabs").bounding_box()
-    assert tools and tabs
-    assert abs(tools["x"] + tools["width"] - tabs["x"] - tabs["width"]) <= 1
+    assert header and tools and tabs
+    assert abs(tabs["x"] - header["x"]) <= 1
+    assert tabs["x"] + tabs["width"] <= tools["x"] + 1
+    for tab in page.locator(".editor-tabs [role='tab']").all():
+        bounds = tab.bounding_box()
+        assert bounds
+        assert abs(bounds["y"] - header["y"]) <= 1
+        assert abs(bounds["height"] - header["height"]) <= 1
     if dimensions["width"] < 992 and page.locator("#statusBar").count():
         status = page.locator("#statusBar").bounding_box()
         arena = page.locator("#canvasContainer").bounding_box()
@@ -84,7 +91,7 @@ def check_layout(page):
         assert status["y"] >= arena["y"] + arena["height"], (status, arena)
     bounds = [
         element.bounding_box()
-        for element in page.locator("#editorTools button:visible").all()
+        for element in page.locator(".editor-header button:visible").all()
     ]
     for index, first in enumerate(bounds):
         assert first and first["width"] > 0
@@ -367,7 +374,7 @@ def main():
         finally:
             browser.close()
     print(
-        "PASS: right-aligned tabs, zeroed student config, validation, test-config execution, persistence, import/export, resets and responsive layout"
+        "PASS: full-height left tabs, zeroed student config, validation, test-config execution, persistence, import/export, resets and responsive layout"
     )
     print("Screenshots:", args.output)
 

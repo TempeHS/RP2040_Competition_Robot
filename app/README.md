@@ -31,7 +31,7 @@ A browser-based robot simulator for the AIDriver MicroPython Challenges. This we
 
 ## Shared Configuration
 
-Use the **main.py** and **config.py** tabs at the top right of the same editor.
+Use the full-height **main.py** and **config.py** tabs at the top left of the same editor.
 The simulator remains on screen. Run and Step execute main with the latest
 config regardless of which tab is visible; edits during execution apply on the
 next run. **Validate config.py** (the check-circle button) checks config without
@@ -144,7 +144,7 @@ unfinished student tuning.
 ### Optional Browser Check
 
 The [Chromium workflow check](tests/browser/shared_config.py) is separate from
-pytest and Jest. It uses an isolated browser profile and checks the right-aligned
+pytest and Jest. It uses an isolated browser profile and checks the full-height left-aligned
 tabs, zeroed first load, Config validation, pending saves, challenge changes,
 fresh test-config values on Run and Step while config stays visible, diagnostics,
 import/export, independent resets, robot movement, and desktop/mobile layout.

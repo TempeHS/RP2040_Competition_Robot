@@ -6,7 +6,7 @@ the simulator and robot; there are no separate simulator and hardware profiles.
 
 ## Start And Continue
 
-1. Open a challenge and select the **config.py** tab at the top right of the editor.
+1. Open a challenge and select the **config.py** tab at the top left of the editor.
 2. Review **Robot Setup**, especially `WALL_SIDE` and `DISTANCE_SENSOR`. The
    initial choices use left-wall following and ToF sensors. Select `"ultrasonic"` if
    those are the sensors fitted to your robot.
