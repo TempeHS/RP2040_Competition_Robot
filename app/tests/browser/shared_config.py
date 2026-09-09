@@ -72,13 +72,19 @@ def check_layout(page):
         "({ width: innerWidth, scroll: document.documentElement.scrollWidth })"
     )
     assert dimensions["scroll"] <= dimensions["width"], dimensions
+    assert page.locator("#editorFilename").count() == 0
+    tools = page.locator("#editorTools").bounding_box()
+    tabs = page.locator(".editor-tabs").bounding_box()
+    assert tools and tabs
+    assert abs(tools["x"] + tools["width"] - tabs["x"] - tabs["width"]) <= 1
     if dimensions["width"] < 992 and page.locator("#statusBar").count():
         status = page.locator("#statusBar").bounding_box()
         arena = page.locator("#canvasContainer").bounding_box()
         assert status and arena
         assert status["y"] >= arena["y"] + arena["height"], (status, arena)
     bounds = [
-        element.bounding_box() for element in page.locator("#editorTools button").all()
+        element.bounding_box()
+        for element in page.locator("#editorTools button:visible").all()
     ]
     for index, first in enumerate(bounds):
         assert first and first["width"] > 0
@@ -112,18 +118,26 @@ def run_once(page, speed, source=None):
 
 def exercise(page, base_url, output):
     default = (ROOT / "project/config.py").read_text(encoding="utf-8")
+    test_config = (ROOT / "tests/test-config.py").read_text(encoding="utf-8")
     tuned = (
-        default.replace("BASE_SPEED = 200", "BASE_SPEED = 185")
+        test_config.replace("BASE_SPEED = 200", "BASE_SPEED = 185")
         + "\n# Browser round-trip tuning\n"
     )
     page.goto(urljoin(base_url, "simulator.html?challenge=1"))
     wait_main(page)
+    expect(page.locator("#btnValidateConfig")).to_be_hidden()
     page.evaluate(
         "window.originalEditor = Editor.instance; window.originalRobot = App.robot"
     )
     page.locator("#configTab").click()
     wait_config(page)
     assert page.evaluate("Editor.getActiveCode()") == default
+    expect(page.locator("#btnValidateConfig")).to_be_visible()
+    page.locator("#btnValidateConfig").click()
+    expect(page.locator("#configValidation")).to_have_text("Invalid config")
+    assert "BASE_SPEED" in page.evaluate("Editor.configError.message")
+    assert page.evaluate("[App.robot.rightSpeed, App.robot.leftSpeed]") == [0, 0]
+    assert not page.evaluate("App.hasRun || App.isRunning")
     expect(page.locator("#arenaCanvas")).to_be_visible()
     expect(page.locator("#btnRun")).to_be_visible()
     assert page.evaluate(
@@ -137,6 +151,13 @@ def exercise(page, base_url, output):
         "colors.add(data[index] + ',' + data[index + 1] + ',' + data[index + 2]); return colors.size; }"
     )
     assert pixels > 10, "Arena canvas is blank"
+    page.evaluate(
+        "source => { Editor.instance.setValue(source, -1); document.getElementById('btnValidateConfig').click(); }",
+        tuned,
+    )
+    expect(page.locator("#configValidation")).to_have_text("Config valid")
+    assert saved(page, CONFIG_KEY) == tuned
+    assert not page.evaluate("App.hasRun || App.isRunning")
     start_y = page.evaluate("App.robot.y")
     page.evaluate(
         "source => { Editor.instance.setValue(source, -1); document.getElementById('btnRun').click(); }",
@@ -145,8 +166,12 @@ def exercise(page, base_url, output):
     page.wait_for_function("start => App.robot.y < start - 30", arg=start_y)
     wait_config(page)
     assert saved(page, CONFIG_KEY) == tuned
+    page.locator("#btnValidateConfig").click()
+    expect(page.locator("#configValidation")).to_have_text("Stop before validating")
+    assert page.evaluate("App.isRunning")
     page.locator("#mainTab").click()
     expect(page.locator("#mainTab")).to_have_attribute("aria-selected", "true")
+    expect(page.locator("#btnValidateConfig")).to_be_hidden()
     page.locator("#configTab").click()
     wait_config(page)
     assert page.evaluate("App.isRunning && Editor.instance === window.originalEditor")
@@ -224,7 +249,7 @@ def exercise(page, base_url, output):
     expect(page.locator("#challengeStatus")).to_have_text("Error", timeout=20000)
     line = next(
         index + 1
-        for index, text in enumerate(default.splitlines())
+        for index, text in enumerate(invalid.splitlines())
         if text.startswith("BASE_SPEED =")
     )
     expect(page.locator("#debugConsole")).to_contain_text(f"config.py:{line}:")
@@ -335,14 +360,14 @@ def main():
             page.screenshot(path=str(args.output / "failure.png"), full_page=True)
             print("Failed page:", page.url)
             print("Browser errors:", errors)
-            for selector in ("#editorFilename", "#debugConsole"):
+            for selector in ("#configValidation", "#debugConsole"):
                 if page.locator(selector).count():
                     print(page.locator(selector).inner_text())
             raise
         finally:
             browser.close()
     print(
-        "PASS: in-place tabs, config-visible Run/Step, persistence, downloads, import, diagnostics, resets and responsive layout"
+        "PASS: right-aligned tabs, zeroed student config, validation, test-config execution, persistence, import/export, resets and responsive layout"
     )
     print("Screenshots:", args.output)
 

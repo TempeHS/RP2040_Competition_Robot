@@ -13,6 +13,39 @@ PROGRAMS = [
 ]
 
 
+@pytest.mark.parametrize(
+    "filename",
+    [f"app/{folder}/challenge-{number}.py" for number, folder in PROGRAMS]
+    + ["project/main.py"],
+)
+def test_supplied_scripts_keep_tuning_and_pauses_in_config(filename, isolated_config):
+    tree = ast.parse((ROOT / filename).read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            assert not node.id.isupper(), f"Local constant {node.id} belongs in config"
+            assert not hasattr(isolated_config, node.id), node.id
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "config"
+        ):
+            assert isinstance(
+                node.ctx, ast.Load
+            ), "Runtime state must not mutate config"
+            assert hasattr(isolated_config, node.attr), node.attr
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "hold_state"
+        ):
+            assert len(node.args) == 1
+            pause = node.args[0]
+            assert isinstance(pause, ast.Attribute) and isinstance(
+                pause.value, ast.Name
+            )
+            assert pause.value.id == "config", "Pause durations belong in config"
+
+
 @pytest.mark.parametrize("number,folder", PROGRAMS)
 def test_import_safe_and_config_references_resolve(
     number, folder, challenge_loader, isolated_config, recording_robot

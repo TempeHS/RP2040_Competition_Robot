@@ -52,6 +52,19 @@ def test_browser_check_is_documented_as_optional_and_repeatable():
 
 
 @pytest.mark.parametrize(
+    "filename", ["app/README.md", "docs/Shared_Config_Workflow.md"]
+)
+def test_config_guides_describe_tabs_zero_defaults_and_test_settings(filename):
+    source = (ROOT / filename).read_text(encoding="utf-8")
+    assert "**main.py**" in source and "**config.py**" in source
+    assert "Validate config.py" in source
+    assert "Numeric settings start at zero" in source
+    assert "../tests/test-config.py" in source
+    assert "usable starting values" not in source
+    assert "Main & Simulator" not in source
+
+
+@pytest.mark.parametrize(
     "filename", ["README.md", "Build_Custom_MicroPython_Firmware.md"]
 )
 def test_hardware_guides_describe_two_file_recovery(filename):

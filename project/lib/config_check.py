@@ -54,6 +54,7 @@ def validate_config(config, min_motor_speed=120):
         "turn_Kp",
         "turn_Kd",
         "HEADING_Kp",
+        "STARTUP_PAUSE_TIME",
         "TURN_COAST_TIME",
         "TURN_CLEAR_TIME",
         "TURN_PAUSE_TIME",

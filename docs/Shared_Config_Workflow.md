@@ -6,23 +6,32 @@ the simulator and robot; there are no separate simulator and hardware profiles.
 
 ## Start And Continue
 
-1. Open a challenge in the simulator and select **Config** above the main editor.
+1. Open a challenge and select the **config.py** tab at the top right of the editor.
 2. Review **Robot Setup**, especially `WALL_SIDE` and `DISTANCE_SENSOR`. The
-   baseline uses left-wall following and ToF sensors. Select `"ultrasonic"` if
+   initial choices use left-wall following and ToF sensors. Select `"ultrasonic"` if
    those are the sensors fitted to your robot.
-3. Tune the sections named in the challenge guide, then select **Validate**.
-4. Return to **Main & Simulator** and run the current program.
+3. Set the required numeric values using the comments and challenge notes, then
+   select **Validate config.py** (the check-circle button). Invalid values are
+   marked in config, not in main.
+4. Select **Run** or **Step** with either tab open. Config stays visible if selected;
+   the simulator always executes the main program with the current config.
 5. For the next challenge, load its main program. Your shared config stays put.
 
-All sections are present from the beginning, with usable starting values.
+Numeric settings start at zero. All sections are present, with suggested
+starting ranges in comments rather than prefilled tuning. `WALL_SIDE`,
+`DISTANCE_SENSOR`, `DEBUG_AIDRIVER`, and `KIT_SERVO_PIN` keep their string,
+boolean, or optional-pin types. A fresh or reset config is intentionally not
+ready to run: positive speeds, timings, distances and budgets must be filled in.
+Validation checks the complete configuration, including required values in
+sections a later challenge will use. It never silently supplies test values.
+
 The algorithm decides which settings are active: Challenge 1 uses P only,
 Challenge 2 adds D, and Challenge 3 adds I. Zero is still valid for an unused
 gain. Later geometry and physical hardware can require explicit retuning.
 
-The starting wall gains are `side_Kp = 0.4`, `side_Kd = 0.3`,
-`side_Ki = 0.001`, with `side_INTEGRAL_MAX = 50`. These pass the controlled
-straight-corridor simulator progression checks. They do not guarantee a full
-maze run or replace calibration on your robot.
+The test harness uses a separate [test-config.py](../tests/test-config.py),
+with the former tuned values. Passing simulator checks with that fixture does
+not guarantee a full maze run or replace calibration on your robot.
 
 ## What Lives Where
 
@@ -41,6 +50,10 @@ Do not add `MIN_MOTOR_SPEED` to config: the library owns the 120 PWM motor floor
 Integral history, previous error, state labels, timers, marker history and
 victim counters remain in main and reset on each run. A run uses a snapshot
 of config; changes apply to the next run, not to a moving robot.
+The supplied scripts do not define their own tuning settings. Calculated
+values, unit conversions and runtime variables still belong to the algorithm.
+Students can add variables while extending their code; new adjustable settings
+belong in config rather than duplicating existing settings in main.
 
 The side PID uses error sums and differences **per loop**, not per second.
 Changing `LOOP_DT` can therefore require gain retuning. The visible turn helper
@@ -58,9 +71,11 @@ and D. No unused integral terms have been added to either section.
 - **Reset Main** replaces only the selected main. **Reset Robot** changes only
   simulation state. Neither changes config.
 - **Reset Config** requires confirmation and replaces all shared tuning with
-  the baseline. Saved mains are unchanged.
+  the zeroed student template. Saved mains are unchanged.
 - **Import Config** validates a Python file and asks before replacing tuning.
   **Download Config** preserves the current source, including unfinished edits.
+- Import, download, copy and reset act on the selected file tab. Validation is
+  available on config only, while stopped; it does not run the main program.
 - Existing saved mains remain available. Download your old main before choosing
   **Reset Main** to adopt the new template. Old embedded settings are not
   automatically extracted or rewritten; move your own values into config once.
@@ -69,7 +84,7 @@ and D. No unused integral terms have been added to either section.
 
 1. Use firmware built from this implementation. Older UF2 files do not contain
    the new `config_check` helper. See the [firmware build guide](Build_Custom_MicroPython_Firmware.md).
-2. Download `config.py` from Config and `main.py` from the main editor.
+2. Download each file from its corresponding **config.py** or **main.py** tab.
 3. Stop the robot, then transfer both files to its filesystem root. Check the
    sensor backend, wall side, battery condition and clear working area.
 4. Validate on hardware at a controlled speed. On later challenges replace
@@ -94,8 +109,18 @@ robot_recovery.restore_config()
 ```
 
 This preserves the old source as `config.py.bak`, or the next numbered backup
-if one already exists, and writes the bundled baseline. Restart the robot to
-load it. Keep the backup until you have recovered the tuning you need.
+if one already exists, and writes the bundled zeroed template. Restore or tune
+the required values before running main again. Keep the backup until you have
+recovered the tuning you need.
+
+## Test Configuration
+
+Python, Skulpt and Chromium script checks load [test-config.py](../tests/test-config.py)
+as their runnable `config` module. Tests compare its variable names with the
+student config, not its values. Add a setting to both files when extending the
+course contract: zero in the student template, a suitable value in the fixture.
+The fixture is not staged to the published site or bundled into firmware.
+Separate tests verify zero-value rejection and exact student-template provisioning.
 
 ## Current Limits
 

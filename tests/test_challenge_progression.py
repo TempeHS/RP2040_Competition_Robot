@@ -354,11 +354,13 @@ def test_default_robot_main_retains_config_and_oled_contract(
     challenge_loader, isolated_config, recording_robot, fake_clock
 ):
     isolated_config.BASE_SPEED = 185
+    isolated_config.STARTUP_PAUSE_TIME = 0.12
     module = challenge_loader("project")
     assert recording_robot.calls == []
     fake_clock.limit = 2
     with pytest.raises(StopChallenge):
         module.main()
+    assert ("hold", 0.12) in recording_robot.calls
     assert ("drive", 185, 185) in recording_robot.calls
     assert (
         "display",

@@ -31,18 +31,26 @@ A browser-based robot simulator for the AIDriver MicroPython Challenges. This we
 
 ## Shared Configuration
 
-Open **Config** above the main editor to edit the shared Python settings.
-All sections are available from the start. Keep this file when changing
-challenges; only the main algorithm changes. Config and each challenge main
-are saved independently in this browser's local storage.
+Use the **main.py** and **config.py** tabs at the top right of the same editor.
+The simulator remains on screen. Run and Step execute main with the latest
+config regardless of which tab is visible; edits during execution apply on the
+next run. **Validate config.py** (the check-circle button) checks config without
+running main and marks invalid settings in that file. Stop before validating.
 
-Download `config.py` from Config and `main.py` from the main editor. Transfer
+Numeric settings start at zero, with suggested starting ranges in comments.
+Select the fitted hardware and fill in required speeds, timings, distances and
+budgets before running. Validation checks the entire config; unused PID gains
+may stay zero. Main contains algorithms and runtime state, not duplicate tuning.
+Keep config when changing challenges. Both files save independently in this
+browser's local storage.
+
+Import, download, copy and reset act on the selected tab. Download both files and transfer
 both to the robot initially, then replace only main unless you deliberately
 retune. Use firmware built from this implementation, which includes the
 configuration checker. The checked-in UF2 may predate that helper.
 
 **Reset Main** and **Reset Robot** preserve config. **Reset Config** requires
-confirmation. Existing saved mains are preserved and are not automatically
+confirmation and restores the zeroed template. Existing saved mains are preserved and are not automatically
 rewritten; reset a main explicitly to load its new template.
 
 See the [shared workflow](../docs/Shared_Config_Workflow.md) for section meanings,
@@ -127,11 +135,18 @@ npm install
 npm test -- --runInBand
 ```
 
+Runnable script checks load [test-config.py](../tests/test-config.py), not the
+zeroed student defaults. Python and Skulpt tests keep the two files' variable
+names in sync without requiring equal values. The tuned fixture is excluded
+from the published site and firmware; it is never an automatic fallback for
+unfinished student tuning.
+
 ### Optional Browser Check
 
 The [Chromium workflow check](tests/browser/shared_config.py) is separate from
-pytest and Jest. It uses an isolated browser profile and checks pending saves,
-challenge changes, fresh config on Run and Step, invalid-config diagnostics,
+pytest and Jest. It uses an isolated browser profile and checks the right-aligned
+tabs, zeroed first load, Config validation, pending saves, challenge changes,
+fresh test-config values on Run and Step while config stays visible, diagnostics,
 import/export, independent resets, robot movement, and desktop/mobile layout.
 It saves screenshots and downloaded Python files under the selected output
 directory without touching your browser's saved work.
@@ -173,14 +188,14 @@ from the repository root. Serve the resulting directory over HTTP.
 app/
 ├── index.html          # Main HTML page
 ├── simulator.html      # Main editor and simulator
-├── config.html         # Shared Python config editor
+├── config.html         # Legacy link redirects to the simulator config tab
 ├── README.md           # This file
 ├── css/
 │   └── style.css       # Custom styles
 ├── js/
 │   ├── app.js          # Main application
-│   ├── editor.js       # ACE Editor module
-│   ├── config-editor.js # Config editing, import/export and validation
+│   ├── editor.js       # Main/config sessions, validation and file actions
+│   ├── config-redirect.js # Preserve legacy Config URLs
 │   ├── config-store.js # Independent storage and Skulpt config modules
 │   ├── simulator.js    # Physics engine
 │   ├── python-runner.js # Skulpt integration

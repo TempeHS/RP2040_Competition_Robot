@@ -25,6 +25,10 @@ describe("Canonical config deployment", () => {
       }
       expect(fs.existsSync(path.join(output, "config.html"))).toBe(true);
       expect(fs.existsSync(path.join(output, "node_modules"))).toBe(false);
+      expect(fs.existsSync(path.join(output, "tests"))).toBe(false);
+      expect(fs.existsSync(path.join(output, "project/test-config.py"))).toBe(
+        false,
+      );
       expect(
         fs.existsSync(path.join(output, "_Firmware/THS_Comp_RP2040.uf2")),
       ).toBe(true);

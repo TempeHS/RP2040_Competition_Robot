@@ -9,6 +9,7 @@ KIT_SERVO_PIN = None  # Optional rescue-kit GPIO; None when not fitted.
 # Driving
 BASE_SPEED = 0  # Forward PWM, 120-255; suggested start 180-220.
 LOOP_DT = 0.0  # Normal loop pause, seconds; suggested start 0.02-0.05.
+STARTUP_PAUSE_TIME = 0.0  # Hardware main's startup display pause, seconds; try 1-2.
 
 # Wall PID
 TARGET_WALL_DISTANCE = 0  # Side clearance, mm; suggested start 80-120.

@@ -5,7 +5,6 @@ from config_check import validate_config
 import aidriver
 import config
 
-
 state = "FOLLOW_WALL"
 side_previous_error = 0
 side_integral = 0
@@ -114,7 +113,9 @@ def gyro_turn_pid(relative_angle_deg):
             last_ms = now
             heading = heading + (gz * dt)
         my_robot.brake()
-        heading, last_ms = _settle(heading, last_ms, gyro_sign, config.NUDGE_SETTLE_STEPS)
+        heading, last_ms = _settle(
+            heading, last_ms, gyro_sign, config.NUDGE_SETTLE_STEPS
+        )
         nudges = nudges + 1
     return heading
 
@@ -133,11 +134,13 @@ def main():
     side_previous_error = 0
     side_integral = 0
     try:
-        hold_state(2.0)
+        hold_state(config.STARTUP_PAUSE_TIME)
 
         while True:
             if state == "TURN":
-                my_robot.show_display("TURN", "{} deg".format(config.TURN_ANGLE), "", "", force=True)
+                my_robot.show_display(
+                    "TURN", "{} deg".format(config.TURN_ANGLE), "", "", force=True
+                )
                 my_robot.brake()
                 hold_state(config.TURN_PAUSE_TIME)
                 gyro_turn_pid(config.TURN_ANGLE)
@@ -182,10 +185,14 @@ def main():
             side_derivative = error - side_previous_error
 
             steering = (
-                (config.side_Kp * error) + (config.side_Ki * side_integral) + (config.side_Kd * side_derivative)
+                (config.side_Kp * error)
+                + (config.side_Ki * side_integral)
+                + (config.side_Kd * side_derivative)
             )
 
-            right_speed, left_speed = my_robot.steer(speed, steering, config.MAX_STEERING)
+            right_speed, left_speed = my_robot.steer(
+                speed, steering, config.MAX_STEERING
+            )
 
             my_robot.show_display(
                 "FOLLOW P",

@@ -30,7 +30,7 @@ const ROBOT_CONFIG_JS = path.join(APP_DIR, "js/robot-config.js");
 const AIDRIVER_STUB_JS = path.join(APP_DIR, "js/aidriver-stub.js");
 const ANSWER_PY = path.join(APP_DIR, "answers/challenge-1.py");
 const CONFIG_PY = fs.readFileSync(
-  path.join(APP_DIR, "../project/config.py"),
+  path.join(APP_DIR, "../tests/test-config.py"),
   "utf8",
 );
 const CONFIG_CHECK_PY = fs.readFileSync(
