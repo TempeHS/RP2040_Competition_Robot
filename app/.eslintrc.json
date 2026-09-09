@@ -12,6 +12,7 @@
   "globals": {
     "App": "writable",
     "Editor": "readonly",
+    "ConfigStore": "readonly",
     "Simulator": "readonly",
     "Logger": "readonly",
     "DebugPanel": "readonly",
@@ -46,7 +47,7 @@
       }
     },
     {
-      "files": ["**/*.config.js", "**/*.cjs"],
+      "files": ["**/*.config.js", "**/*.cjs", "scripts/**/*.js"],
       "env": {
         "node": true
       }

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Browser-based AIDriver robot simulator for MicroPython education",
   "scripts": {
+    "build": "node scripts/stage-site.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "test:unit": "jest --testPathPattern=unit",

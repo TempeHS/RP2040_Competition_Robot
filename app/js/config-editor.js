@@ -1,4 +1,3 @@
-/* global ace, bootstrap, ConfigStore */
 const ConfigEditor = {
   instance: null,
   saveTimeout: null,

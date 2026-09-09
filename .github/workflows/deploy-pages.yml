@@ -28,16 +28,18 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Copy firmware files to app directory
-        run: cp -r _Firmware app/
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-      - name: Copy docs to app directory
-        run: cp -r docs app/
+      - name: Stage website and canonical Python sources
+        run: node app/scripts/stage-site.js _site
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: app/
+          path: _site/
 
       - name: Deploy to GitHub Pages
         id: deployment

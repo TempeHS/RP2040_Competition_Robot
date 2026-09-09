@@ -1,4 +1,3 @@
-/* global Sk */
 const ConfigStore = {
   key: "aidriver_shared_config",
   source: null,
@@ -6,24 +5,26 @@ const ConfigStore = {
   checkSource: null,
   loading: null,
 
+  async loadSource(path) {
+    for (const location of [path, "../" + path]) {
+      const response = await fetch(location, { cache: "no-cache" });
+      if (response.ok) return response.text();
+      if (response.status !== 404)
+        throw new Error(
+          "Could not load " + path + " (HTTP " + response.status + ")",
+        );
+    }
+    throw new Error("Could not find " + path);
+  },
+
   async init() {
     if (!this.loading) {
       this.loading = Promise.all([
-        fetch("../project/config.py", { cache: "no-cache" }),
-        fetch("../project/lib/config_check.py", { cache: "no-cache" }),
+        this.loadSource("project/config.py"),
+        this.loadSource("project/lib/config_check.py"),
       ])
-        .then(async (responses) => {
-          for (const response of responses) {
-            if (!response.ok)
-              throw new Error(
-                "Could not load configuration files (HTTP " +
-                  response.status +
-                  ")",
-              );
-          }
-          [this.defaultSource, this.checkSource] = await Promise.all(
-            responses.map((response) => response.text()),
-          );
+        .then((sources) => {
+          [this.defaultSource, this.checkSource] = sources;
           this.source = localStorage.getItem(this.key) ?? this.defaultSource;
           return this;
         })

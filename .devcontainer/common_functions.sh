@@ -20,6 +20,7 @@ export PROJECT_BASE="$(cd "$SCRIPT_DIR/.." && pwd)"
 export PROJECT_DIR="$PROJECT_BASE/project"
 export PROJECT_LIB_DIR="$PROJECT_DIR/lib"
 export PROJECT_MAIN="$PROJECT_DIR/main.py"
+export PROJECT_CONFIG="$PROJECT_DIR/config.py"
 export MICROPYTHON_DIR="$PROJECT_BASE/micropython"
 export MODULES_DIR="$MICROPYTHON_DIR/ports/rp2/modules"
 export BUILD_DIR="$MICROPYTHON_DIR/ports/rp2"
@@ -29,6 +30,7 @@ export FIRMWARE_DEST="$PROJECT_BASE/_Firmware/THS_Comp_RP2040.uf2"
 # Mirrors project/lib/*.py so the firmware is self-contained: aidriver and every
 # driver it imports are frozen. main.py is excluded - it goes to the filesystem.
 export CUSTOM_FILES=(
+    "$PROJECT_LIB_DIR/config_check.py"
     "$PROJECT_LIB_DIR/eventlog.py"
     "$PROJECT_LIB_DIR/grove_ultrasonic.py"
     "$PROJECT_LIB_DIR/lsm6ds3.py"
@@ -47,6 +49,7 @@ export CUSTOM_PACKAGES=(
 # Files to copy to filesystem (not frozen)
 export FILESYSTEM_FILES=(
     "$PROJECT_MAIN"
+    "$PROJECT_CONFIG"
 )
 
 # Function to print colored messages
@@ -157,9 +160,9 @@ clean_custom_modules() {
     log_info "🧹 Cleaning existing custom modules..."
     
     # Define module filenames to clean from frozen modules
-    local frozen_modules=("aidriver.py" "eventlog.py" "grove_ultrasonic.py" "lsm6ds3.py" "tcs34725.py" "ssd1306.py")
+    local frozen_modules=("aidriver.py" "eventlog.py" "grove_ultrasonic.py" "lsm6ds3.py" "tcs34725.py" "ssd1306.py" "config_check.py" "robot_recovery.py")
     local frozen_packages=("aidriver")
-    local filesystem_modules=("main.py")
+    local filesystem_modules=("main.py" "config.py")
     
     # Clean frozen modules
     for module in "${frozen_modules[@]}"; do
@@ -228,7 +231,7 @@ copy_custom_modules() {
                 
                 # main.py is the run-script and goes to the filesystem;
                 # all other root .py files go to frozen modules.
-                if [[ "$filename" == "main.py" ]]; then
+                if [[ "$filename" == "main.py" || "$filename" == "config.py" ]]; then
                     echo "Copying $filename to filesystem"
                     cp "$file" "$filesystem_target_dir/"
                     filesystem_copy_count=$((filesystem_copy_count + 1))
@@ -305,18 +308,19 @@ ensure_firmware_dir() {
 # Function to create _boot.py with embedded main.py content
 create_boot_with_main() {
     local main_py_path="$PROJECT_DIR/main.py"
+    local config_py_path="$PROJECT_DIR/config.py"
     local boot_py_path="$MODULES_DIR/_boot.py"
     local boot_backup_path="$MODULES_DIR/_boot_original.py"
     
-    if [[ ! -f "$main_py_path" ]]; then
-        log_error "main.py not found at $main_py_path"
+    if [[ ! -f "$main_py_path" || ! -f "$config_py_path" ]]; then
+        log_error "Both main.py and config.py are required in $PROJECT_DIR"
         return 1
     fi
     
     log_info "📝 Creating _boot.py with embedded main.py content..."
     
     # Use Python script to properly handle the content embedding
-    if python3 "$SCRIPT_DIR/create_boot.py" "$main_py_path" "$boot_py_path" "$boot_backup_path"; then
+    if python3 "$SCRIPT_DIR/create_boot.py" "$main_py_path" "$boot_py_path" "$boot_backup_path" "$config_py_path"; then
         log_success "✅ Created _boot.py with embedded main.py content"
         return 0
     else

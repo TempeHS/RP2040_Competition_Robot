@@ -70,5 +70,5 @@ jobs:
           generate_release_notes: true
           body_path: _Firmware/build_info.txt
           files: |
-            _Firmware/AI_Driver_RP2040.uf2
+            _Firmware/THS_Comp_RP2040.uf2
             _Firmware/build_info.txt

@@ -19,6 +19,7 @@ def test_p_pd_pid_activation(
     isolated_config.side_Kp = 0.3
     isolated_config.side_Kd = 0.2
     isolated_config.side_Ki = 0.1
+    isolated_config.side_INTEGRAL_MAX = 100
     recording_robot.set_readings("side", [120, 140])
     fake_clock.limit = 2
     with pytest.raises(StopChallenge):
