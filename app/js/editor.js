@@ -3,10 +3,6 @@
  * ACE Editor configuration and management
  */
 
-// Bumped whenever starter scaffolds change so previously cached student code
-// (which may have been written against an older starter shape, or accidentally
-// contain the answer key) is treated as stale and replaced with the fresh
-// scaffold on next load. Increment when starter-code/*.py changes meaningfully.
 const STARTER_VERSION = "v4";
 
 const Editor = {
@@ -232,8 +228,17 @@ const Editor = {
     }
 
     this.saveTimeout = setTimeout(() => {
+      this.saveTimeout = null;
       this.saveCode();
     }, 1000);
+  },
+
+  flushSave() {
+    if (this.saveTimeout !== null) {
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+      this.saveCode();
+    }
   },
 
   /**
@@ -355,6 +360,8 @@ const Editor = {
    * @returns {void}
    */
   clearSavedCode(challengeId) {
+    clearTimeout(this.saveTimeout);
+    this.saveTimeout = null;
     const key = `aidriver_challenge_${challengeId}_code_${STARTER_VERSION}`;
     localStorage.removeItem(key);
   },

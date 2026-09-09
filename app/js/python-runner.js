@@ -92,6 +92,10 @@ const PythonRunner = {
     Sk.builtinFiles["files"]["src/lib/aidriver.js"] =
       "var $builtinmodule = function() { return window.__aidriverModuleFactory('aidriver'); };";
 
+    if (this.configSnapshot && typeof ConfigStore !== "undefined") {
+      ConfigStore.register(this.configSnapshot);
+    }
+
     console.log(
       "[PythonRunner] Registered aidriver JS builtin module in builtinFiles",
     );
@@ -192,13 +196,14 @@ def _get_commands():
 class AIDriver:
     """AIDriver robot controller for the simulator"""
     
-    def __init__(self, wall_side, min_approach_speed=130):
+    def __init__(self, wall_side, distance_sensor="ultrasonic", min_approach_speed=130, kit_servo_pin=None):
         """Initialize the robot. wall_side must be "left" or "right" (case-insensitive)."""
         global DEBUG_AIDRIVER
         side = str(wall_side).lower()
         if side not in ("left", "right"):
             side = "left"
         self.wall_sign = -1 if side == "left" else 1
+        self.distance_sensor = distance_sensor
         self.min_approach_speed = min_approach_speed
         self._right_speed = 0
         self._left_speed = 0
@@ -400,7 +405,7 @@ class AIDriver:
         return False
 
     # Minimum reliable motor speed - motors stutter below this due to undervoltage
-    MIN_MOTOR_SPEED = 100
+    MIN_MOTOR_SPEED = 120
 
     def drive(self, right_speed, left_speed):
         """Drive robot with signed speeds for PID control.
@@ -827,6 +832,11 @@ def ticks_diff(t1, t2):
       // Store reference to this for callbacks
       const self = this;
 
+      this.configSnapshot =
+        typeof ConfigStore !== "undefined"
+          ? await ConfigStore.snapshot()
+          : null;
+
       console.log(
         "[PythonRunner] run() - Before Sk.configure, Sk.setTimeout:",
         typeof Sk.setTimeout,
@@ -946,6 +956,7 @@ def ticks_diff(t1, t2):
 
       this.executionPromise = promise;
       await promise;
+      this.processCommandQueue();
 
       console.log(
         "[PythonRunner] Execution promise resolved successfully - this is unexpected for infinite loops!",
@@ -957,6 +968,13 @@ def ticks_diff(t1, t2):
     } catch (error) {
       console.log("[PythonRunner] Execution threw error:", error);
       this.handleError(error);
+      if (
+        !this.shouldStop &&
+        !error.isStopExecution &&
+        error.tp$name !== "KeyboardInterrupt"
+      ) {
+        throw error;
+      }
     } finally {
       console.log("[PythonRunner] Stopped (finally block)");
       this.isRunning = false;
@@ -972,54 +990,48 @@ def ticks_diff(t1, t2):
    */
   injectDebugCalls(code) {
     const lines = code.split("\n");
-    const result = [];
-
-    // Add imports at the very beginning (includes _get_trace for trace collection)
-    result.push("from aidriver import _step_debug, _get_trace");
-    result.push("");
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lineNum = i + 1;
-      const trimmed = line.trim();
-
-      // Skip empty lines and pure comments
-      if (trimmed === "" || trimmed.startsWith("#")) {
-        result.push(line);
-        continue;
+    const parsed = Sk.parse("main.py", code);
+    const tree = Sk.astFromParse(parsed.cst, "main.py", parsed.flags);
+    const statements = new Set();
+    const visit = (body) => {
+      for (const statement of body || []) {
+        const kind = statement._astname;
+        const docstring = kind === "Expr" && statement.value._astname === "Str";
+        const lineNumber = statement.decorator_list?.length
+          ? Math.min(
+              statement.lineno,
+              ...statement.decorator_list.map((decorator) => decorator.lineno),
+            )
+          : statement.lineno;
+        const text = (lines[lineNumber - 1] || "").trim();
+        if (
+          !docstring &&
+          !["Import", "ImportFrom", "Global", "Nonlocal"].includes(kind) &&
+          !/^(elif\s|else:|except\b|finally:)/.test(text)
+        ) {
+          statements.add(lineNumber);
+        }
+        visit(statement.body);
+        visit(statement.orelse);
+        visit(statement.finalbody);
+        for (const handler of statement.handlers || []) visit(handler.body);
       }
-
-      // Skip import statements (already processed by the added import)
-      if (trimmed.startsWith("import ") || trimmed.startsWith("from ")) {
-        result.push(line);
-        continue;
+    };
+    visit(tree.body);
+    const result = ["from aidriver import _step_debug, _get_trace", ""];
+    this.traceLineMap = [null, null, null];
+    lines.forEach((line, index) => {
+      const lineNumber = index + 1;
+      if (statements.has(lineNumber)) {
+        const indent = line.match(/^(\s*)/)[1];
+        result.push(
+          `${indent}_step_debug(${lineNumber}, ${JSON.stringify(line.trim())})`,
+        );
+        this.traceLineMap[result.length] = lineNumber;
       }
-
-      // Skip structural keywords that can't have code before them
-      if (
-        trimmed.startsWith("else:") ||
-        trimmed.startsWith("elif ") ||
-        trimmed.startsWith("except") ||
-        trimmed.startsWith("finally:")
-      ) {
-        result.push(line);
-        continue;
-      }
-
-      // Get indentation
-      const indent = line.match(/^(\s*)/)[1];
-
-      // Escape the line code for Python string
-      const escapedLine = trimmed
-        .replace(/\\/g, "\\\\")
-        .replace(/"/g, '\\"')
-        .replace(/'/g, "\\'");
-
-      // Add debug call before the line (same indentation)
-      result.push(`${indent}_step_debug(${lineNum}, "${escapedLine}")`);
       result.push(line);
-    }
-
+      this.traceLineMap[result.length] = lineNumber;
+    });
     return result.join("\n");
   },
 
@@ -1047,7 +1059,14 @@ def ticks_diff(t1, t2):
       DebugPanel.info("Collecting execution trace...");
     }
 
-    const traceCollected = await this.collectTrace(code);
+    let traceCollected;
+    try {
+      traceCollected = await this.collectTrace(code);
+    } catch (error) {
+      this.handleError(error);
+      this.stepMode = false;
+      throw error;
+    }
 
     if (!traceCollected || this.shouldStop) {
       return;
@@ -1071,6 +1090,8 @@ def ticks_diff(t1, t2):
    * @returns {Promise<boolean>} Resolves true when a trace (even partial) is gathered, false on fatal errors.
    */
   async collectTrace(code) {
+    this.configSnapshot =
+      typeof ConfigStore !== "undefined" ? await ConfigStore.snapshot() : null;
     this.isCollectingTrace = true;
     this.executionTrace = [];
     this.traceOutputs = [];
@@ -1129,6 +1150,8 @@ def ticks_diff(t1, t2):
         return setTimeout(fn, delay);
       },
     });
+
+    if (this.configSnapshot) ConfigStore.register(this.configSnapshot);
 
     // Inject debug calls and add trace retrieval
     const instrumentedCode =
@@ -1711,7 +1734,7 @@ def ticks_diff(t1, t2):
   handleError(error) {
     try {
       // Ignore errors if we're already stopped
-      if (this.shouldStop || !this.isRunning) {
+      if (this.shouldStop || (!this.isRunning && !this.stepMode)) {
         return;
       }
 
@@ -1751,10 +1774,34 @@ def ticks_diff(t1, t2):
         return;
       }
 
+      const isConfigError =
+        error.filename === "config.py" ||
+        /config\.[A-Za-z_]/.test(String(error)) ||
+        (error.traceback || []).some((frame) =>
+          /config(_check)?\.py$/.test(frame.filename || ""),
+        );
+      if (isConfigError && typeof ConfigStore !== "undefined") {
+        const location = ConfigStore.errorLocation(
+          error,
+          this.configSnapshot?.source,
+        );
+        DebugPanel.log(
+          `[Error] ${location.filename}:${location.line}: ${location.message}`,
+          "error",
+        );
+        const link = document.getElementById("configLink");
+        if (link) {
+          link.href = `config.html?challenge=${encodeURIComponent(App.currentChallenge)}&line=${location.line}`;
+          link.classList.add("btn-outline-danger");
+          link.title = `${location.filename}:${location.line}: ${location.message}`;
+        }
+        return;
+      }
+
       if (error && error.traceback && error.traceback.length > 0) {
         const tb = error.traceback[0];
         lineNumber = tb.lineno;
-        message = `Line ${lineNumber}: ${error.toString()}`;
+        message = `main.py:${lineNumber}: ${error.toString()}`;
       } else {
         message = error.toString();
       }

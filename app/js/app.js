@@ -43,22 +43,6 @@ const App = {
 };
 
 /**
- * Insert `distance_sensor="tof"` into an `AIDriver("left"|"right")` call so
- * copied code targets a real ToF-equipped robot. Only touches the plain
- * single-argument form; leaves calls that already pass a second argument
- * (e.g. already has distance_sensor=...) untouched, so it's idempotent.
- *
- * @param {string} code Student code from the editor.
- * @returns {string} Code with the ToF argument inserted where applicable.
- */
-function withTofSensorArg(code) {
-  return code.replace(
-    /AIDriver\(\s*(["'])(left|right)\1\s*\)/g,
-    'AIDriver($1$2$1, distance_sensor="tof")',
-  );
-}
-
-/**
  * Bridge invoked from the Skulpt-side AIDriver constructor command queue.
  * Mounts the side sensor, mirrors the spawn pose if the user picked the
  * non-default wall side, and re-renders. This makes the AIDriver(side)
@@ -218,7 +202,6 @@ function cacheElements() {
     btnReset: document.getElementById("btnReset"),
     btnResetCode: document.getElementById("btnResetCode"),
     btnCopyCode: document.getElementById("btnCopyCode"),
-    chkTofSensor: document.getElementById("chkTofSensor"),
     btnClearDebug: document.getElementById("btnClearDebug"),
     btnConfirmReset: document.getElementById("btnConfirmReset"),
     btnRotateCar: document.getElementById("btnRotateCar"),
@@ -336,10 +319,8 @@ function setupEventListeners() {
 
   // Copy code button
   App.elements.btnCopyCode.addEventListener("click", () => {
-    let code = Editor.getCode();
-    if (App.elements.chkTofSensor && App.elements.chkTofSensor.checked) {
-      code = withTofSensorArg(code);
-    }
+    Editor.flushSave();
+    const code = Editor.getCode();
     navigator.clipboard
       .writeText(code)
       .then(() => {
@@ -356,6 +337,15 @@ function setupEventListeners() {
         console.error("Failed to copy code:", err);
       });
   });
+
+  document.getElementById("btnDownloadMain").addEventListener("click", () => {
+    Editor.flushSave();
+    ConfigStore.download(Editor.getCode(), "main.py");
+  });
+  document
+    .getElementById("configLink")
+    .addEventListener("click", () => Editor.flushSave());
+  window.addEventListener("pagehide", () => Editor.flushSave());
 
   // Reset code button - show modal
   App.elements.btnResetCode.addEventListener("click", () => {
@@ -489,7 +479,12 @@ function handleKeyboardShortcuts(e) {
  * @returns {void}
  */
 function loadChallenge(challengeId) {
+  Editor.flushSave();
   App.currentChallenge = challengeId;
+  const configLink = document.getElementById("configLink");
+  if (configLink)
+    configLink.href =
+      "config.html?challenge=" + encodeURIComponent(challengeId);
 
   // Log challenge load event
   if (typeof Logger !== "undefined") {
@@ -529,7 +524,7 @@ function loadChallenge(challengeId) {
     loadStarterCode(challengeId);
   } else {
     const savedCode = Editor.loadSavedCode(challengeId);
-    if (savedCode) {
+    if (savedCode !== null) {
       Editor.setCode(savedCode);
       logDebug(`Loaded saved code for Challenge ${challengeId}`);
     } else {
@@ -670,9 +665,11 @@ async function loadStarterCode(challengeId) {
     }
 
     const code = await response.text();
+    if (App.currentChallenge !== challengeId) return;
     Editor.setCode(code);
     logDebug(`[App] Loaded starter code from ${starterCodePath}`);
   } catch (err) {
+    if (App.currentChallenge !== challengeId) return;
     console.warn(
       `[App] Could not fetch starter code at ${starterCodePath}:`,
       err,
@@ -807,6 +804,7 @@ function collapseDebugPanel() {
  */
 function runCode() {
   if (App.isRunning) return;
+  Editor.flushSave();
 
   App.isRunning = true;
   App.isPaused = false;
@@ -914,6 +912,7 @@ function stopExecution() {
  * @returns {Promise<void>} Resolves when stepping completes or rejects on failure.
  */
 async function stepCode() {
+  Editor.flushSave();
   // If already playing trace, toggle pause
   if (PythonRunner.stepMode && PythonRunner.isPlayingTrace) {
     if (PythonRunner.stepPaused) {

@@ -24,6 +24,14 @@ const SKULPT_STDLIB = path.join(
 const SIMULATOR_JS = path.join(APP_DIR, "js/simulator.js");
 const ROBOT_CONFIG_JS = path.join(APP_DIR, "js/robot-config.js");
 const AIDRIVER_STUB_JS = path.join(APP_DIR, "js/aidriver-stub.js");
+const CONFIG_PY = fs.readFileSync(
+  path.join(APP_DIR, "../project/config.py"),
+  "utf8",
+);
+const CONFIG_CHECK_PY = fs.readFileSync(
+  path.join(APP_DIR, "../project/lib/config_check.py"),
+  "utf8",
+);
 
 const CHALLENGE_FILES = {
   1: path.join(APP_DIR, "answers/challenge-1.py"),
@@ -120,6 +128,8 @@ describe("Challenge progression: P → PD → PID tightens lateral excursion", (
     ]);
     Simulator.clearObstacles();
     AIDriverStub.commandQueue = [];
+    Sk.builtinFiles.files["src/lib/config.py"] = CONFIG_PY;
+    Sk.builtinFiles.files["src/lib/config_check.py"] = CONFIG_CHECK_PY;
 
     const samples = [];
     let stopReason = null;
@@ -366,10 +376,10 @@ describe("Challenge progression: P → PD → PID tightens lateral excursion", (
 
   /* ── Multi-start: converges to target from any starting distance ── */
 
-  // TARGET_WALL_DISTANCE = 40mm. The side sensor is mounted ROBOT_WIDTH/2
-  // = 60mm from body centre. So when the sensor reads 40mm the body centre
-  // sits at x = 40 + 60 = 100mm from the left arena wall.
-  const TARGET_X = 100;
+  // TARGET_WALL_DISTANCE = 100mm. The side sensor is mounted ROBOT_WIDTH/2
+  // = 60mm from body centre. So when the sensor reads 100mm the body centre
+  // sits at x = 100 + 60 = 160mm from the left arena wall.
+  const TARGET_X = 160;
   const START_DISTANCES = [70, 85, 100, 115, 130, 140];
   // Tolerance: steady-state mean X must be within this many mm of target.
   const CONVERGE_TOLERANCE = 20;

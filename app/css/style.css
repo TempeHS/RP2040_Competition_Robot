@@ -19,6 +19,46 @@ body {
 }
 
 /* Editor Styling */
+.config-page {
+  padding-bottom: 0;
+}
+
+.config-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.config-toolbar select {
+  width: min(100%, 320px);
+}
+
+.config-toolbar .btn-group .btn {
+  width: 36px;
+  height: 32px;
+}
+
+#configEditor {
+  width: 100%;
+  height: calc(100dvh - 190px);
+  min-height: 360px;
+}
+
+#configResult {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 575px) {
+  .config-toolbar select {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  #configEditor {
+    height: calc(100dvh - 270px);
+  }
+}
+
 #editor {
   width: 100%;
   height: 500px;

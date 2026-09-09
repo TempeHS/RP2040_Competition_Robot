@@ -1,33 +1,33 @@
-# Challenge 1: Wall Follow — P Control
-# Follow the side wall using a Proportional controller.
-# Fill in the values below (they start at 0). Guide: docs.html?doc=Challenge_1
+"""Challenge 1: Wall P control. Tune Driving and Wall PID in config.py."""
 
 from aidriver import AIDriver, hold_state
+from config_check import validate_config
 import aidriver
-
-aidriver.DEBUG_AIDRIVER = False  # Set True to print sensor + motor values
-my_robot = AIDriver("left")  # "left" or "right" — match the simulator scene
-
-BASE_SPEED = 0  # forward speed (keep BASE_SPEED - MAX_STEERING > 120)
-TARGET_WALL_DISTANCE = 0  # distance to hold from the wall (mm)
-MAX_STEERING = 0  # max wheel-speed difference
-
-side_Kp = 0.0  # proportional gain
+import config
 
 
-while True:
-    wall_distance = my_robot.read_distance_2()
+def main():
+    validate_config(config, AIDriver.MIN_MOTOR_SPEED)
+    aidriver.DEBUG_AIDRIVER = config.DEBUG_AIDRIVER
+    my_robot = AIDriver(
+        config.WALL_SIDE,
+        distance_sensor=config.DISTANCE_SENSOR,
+        min_approach_speed=config.MIN_APPROACH_SPEED,
+        kit_servo_pin=config.KIT_SERVO_PIN,
+    )
+    try:
+        while True:
+            wall_distance = my_robot.read_distance_2()
+            if wall_distance == -1:
+                my_robot.drive(config.BASE_SPEED, config.BASE_SPEED)
+            else:
+                error = wall_distance - config.TARGET_WALL_DISTANCE
+                steering = config.side_Kp * error
+                my_robot.steer(config.BASE_SPEED, steering, config.MAX_STEERING)
+            hold_state(config.LOOP_DT)
+    finally:
+        my_robot.brake()
 
-    if wall_distance == -1:
-        # Sensor lost the wall — drive straight and try again next tick.
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        hold_state(0.05)
-        continue
 
-    error = wall_distance - TARGET_WALL_DISTANCE
-    steering = side_Kp * error
-
-    # steer() applies the correction to the correct wheel for your chosen wall
-    # and caps it so the slower wheel stays above the motor dead zone.
-    my_robot.steer(BASE_SPEED, steering, MAX_STEERING)
-    hold_state(0.05)
+if __name__ == "__main__":
+    main()

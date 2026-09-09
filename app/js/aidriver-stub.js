@@ -82,10 +82,12 @@ const AIDriverStub = {
            * Initialize the stub and register the robot instance.
            * @returns {null}
            */
-          $loc.__init__ = new Sk.builtin.func(function (
+          const initialize = function (
             self,
             wallSide,
+            distanceSensor,
             minApproachSpeed,
+            kitServoPin,
           ) {
             // Resolve the wall_side argument (defaults to "left" if omitted).
             let sideStr = "left";
@@ -132,6 +134,14 @@ const AIDriverStub = {
               new Sk.builtin.int_(minAppr),
             );
 
+            self.tp$setattr(
+              new Sk.builtin.str("distance_sensor"),
+              distanceSensor || new Sk.builtin.str("ultrasonic"),
+            );
+            AIDriverStub.DEBUG_AIDRIVER = !!Sk.ffi.remapToJs(
+              mod.DEBUG_AIDRIVER,
+            );
+
             self.rightSpeed = 0;
             self.leftSpeed = 0;
             self.isMoving = false;
@@ -150,7 +160,20 @@ const AIDriverStub = {
             }
 
             return Sk.builtin.none.none$;
-          });
+          };
+          initialize.co_varnames = [
+            "self",
+            "wall_side",
+            "distance_sensor",
+            "min_approach_speed",
+            "kit_servo_pin",
+          ];
+          initialize.$defaults = [
+            new Sk.builtin.str("ultrasonic"),
+            new Sk.builtin.int_(130),
+            Sk.builtin.none.none$,
+          ];
+          $loc.__init__ = new Sk.builtin.func(initialize);
 
           /**
            * Queue a forward driving command with discrete wheel speeds.
@@ -278,7 +301,7 @@ const AIDriverStub = {
             const tolerance = readTurnGain(self, "turn_tolerance", 2.0);
             const maxSpeed = readTurnGain(self, "turn_max_speed", 200);
             const timeoutMs = readTurnGain(self, "turn_timeout_ms", 4000);
-            const MIN_SPEED = 100;
+            const MIN_SPEED = 120;
 
             function applySpin(speed) {
               if (typeof App === "undefined" || !App.robot) return;
@@ -453,7 +476,7 @@ const AIDriverStub = {
           /**
            * Minimum reliable motor speed constant matching the hardware library.
            */
-          $loc.MIN_MOTOR_SPEED = new Sk.builtin.int_(100);
+          $loc.MIN_MOTOR_SPEED = new Sk.builtin.int_(120);
 
           /**
            * Drive with signed speeds for PID control.
@@ -468,7 +491,7 @@ const AIDriverStub = {
             rightSpeed,
             leftSpeed,
           ) {
-            const MIN_MOTOR_SPEED = 100;
+            const MIN_MOTOR_SPEED = 120;
             let rs = Math.max(
               -255,
               Math.min(255, Sk.ffi.remapToJs(rightSpeed)),
@@ -514,7 +537,7 @@ const AIDriverStub = {
             steering,
             maxSteering,
           ) {
-            const MIN_MOTOR_SPEED = 100;
+            const MIN_MOTOR_SPEED = 120;
             const base = Sk.ffi.remapToJs(baseSpeed);
             let corr = Sk.ffi.remapToJs(steering);
             let maxSteer = 60;

@@ -7,7 +7,12 @@ const Validator = (function () {
   "use strict";
 
   // Allowed imports
-  const ALLOWED_IMPORTS = new Set(["aidriver", "time"]);
+  const ALLOWED_IMPORTS = new Set([
+    "aidriver",
+    "time",
+    "config",
+    "config_check",
+  ]);
 
   // Allowed from aidriver imports
   const ALLOWED_FROM_AIDRIVER = new Set([
@@ -19,6 +24,7 @@ const Validator = (function () {
 
   // Allowed function calls (builtins + aidriver functions)
   const ALLOWED_FUNCTIONS = new Set([
+    "validate_config",
     // Core Python builtins
     "print",
     "range",

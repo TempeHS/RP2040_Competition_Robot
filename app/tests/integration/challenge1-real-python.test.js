@@ -29,6 +29,14 @@ const SIMULATOR_JS = path.join(APP_DIR, "js/simulator.js");
 const ROBOT_CONFIG_JS = path.join(APP_DIR, "js/robot-config.js");
 const AIDRIVER_STUB_JS = path.join(APP_DIR, "js/aidriver-stub.js");
 const ANSWER_PY = path.join(APP_DIR, "answers/challenge-1.py");
+const CONFIG_PY = fs.readFileSync(
+  path.join(APP_DIR, "../project/config.py"),
+  "utf8",
+);
+const CONFIG_CHECK_PY = fs.readFileSync(
+  path.join(APP_DIR, "../project/lib/config_check.py"),
+  "utf8",
+);
 
 function loadIntoGlobal(file, exposeAs) {
   const src = fs.readFileSync(file, "utf8");
@@ -146,6 +154,8 @@ describe("Challenge 1 answer — real Python through the browser pipeline", () =
 
     // ---- Register aidriver as the JS builtin module ------------------------
     Sk.builtinFiles = Sk.builtinFiles || { files: {} };
+    Sk.builtinFiles.files["src/lib/config.py"] = CONFIG_PY;
+    Sk.builtinFiles.files["src/lib/config_check.py"] = CONFIG_CHECK_PY;
     const realFactory = AIDriverStub.getModule();
 
     // Wrap the factory so that every freshly-constructed `aidriver` module
@@ -322,16 +332,19 @@ describe("Challenge 1 answer — real Python through the browser pipeline", () =
   });
 
   // Sanity-check: prove the assertions actually catch a known-bad tuning.
-  // The original (high-gain) values caused the in-browser car to corkscrew.
+  // A wrong-signed gain makes the in-browser car corkscrew away from the wall.
   // If this test ever PASSES we know the trajectory checks have gone soft.
-  test("CONTROL: high-gain tuning is rejected (proves the test bites)", async () => {
-    // Use a low BASE_SPEED that triggers the MIN_MOTOR_SPEED=120 cliff
-    // when combined with high Kp and MAX_STEERING.
+  test("CONTROL: wrong-signed steering is rejected (proves the test bites)", async () => {
+    // steer() clamps the correction so the slower wheel stays above
+    // MIN_MOTOR_SPEED, which makes saturated high-gain tuning merely twitchy
+    // rather than divergent. The tuning that still breaks the loop is a
+    // wrong-signed gain: every correction pushes the robot the wrong way.
     const broken = fs
       .readFileSync(ANSWER_PY, "utf8")
-      .replace(/^BASE_SPEED = \d+/m, "BASE_SPEED = 130")
-      .replace(/^MAX_STEERING = \d+/m, "MAX_STEERING = 80")
-      .replace(/^side_Kp = [\d.]+/m, "side_Kp = 0.80");
+      .replace(
+        "steering = config.side_Kp * error",
+        "steering = -config.side_Kp * error",
+      );
 
     const { samples } = await runPython(broken);
     let maxAbsHeading = 0;

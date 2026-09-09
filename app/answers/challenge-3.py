@@ -1,53 +1,47 @@
-# === ANSWER KEY — Challenge 3 (teacher reference; students should NOT see this) ===
-# Same as app/starter-code/challenge-3.py with tuned values filled in.
-
-# Challenge 3: Wall Follow — Full PID
-# Add an Integral term so the robot holds the wall around the L corner.
-# Guide: docs.html?doc=Challenge_3
+"""Teacher reference: Challenge 3. Integral history is bounded and reset on wall loss."""
 
 from aidriver import AIDriver, hold_state
+from config_check import validate_config
 import aidriver
-
-aidriver.DEBUG_AIDRIVER = False
-my_robot = AIDriver("left")
-
-BASE_SPEED = 200  # carry forward
-TARGET_WALL_DISTANCE = 100  # carry forward
-MAX_STEERING = 60  # carry forward
-
-side_Kp = 0.4  # carry forward
-side_Kd = 0.3  # carry forward
-side_Ki = 0.001  # integral gain — start very small
-side_INTEGRAL_MAX = 50  # anti-windup clamp
-
-side_previous_error = 0
-side_integral = 0
+import config
 
 
-while True:
-    wall_distance = my_robot.read_distance_2()
-
-    if wall_distance == -1:
-        my_robot.drive(BASE_SPEED, BASE_SPEED)
-        side_integral = 0  # reset so windup can't build while wall is gone
-        hold_state(0.05)
-        continue
-
-    error = wall_distance - TARGET_WALL_DISTANCE
-
-    side_integral = side_integral + error
-    if side_integral > side_INTEGRAL_MAX:
-        side_integral = side_INTEGRAL_MAX
-    elif side_integral < -side_INTEGRAL_MAX:
-        side_integral = -side_INTEGRAL_MAX
-
-    side_derivative = error - side_previous_error
-
-    steering = (
-        (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
+def main():
+    validate_config(config, AIDriver.MIN_MOTOR_SPEED)
+    aidriver.DEBUG_AIDRIVER = config.DEBUG_AIDRIVER
+    my_robot = AIDriver(
+        config.WALL_SIDE,
+        distance_sensor=config.DISTANCE_SENSOR,
+        min_approach_speed=config.MIN_APPROACH_SPEED,
+        kit_servo_pin=config.KIT_SERVO_PIN,
     )
+    side_previous_error = 0
+    side_integral = 0
+    try:
+        while True:
+            wall_distance = my_robot.read_distance_2()
+            if wall_distance == -1:
+                my_robot.drive(config.BASE_SPEED, config.BASE_SPEED)
+                side_integral = 0
+            else:
+                error = wall_distance - config.TARGET_WALL_DISTANCE
+                side_integral = side_integral + error
+                if side_integral > config.side_INTEGRAL_MAX:
+                    side_integral = config.side_INTEGRAL_MAX
+                elif side_integral < -config.side_INTEGRAL_MAX:
+                    side_integral = -config.side_INTEGRAL_MAX
+                side_derivative = error - side_previous_error
+                steering = (
+                    (config.side_Kp * error)
+                    + (config.side_Ki * side_integral)
+                    + (config.side_Kd * side_derivative)
+                )
+                my_robot.steer(config.BASE_SPEED, steering, config.MAX_STEERING)
+                side_previous_error = error
+            hold_state(config.LOOP_DT)
+    finally:
+        my_robot.brake()
 
-    my_robot.steer(BASE_SPEED, steering, MAX_STEERING)
 
-    side_previous_error = error
-    hold_state(0.05)
+if __name__ == "__main__":
+    main()
