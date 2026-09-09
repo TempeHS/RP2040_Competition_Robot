@@ -7,31 +7,25 @@ def _setting(config, name):
     return getattr(config, name)
 
 
-def _number(config, name, minimum=0, maximum=None, integer=False):
+def _number(config, name, integer=False):
     value = _setting(config, name)
-    if type(value) not in (int, float) or value != value or abs(value) == float("inf"):
-        raise ValueError("config." + name + " must be a finite number")
+    if type(value) not in (int, float):
+        raise ValueError("config." + name + " must be a number")
     if integer and type(value) is not int:
         raise ValueError("config." + name + " must be an integer")
-    if value < minimum or (maximum is not None and value > maximum):
-        raise ValueError("config." + name + " is outside its allowed range")
     return value
 
 
 def validate_config(config, min_motor_speed=120):
-    """Reject invalid settings before the main program constructs its robot."""
-    if _setting(config, "WALL_SIDE") not in ("left", "right"):
-        raise ValueError('config.WALL_SIDE must be "left" or "right"')
-    if _setting(config, "DISTANCE_SENSOR") not in ("tof", "ultrasonic"):
-        raise ValueError('config.DISTANCE_SENSOR must be "tof" or "ultrasonic"')
+    """Check names and types only; min_motor_speed is retained for existing callers."""
+    del min_motor_speed
+    for name in ("WALL_SIDE", "DISTANCE_SENSOR"):
+        if type(_setting(config, name)) is not str:
+            raise ValueError("config." + name + " must be a string")
     if type(_setting(config, "DEBUG_AIDRIVER")) is not bool:
         raise ValueError("config.DEBUG_AIDRIVER must be True or False")
     if _setting(config, "KIT_SERVO_PIN") is not None:
-        pin = _number(config, "KIT_SERVO_PIN", 0, 29, True)
-        if pin in (3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 16, 17, 25, 26, 27, 28, 29, 2):
-            raise ValueError(
-                "config.KIT_SERVO_PIN conflicts with reserved robot wiring"
-            )
+        _number(config, "KIT_SERVO_PIN", integer=True)
 
     for name in (
         "BASE_SPEED",
@@ -43,8 +37,8 @@ def validate_config(config, min_motor_speed=120):
         "REVERSE_SPEED",
         "FORWARD_SPEED",
     ):
-        _number(config, name, min_motor_speed, 255, True)
-    _number(config, "MAX_STEERING", 0, 255)
+        _number(config, name, integer=True)
+    _number(config, "MAX_STEERING")
     for name in (
         "side_Kp",
         "side_Kd",
@@ -86,7 +80,7 @@ def validate_config(config, min_motor_speed=120):
         "WALL_FOUND_DISTANCE",
         "GRID_CELL_MM",
     ):
-        _number(config, name, 0.000001)
+        _number(config, name)
     for name in (
         "TURN_TIMEOUT_MS",
         "TURN_KICK_STEPS",
@@ -100,28 +94,11 @@ def validate_config(config, min_motor_speed=120):
         "REVERSE_MAX_STEPS",
         "FORWARD_MAX_STEPS",
     ):
-        _number(config, name, 1, integer=True)
+        _number(config, name, integer=True)
     for name in ("POINTS_UNHARMED", "POINTS_HARMED", "POINTS_KIT"):
-        _number(config, name, 0, integer=True)
+        _number(config, name, integer=True)
     for name in ("color_red_ratio", "color_green_ratio"):
-        _number(config, name, 0, 1)
-    _number(config, "TURN_ANGLE", 0.000001, 360)
-    _number(config, "VICTIM_PAUSE_TIME", 1)
-
-    for smaller, larger in (
-        ("FRONT_STOP_DISTANCE", "FRONT_SLOW_DISTANCE"),
-        ("TARGET_WALL_DISTANCE", "NIB_LOST_DISTANCE"),
-    ):
-        if getattr(config, smaller) >= getattr(config, larger):
-            raise ValueError(
-                "config." + smaller + " must be less than config." + larger
-            )
-    for smaller, larger in (
-        ("MIN_APPROACH_SPEED", "BASE_SPEED"),
-        ("MIN_TURN_SPEED", "TURN_MAX_SPEED"),
-        ("NUDGE_MIN_MS", "NUDGE_MAX_MS"),
-        ("REVERSE_CLEAR_STEPS", "REVERSE_MAX_STEPS"),
-    ):
-        if getattr(config, smaller) > getattr(config, larger):
-            raise ValueError("config." + smaller + " must not exceed config." + larger)
+        _number(config, name)
+    _number(config, "TURN_ANGLE")
+    _number(config, "VICTIM_PAUSE_TIME")
     return True

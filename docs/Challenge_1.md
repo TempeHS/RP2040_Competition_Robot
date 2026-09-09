@@ -22,10 +22,12 @@ The robot follows a straight wall through the corridor and reaches the green exi
 1. Complete the robot hardware setup.
 2. Open the simulator and select Challenge 1.
 3. Set `WALL_SIDE` and `DISTANCE_SENSOR` in config to match your robot.
-4. Numeric config values start at zero. Fill in required speeds, distances,
-   timings and budgets from the commented starting ranges, then use
-   **Validate config.py** on the **config.py** tab. Validation checks all sections;
-   unused D and I gains can remain zero.
+4. Numeric config values start at zero. Tune this challenge's driving and wall
+   P settings using the commented starting ranges, then use **Validate config.py**
+   on the **config.py** tab. It checks required names, Python syntax and types,
+   not values. D, I, turn, recovery and competition settings can remain zero.
+   Set `LOOP_DT` for a consistent sample interval and `MIN_APPROACH_SPEED` for
+   robot setup; validation does not choose these values for you.
 5. Run from either editor tab. The simulator executes main even while config
    is visible; there is no need to copy tuning into the main program.
 

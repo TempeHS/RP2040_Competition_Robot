@@ -8,7 +8,7 @@ A browser-based robot simulator for the AIDriver MicroPython Challenges. This we
 - **Shared Config Editor** - One purpose-organised Python config retained across challenges
 - **10 Progressive Challenges** - PID wall-following, maze navigation, markers and recovery
 - **Real-time Simulation** - See your robot move in a 2030×2030mm virtual arena
-- **Strict Validation** - Checks the supported robot API and shared settings before movement
+- **Code Validation** - Checks the supported robot API plus config syntax, required names and types
 - **Ultrasonic, Gyro & Colour Simulation** - Front/side distance, yaw rate, and ground-colour readings
 - **On-screen OLED Panel** - Mirrors the SSD1306 display for the competition challenge
 - **Pre-built Mazes** - Corner, outside-corner, dead-end and full-maze layouts
@@ -38,9 +38,12 @@ next run. **Validate config.py** (the check-circle button) checks config without
 running main and marks invalid settings in that file. Stop before validating.
 
 Numeric settings start at zero, with suggested starting ranges in comments.
-Select the fitted hardware and fill in required speeds, timings, distances and
-budgets before running. Validation checks the entire config; unused PID gains
-may stay zero. Main contains algorithms and runtime state, not duplicate tuning.
+Config validation checks required variable names, Python syntax and types only.
+It does not validate values or enforce ranges, threshold ordering, string choices
+or pin restrictions. Zeroed settings pass; later-challenge settings can stay zero.
+Tune the settings used by the current main. A valid config is not a guarantee
+of correct or safe motion; runtime errors and hardware-library limits still
+apply. Main contains algorithms and runtime state, not duplicate tuning.
 Keep config when changing challenges. Both files save independently in this
 browser's local storage.
 

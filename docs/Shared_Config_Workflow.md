@@ -20,10 +20,16 @@ the simulator and robot; there are no separate simulator and hardware profiles.
 Numeric settings start at zero. All sections are present, with suggested
 starting ranges in comments rather than prefilled tuning. `WALL_SIDE`,
 `DISTANCE_SENSOR`, `DEBUG_AIDRIVER`, and `KIT_SERVO_PIN` keep their string,
-boolean, or optional-pin types. A fresh or reset config is intentionally not
-ready to run: positive speeds, timings, distances and budgets must be filled in.
-Validation checks the complete configuration, including required values in
-sections a later challenge will use. It never silently supplies test values.
+boolean, or optional-pin types. Config validation checks required variable names,
+Python syntax and types only. It does not validate values: zeros, negative
+numbers, out-of-range numbers and unrecognised string choices are not rejected
+by the config checker. Settings for later challenges can remain zero.
+
+"Config valid" does not prove the robot will move correctly or that settings
+are safe. Choose and tune the values used by the current challenge using its
+notes and the comments. Invalid operating choices can still cause runtime
+errors or unexpected motion. Hardware-library motor limits remain unchanged;
+validation never silently supplies test values.
 
 The algorithm decides which settings are active: Challenge 1 uses P only,
 Challenge 2 adds D, and Challenge 3 adds I. Zero is still valid for an unused
@@ -44,7 +50,11 @@ not guarantee a full maze run or replace calibration on your robot.
 Config supports scalar assignments and arithmetic using settings defined
 earlier in the file. It must not contain imports, functions, loops, I/O, or
 robot construction. Main reads settings as `config.BASE_SPEED`, for example.
-Validation names missing or invalid settings before the robot is constructed.
+Validation names missing settings or incorrect types before the robot is constructed.
+Motor speeds, step counts and score fields require integers, numeric gains and
+timings accept integers or floats, setup names require strings, debug requires a
+boolean, and the optional servo pin requires an integer or `None`. Booleans are
+not accepted as numeric settings.
 Do not add `MIN_MOTOR_SPEED` to config: the library owns the 120 PWM motor floor.
 
 Integral history, previous error, state labels, timers, marker history and
@@ -87,7 +97,7 @@ and D. No unused integral terms have been added to either section.
 2. Download each file from its corresponding **config.py** or **main.py** tab.
 3. Stop the robot, then transfer both files to its filesystem root. Check the
    sensor backend, wall side, battery condition and clear working area.
-4. Validate on hardware at a controlled speed. On later challenges replace
+4. Test on hardware at a controlled speed. On later challenges replace
    only main, unless you intentionally changed config as well.
 
 New firmware provisions missing main/config files but does not overwrite
@@ -98,8 +108,10 @@ a firmware rebuild. `KIT_SERVO_PIN = None` means no rescue-kit servo is fitted.
 
 Ground GP2 during boot to restore the bundled main and clear the event log.
 Config is preserved, even if it contains a mistake. Remove the jumper afterward.
-An invalid config raises an error in main; it is not silently reset or retried
-by the boot code. Stop execution in your IDE and correct the named setting.
+Syntax errors, missing variables or incorrect types raise an error when main
+loads or checks config; bad tuning values may only fail during execution.
+Config is not silently reset or retried by boot code. Stop execution in your
+IDE and correct the reported problem.
 
 For an explicit config reset from the MicroPython REPL:
 
@@ -120,7 +132,8 @@ as their runnable `config` module. Tests compare its variable names with the
 student config, not its values. Add a setting to both files when extending the
 course contract: zero in the student template, a suitable value in the fixture.
 The fixture is not staged to the published site or bundled into firmware.
-Separate tests verify zero-value rejection and exact student-template provisioning.
+Separate tests verify zero-value acceptance, missing-name/type/syntax errors,
+and exact student-template provisioning.
 
 ## Current Limits
 

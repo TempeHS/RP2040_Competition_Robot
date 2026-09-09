@@ -60,6 +60,10 @@ def test_config_guides_describe_tabs_zero_defaults_and_test_settings(filename):
     assert "Validate config.py" in source
     assert "Numeric settings start at zero" in source
     assert "../tests/test-config.py" in source
+    assert "required variable names" in source
+    assert "Python syntax and types only" in source
+    assert "does not validate values" in source
+    assert "zero-value rejection" not in source
     assert "usable starting values" not in source
     assert "Main & Simulator" not in source
 

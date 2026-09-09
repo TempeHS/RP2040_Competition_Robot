@@ -164,7 +164,7 @@ describe("Separate main and config persistence", () => {
   });
 
   test("Validate marks invalid config, not main, and skips running simulations", async () => {
-    const source = "BASE_SPEED = 0\n";
+    const source = 'BASE_SPEED = "fast"\n';
     Editor.activeFile = "config.py";
     Editor.mainSession = { setAnnotations: jest.fn() };
     Editor.configSession = {
@@ -175,13 +175,18 @@ describe("Separate main and config persistence", () => {
     Editor.instance.gotoLine = jest.fn();
     const validate = jest
       .spyOn(ConfigStore, "validate")
-      .mockRejectedValue(new Error("Invalid speed"));
+      .mockRejectedValue(new Error("BASE_SPEED must be an integer"));
     jest
       .spyOn(ConfigStore, "errorLocation")
-      .mockReturnValue({ line: 1, message: "Invalid speed" });
+      .mockReturnValue({ line: 1, message: "BASE_SPEED must be an integer" });
     expect(await Editor.validateConfig()).toBe(false);
     expect(Editor.configSession.setAnnotations).toHaveBeenCalledWith([
-      { row: 0, column: 0, text: "Invalid speed", type: "error" },
+      {
+        row: 0,
+        column: 0,
+        text: "BASE_SPEED must be an integer",
+        type: "error",
+      },
     ]);
     expect(Editor.mainSession.setAnnotations).not.toHaveBeenCalled();
     expect(document.getElementById("configValidation").textContent).toBe(

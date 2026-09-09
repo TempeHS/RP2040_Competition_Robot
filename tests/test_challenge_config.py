@@ -1,5 +1,6 @@
 import ast
 from pathlib import Path
+import runpy
 
 import pytest
 
@@ -98,11 +99,39 @@ def test_constructor_and_driving_consume_retained_config(
 
 
 @pytest.mark.parametrize("number,folder", PROGRAMS)
-def test_invalid_config_stops_before_hardware_init(
+def test_wrong_config_type_stops_before_hardware_init(
     number, folder, challenge_loader, isolated_config, recording_robot
 ):
-    isolated_config.LOOP_DT = 0
+    isolated_config.LOOP_DT = "0.05"
     module = challenge_loader(number, folder)
     with pytest.raises(ValueError, match="LOOP_DT"):
         module.main()
     assert recording_robot.calls == []
+
+
+def test_challenge_one_runs_with_later_settings_left_zero(
+    challenge_loader, isolated_config, recording_robot, fake_clock
+):
+    module = challenge_loader(1)
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    used = {
+        node.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "config"
+    }
+    for name, value in runpy.run_path(str(ROOT / "project/config.py")).items():
+        if not name.startswith("__") and name not in used:
+            setattr(isolated_config, name, value)
+    assert isolated_config.TURN_MAX_SPEED == 0
+    assert isolated_config.REVERSE_SPEED == 0
+    fake_clock.limit = 1
+    with pytest.raises(StopChallenge):
+        module.main()
+    assert (
+        "drive",
+        isolated_config.BASE_SPEED,
+        isolated_config.BASE_SPEED,
+    ) in recording_robot.calls
+    assert recording_robot.calls[-1] == ("brake",)

@@ -108,8 +108,14 @@ describe("Shared configuration through real Skulpt", () => {
     },
   );
 
-  test("Run rejects invalid config before queuing movement", async () => {
-    const source = testSource.replace("BASE_SPEED = 200", "BASE_SPEED = 0");
+  test.each([
+    [
+      "wrong type",
+      testSource.replace("BASE_SPEED = 200", 'BASE_SPEED = "fast"'),
+    ],
+    ["missing variable", testSource.replace("BASE_SPEED = 200\n", "")],
+    ["syntax error", testSource.replace("BASE_SPEED = 200", "BASE_SPEED = (")],
+  ])("Run rejects config %s before queuing movement", async (_kind, source) => {
     localStorage.setItem(store.key, source);
     AIDriverStub.clearQueue();
     Editor.markError.mockClear();
@@ -136,8 +142,26 @@ describe("Shared configuration through real Skulpt", () => {
       [...store.inspect(testSource).keys()].sort(),
     );
     await expect(store.validate(testSource)).resolves.toBe(true);
-    await expect(store.validate(studentSource)).rejects.toBeDefined();
+    await expect(store.validate(studentSource)).resolves.toBe(true);
   });
+
+  test.each([
+    ["BASE_SPEED = 200", "BASE_SPEED = -1000"],
+    ["LOOP_DT = 0.05", "LOOP_DT = 0"],
+    ["side_Kp = 0.4", "side_Kp = 1e309"],
+    ['WALL_SIDE = "left"', 'WALL_SIDE = "middle"'],
+    ['DISTANCE_SENSOR = "tof"', 'DISTANCE_SENSOR = "laser"'],
+    ["KIT_SERVO_PIN = None", "KIT_SERVO_PIN = 26"],
+    ["color_red_ratio = 0.55", "color_red_ratio = 1.2"],
+    ["FRONT_STOP_DISTANCE = 150", "FRONT_STOP_DISTANCE = 5000"],
+  ])(
+    "validates types without restricting values: %s -> %s",
+    async (before, after) => {
+      await expect(
+        store.validate(testSource.replace(before, after)),
+      ).resolves.toBe(true);
+    },
+  );
 
   test.each([
     "import os",
@@ -173,7 +197,10 @@ describe("Shared configuration through real Skulpt", () => {
   });
 
   test("validation points to the setting instead of the helper module", async () => {
-    const source = testSource.replace("BASE_SPEED = 200", "BASE_SPEED = 0");
+    const source = testSource.replace(
+      "BASE_SPEED = 200",
+      'BASE_SPEED = "fast"',
+    );
     try {
       await store.validate(source);
       throw new Error("Invalid config unexpectedly passed");

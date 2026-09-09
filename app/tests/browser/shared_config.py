@@ -141,8 +141,8 @@ def exercise(page, base_url, output):
     assert page.evaluate("Editor.getActiveCode()") == default
     expect(page.locator("#btnValidateConfig")).to_be_visible()
     page.locator("#btnValidateConfig").click()
-    expect(page.locator("#configValidation")).to_have_text("Invalid config")
-    assert "BASE_SPEED" in page.evaluate("Editor.configError.message")
+    expect(page.locator("#configValidation")).to_have_text("Config valid")
+    assert page.evaluate("Editor.configError") is None
     assert page.evaluate("[App.robot.rightSpeed, App.robot.leftSpeed]") == [0, 0]
     assert not page.evaluate("App.hasRun || App.isRunning")
     expect(page.locator("#arenaCanvas")).to_be_visible()
@@ -158,6 +158,25 @@ def exercise(page, base_url, output):
         "colors.add(data[index] + ',' + data[index + 1] + ',' + data[index + 2]); return colors.size; }"
     )
     assert pixels > 10, "Arena canvas is blank"
+    for invalid_source in (
+        default.replace("BASE_SPEED = 0", 'BASE_SPEED = "fast"'),
+        default.replace("BASE_SPEED = 0", "# BASE_SPEED omitted"),
+        default + "\nSYNTAX_PROBE = (\n",
+    ):
+        page.evaluate(
+            "source => { Editor.instance.setValue(source, -1); document.getElementById('btnValidateConfig').click(); }",
+            invalid_source,
+        )
+        expect(page.locator("#configValidation")).to_have_text("Invalid config")
+        assert page.evaluate("Editor.configError.message")
+        assert not page.evaluate("App.hasRun || App.isRunning")
+        assert page.evaluate("[App.robot.rightSpeed, App.robot.leftSpeed]") == [0, 0]
+        assert (
+            page.evaluate(
+                "Editor.mainSession.getAnnotations().filter(item => item.type === 'error')"
+            )
+            == []
+        )
     page.evaluate(
         "source => { Editor.instance.setValue(source, -1); document.getElementById('btnValidateConfig').click(); }",
         tuned,
@@ -248,7 +267,7 @@ def exercise(page, base_url, output):
     wait_config(page)
 
     page.locator("#btnReset").click()
-    invalid = fresh.replace("BASE_SPEED = 190", "BASE_SPEED = 0")
+    invalid = fresh.replace("BASE_SPEED = 190", 'BASE_SPEED = "fast"')
     page.evaluate(
         "source => { Editor.instance.setValue(source, -1); document.getElementById('btnRun').click(); }",
         invalid,

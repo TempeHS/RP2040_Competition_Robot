@@ -30,8 +30,7 @@ def test_student_numeric_settings_start_at_zero():
     }
     assert numeric
     assert all(value == 0 for value in numeric.values()), numeric
-    with pytest.raises(ValueError, match="config\\.BASE_SPEED"):
-        validate_config(types.SimpleNamespace(**values))
+    assert validate_config(types.SimpleNamespace(**values))
 
 
 def test_student_and_test_config_have_the_same_variable_names():
@@ -81,31 +80,65 @@ def test_config_contains_only_unique_constant_assignments(filename):
 @pytest.mark.parametrize(
     "name,value",
     [
-        ("BASE_SPEED", 0),
+        ("BASE_SPEED", "200"),
         ("BASE_SPEED", True),
-        ("LOOP_DT", 0),
-        ("side_Kp", float("nan")),
-        ("side_Kd", float("inf")),
-        ("WALL_SIDE", "middle"),
-        ("DISTANCE_SENSOR", "laser"),
+        ("BASE_SPEED", 200.0),
+        ("LOOP_DT", "0.05"),
+        ("side_Kp", False),
+        ("side_Kd", None),
+        ("WALL_SIDE", 1),
+        ("DISTANCE_SENSOR", None),
         ("TURN_KICK_STEPS", 1.5),
         ("DEBUG_AIDRIVER", 1),
-        ("FRONT_STOP_DISTANCE", 500),
-        ("MIN_APPROACH_SPEED", 255),
-        ("KIT_SERVO_PIN", 26),
-        ("color_red_ratio", 1.2),
+        ("FRONT_STOP_DISTANCE", "150"),
+        ("MIN_APPROACH_SPEED", 130.0),
+        ("KIT_SERVO_PIN", True),
+        ("KIT_SERVO_PIN", "26"),
+        ("KIT_SERVO_PIN", 26.5),
+        ("color_red_ratio", [0.55]),
     ],
 )
-def test_invalid_settings_are_named(settings, name, value):
+def test_wrong_setting_types_are_named(settings, name, value):
     setattr(settings, name, value)
     with pytest.raises(ValueError, match="config\\." + name):
         validate_config(settings)
 
 
-def test_missing_setting_is_not_silently_defaulted(settings):
-    del settings.side_Kp
-    with pytest.raises(ValueError, match="side_Kp is missing"):
-        validate_config(settings)
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("BASE_SPEED", 0),
+        ("BASE_SPEED", -300),
+        ("BASE_SPEED", 1000),
+        ("LOOP_DT", 0),
+        ("LOOP_DT", -0.05),
+        ("side_Kp", float("nan")),
+        ("side_Kd", float("inf")),
+        ("WALL_SIDE", "middle"),
+        ("DISTANCE_SENSOR", "laser"),
+        ("TURN_KICK_STEPS", -5),
+        ("FRONT_STOP_DISTANCE", 500),
+        ("MIN_APPROACH_SPEED", 255),
+        ("KIT_SERVO_PIN", 26),
+        ("KIT_SERVO_PIN", -1),
+        ("KIT_SERVO_PIN", 1000),
+        ("color_red_ratio", 1.2),
+        ("NUDGE_MIN_MS", 5000),
+        ("REVERSE_CLEAR_STEPS", 1000),
+        ("VICTIM_PAUSE_TIME", 0),
+    ],
+)
+def test_setting_values_are_not_validated(settings, name, value):
+    setattr(settings, name, value)
+    assert validate_config(settings, min_motor_speed=250)
+
+
+def test_every_required_setting_must_be_present(settings):
+    for name, value in vars(settings).copy().items():
+        delattr(settings, name)
+        with pytest.raises(ValueError, match="config\\." + name + " is missing"):
+            validate_config(settings)
+        setattr(settings, name, value)
 
 
 def test_zero_unused_pid_terms_are_valid(settings):
