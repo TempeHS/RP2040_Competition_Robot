@@ -4,6 +4,15 @@
 
 Validate robust front-trigger dead-end handling using the existing state-machine structure and your held gyro turn PID.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** All navigation sections in [config.py](../project/config.py), including Outside Corners.
+2. **Tune These Settings:** Revisit front thresholds and turn control only as needed for dead ends.
+3. **New Main Behaviour:** Exercise the existing front-first state machine against dead-end geometry.
+4. **Replace Main:** Use the [Challenge 6 main](../app/starter-code/challenge-6.py) as `main.py`. Retain the same config; no new config section is needed.
+
+Read the [shared workflow](Shared_Config_Workflow.md). State, timers and error history reset each run, while tuning remains saved.
+
 ## Success Criteria
 
 The robot detects dead ends reliably, turns away cleanly, and reaches the green exit zone.
@@ -12,7 +21,7 @@ The robot detects dead ends reliably, turns away cleanly, and reaches the green 
 
 1. Complete Challenge 5 with reliable turn behavior.
 2. Open simulator Challenge 6.
-3. Carry forward all tuned values.
+3. Keep the existing config with all tuned values.
 
 ## Maze Situation
 
@@ -27,7 +36,7 @@ New: robustness validation of front-trigger turn behavior.
 
 Unchanged: same core control-loop structure and turn PID from earlier challenges.
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                   | Notes                         |
 | ------- | ------------------------------------------ | ----------------------------- |
@@ -60,12 +69,12 @@ stateDiagram-v2
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. Tunables only.
 2. Speed and distance thresholds for this maze.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. State list.
 2. Trigger priority.

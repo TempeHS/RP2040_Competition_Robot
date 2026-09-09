@@ -4,6 +4,15 @@
 
 Introduce color-marker handling so the robot reacts to red and green markers and recognizes silver start/finish markers.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** Robot Setup and Driving in [config.py](../project/config.py). Earlier navigation tuning remains saved but is inactive in this corridor exercise.
+2. **Tune These Settings:** Colour Detection: clear thresholds, channel ratios and `COLOR_PAUSE_TIME`.
+3. **New Main Behaviour:** Drive the marker corridor, pause on new red/green markers and distinguish silver start from finish.
+4. **Replace Main:** Use the [Challenge 8 main](../app/starter-code/challenge-8.py) as `main.py`. Keep config; do not replace it with colour-only settings.
+
+Read the [shared workflow](Shared_Config_Workflow.md). Marker history and the started flag stay in main. This main does not include the full maze controller.
+
 ## Success Criteria
 
 The robot pauses on each red and green marker for the configured pause time and reaches the silver finish marker.
@@ -27,7 +36,7 @@ New: marker classification pipeline and marker-driven pause behavior.
 
 Unchanged: base movement loop style and loop timing expectations.
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                                                        | Notes                                     |
 | ------- | ------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -66,13 +75,13 @@ stateDiagram-v2
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. Color thresholds.
 2. Pause duration.
 3. Speed.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. Marker gate and classification order.
 2. Duplicate-marker guard logic.

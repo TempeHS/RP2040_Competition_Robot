@@ -134,31 +134,32 @@ See [Assembly_Instructions.md](Assembly_Instructions.md) for full assembly and h
 
 ## Build Custom Firmware
 
-The build system produces firmware with AIDriver libraries frozen for fast import while keeping `main.py` on the device filesystem for easy IDE editing.
+The build system freezes AIDriver libraries for fast import while keeping `main.py` and `config.py` editable on the device filesystem. Existing files are preserved; missing files are provisioned from bundled defaults.
 
 Quick build:
 
 ```bash
-cd /workspaces/AIDriver_MicroPython_Challanges/.devcontainer
+cd /workspaces/RP2040_Competition_Robot/.devcontainer
 ./build_firmware.sh
 ```
 
 Recovery mode:
 
 - If `main.py` is corrupted, hold GPIO2 low (connect GP2 to GND) during boot.
-- Recovery restores default `main.py` and clears `event_log.txt`.
+- Recovery restores default `main.py` and clears `event_log.txt`, but preserves `config.py`.
+- To explicitly reset config, call `robot_recovery.restore_config()` from the MicroPython REPL. It backs up the old source before replacement; restart afterward.
 
 Full guide: [Build_Custom_MicroPython_Firmware.md](Build_Custom_MicroPython_Firmware.md)
 
 ## Debugging and Event Logging
 
-- Set `aidriver.DEBUG_AIDRIVER = True` in `main.py` for richer runtime logs.
+- Set `DEBUG_AIDRIVER = True` in shared config for richer runtime logs.
 - The firmware creates a run-scoped `event_log.txt` next to `main.py`.
-- In recovery mode (GPIO2 held low at boot), both `main.py` and `event_log.txt` are reset to defaults.
+- In recovery mode (GPIO2 held low at boot), main and the event log are reset; config is retained.
 
 ## Challenges
 
-Students complete challenge stages in order, carrying code forward each time.
+Students complete stages in order, keeping one purpose-organised config and replacing only main. Algorithms remain visible and editable; there is no need to copy tuning between programs. Start with the [Shared Config Workflow](Shared_Config_Workflow.md).
 
 Stage 1: PID wall following
 

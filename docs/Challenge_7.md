@@ -4,6 +4,15 @@
 
 Validate full-maze performance using the established three-state controller, focusing on reliability across long sequences of corners.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** All navigation tuning in [config.py](../project/config.py).
+2. **Tune These Settings:** Adjust only settings supported by repeated maze observations; no new config section is introduced.
+3. **New Main Behaviour:** Apply wall, front, turn and outside-corner decisions across a full maze.
+4. **Replace Main:** Use the [Challenge 7 main](../app/starter-code/challenge-7.py) as `main.py`. Keep your existing config and any deliberate tuning changes.
+
+Read the [shared workflow](Shared_Config_Workflow.md). Replacing main does not automatically merge your algorithm edits into another main.
+
 ## Success Criteria
 
 The robot completes the full maze from start to green exit zone with stable behavior across dead ends and outside corners.
@@ -12,7 +21,7 @@ The robot completes the full maze from start to green exit zone with stable beha
 
 1. Complete Challenge 6.
 2. Open simulator Challenge 7.
-3. Carry forward your best stable values.
+3. Keep your best stable values in the shared config.
 
 ## Maze Situation
 
@@ -27,7 +36,7 @@ New: robustness target (repeatability over full run length).
 
 Unchanged: same states, triggers, and core algorithms.
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable           | Notes                     |
 | ------- | ------------------ | ------------------------- |
@@ -65,11 +74,11 @@ stateDiagram-v2
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. Tunables only.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. State machine topology.
 2. Trigger order.

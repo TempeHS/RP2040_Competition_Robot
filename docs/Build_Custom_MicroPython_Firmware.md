@@ -1,6 +1,6 @@
 # Building Custom MicroPython Firmware for Raspberry Pi Pico
 
-This guide explains how to build MicroPython firmware for the Raspberry Pi Pico with your custom AIDriver libraries integrated. The build system automatically creates firmware with your libraries frozen into the firmware for fast loading, while `main.py` is placed on the filesystem for IDE editing with hardware recovery capability.
+This guide explains how to build MicroPython firmware for the Raspberry Pi Pico with your custom AIDriver libraries integrated. Libraries are frozen for fast loading, while `main.py` and `config.py` remain on the filesystem for IDE editing. Students retain their tuning and replace main when changing challenges; see the [shared workflow](Shared_Config_Workflow.md).
 
 ---
 
@@ -26,10 +26,10 @@ The script automatically:
 - ✅ Validates the build environment
 - ✅ Updates MicroPython to the latest version (if internet available)
 - ✅ Copies custom libraries to frozen modules (fast loading)
-- ✅ Embeds `main.py` in firmware for filesystem creation
+- ✅ Bundles defaults for missing editable `main.py` and `config.py` files
 - ✅ Validates Python syntax
 - ✅ Builds firmware with parallel compilation
-- ✅ Saves to `_Firmware/AI_Driver_RP2040.uf2`
+- ✅ Saves to `_Firmware/THS_Comp_RP2040.uf2`
 - ✅ Creates build metadata for tracking
 
 ---
@@ -38,13 +38,15 @@ The script automatically:
 
 ### **Frozen Modules (Fast Loading):**
 
-- `project/lib/aidriver.py` → Frozen into firmware
+- The [AIDriver package](../project/lib/aidriver/__init__.py), peripheral modules and [config checker](../project/lib/config_check.py) are frozen into firmware.
+- The build generates `robot_recovery` with bundled main/config defaults. Neither editable file is imported as a frozen module.
 
 **Benefits:** Instant loading, memory efficient, cannot be accidentally corrupted
 
 ### **Filesystem Files (IDE Editable):**
 
-- `project/main.py` → Created on device filesystem during first boot
+- [project/main.py](../project/main.py) and [project/config.py](../project/config.py) are created on the device filesystem when missing.
+- Existing files are preserved, even across a firmware update. Missing or invalid settings must be fixed explicitly; firmware does not silently replace student tuning.
 
 **Benefits:** Visible in IDE, editable, preserves user changes across reboots
 
@@ -59,13 +61,21 @@ The script automatically:
 3. **Power on** or reset the Pico
 4. **Recovery activates** → `main.py` restored to default content
 5. **Remove jumper** from pin 2
-6. **Reset** → Normal operation resumes with fresh `main.py`
+6. **Reset** → The fresh `main.py` reads your existing `config.py`
+
+This restores main and clears the event log, but **preserves config**, including an invalid config. Correct the named setting in your IDE, or explicitly restore the baseline from the MicroPython REPL:
+
+```python
+import robot_recovery
+robot_recovery.restore_config()
+```
+
+The previous file is backed up as `config.py.bak`, then `config.py.bak.1`, and so on without overwriting earlier backups. Restart the robot afterward. A normal boot never executes this reset automatically.
 
 **Console output during recovery:**
 
 ```
-RECOVERY MODE: Pin 2 detected grounded - overwriting main.py with default
-Recovery complete: main.py restored to default content
+Restored main.py; config.py preserved
 ```
 
 ---
@@ -111,17 +121,19 @@ Just copies modules without building firmware. Useful for testing module syntax.
 2. **Pico mounts as USB drive** (RPI-RP2)
 3. **Copy firmware file:**
    ```bash
-   # From: /workspaces/RP2040_Competition_Robot/_Firmware/AI_Driver_RP2040.uf2
+   # From: /workspaces/RP2040_Competition_Robot/_Firmware/THS_Comp_RP2040.uf2
    # To: RPI-RP2 USB drive
    ```
 4. **Pico reboots automatically** and runs your integrated code
 
 ### **What Happens After Flashing:**
 
-- **First boot:** `main.py` automatically created on filesystem with your test code
-- **Subsequent boots:** Existing `main.py` preserved (user edits maintained)
-- **IDE connection:** `main.py` visible and editable in Thonny, VS Code, etc.
+- **First boot:** Missing `config.py` and `main.py` are created on the filesystem
+- **Subsequent boots:** Existing main and configuration are preserved
+- **IDE connection:** Both files are visible and editable in Thonny, VS Code, etc.
 - **Library access:** `from aidriver import AIDriver` works immediately (frozen modules)
+
+Build firmware from this implementation before deploying the new challenge mains. Older UF2 files may not contain `config_check` or `robot_recovery`. Source/test verification does not update the checked-in binary automatically or prove operation on a physical robot.
 
 ---
 
@@ -130,7 +142,7 @@ Just copies modules without building firmware. Useful for testing module syntax.
 ### **Success Indicators:**
 
 - ✅ Terminal shows `✅ AIDriver firmware build complete!`
-- ✅ `AI_Driver_RP2040.uf2` file exists in `_Firmware/` folder (~630-650KB)
+- ✅ `THS_Comp_RP2040.uf2` file exists in `_Firmware/` folder
 - ✅ No error messages in terminal output
 - ✅ Build reports module counts: "Copied X modules to frozen modules directory"
 
@@ -144,8 +156,8 @@ chmod +x /workspaces/RP2040_Competition_Robot/.devcontainer/*.sh
 
 **Files Not Found:**
 
-- Verify files exist: `project/lib/*.py` and `project/main.py`
-- Check exact filenames: `aidriver.py`
+- Verify the AIDriver package, library modules, `project/main.py` and `project/config.py` exist.
+- AIDriver is a package under `project/lib/aidriver/`, not a single `aidriver.py` file.
 
 **Syntax Errors:**
 
@@ -180,18 +192,24 @@ chmod +x /workspaces/RP2040_Competition_Robot/.devcontainer/*.sh
 
 ### **Iterative Development:**
 
-1. **Edit code** in `project/` folder
-2. **Build firmware:** `./build_firmware.sh --skip-update`
-3. **Flash to Pico** (copy .uf2 file)
-4. **Test on device**
-5. **Repeat**
+1. **Tune config or edit main**, then transfer the changed file to the robot filesystem.
+2. **Restart and test on device** in a clear, controlled area.
+3. **Build and flash firmware only for library or provisioning changes:** `./build_firmware.sh --skip-update`.
+4. **Keep the same config when replacing main** for the next challenge.
 
 ### **Recovery Testing:**
 
 1. **Flash firmware** with your code
 2. **Edit main.py** on device (introduce error)
 3. **Connect pin 2 to ground** and reset
-4. **Verify recovery** restores original code
+4. **Verify recovery** restores original main while retaining a deliberately changed config value
+5. **Test explicit config recovery** and verify the previous source remains in its numbered backup
+
+Host-only provisioning checks run without a connected robot:
+
+```bash
+python -m pytest -q tests/test_firmware_config.py
+```
 
 ---
 
@@ -202,6 +220,7 @@ If you need to customize the build or prefer manual control:
 ```bash
 # Copy modules manually
 cp /workspaces/RP2040_Competition_Robot/project/lib/*.py /micropython/ports/rp2/modules/
+cp -r /workspaces/RP2040_Competition_Robot/project/lib/aidriver /micropython/ports/rp2/modules/
 
 # Build manually
 cd /micropython/ports/rp2
@@ -210,10 +229,10 @@ make clean
 make -j$(nproc)
 
 # Copy firmware
-cp build-RPI_PICO/firmware.uf2 /workspaces/RP2040_Competition_Robot/_Firmware/AI_Driver_RP2040.uf2
+cp build-RPI_PICO/firmware.uf2 /workspaces/RP2040_Competition_Robot/_Firmware/THS_Comp_RP2040.uf2
 ```
 
-**Note:** Manual process doesn't include the pin 2 recovery feature or filesystem `main.py` handling.
+**Note:** This manual process omits provisioning and recovery. Transfer both main and config yourself, and do not copy either into frozen modules. Use the automated build for the supported two-file deployment workflow.
 
 ---
 

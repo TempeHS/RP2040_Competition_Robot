@@ -4,6 +4,15 @@
 
 Add robust black-zone handling so the robot can detect black floor patches and recover using the implemented four-step maneuver.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** Driving, wall P/D, colour and turn tuning in [config.py](../project/config.py).
+2. **Tune These Settings:** Heading Hold, No-Go Recovery and `color_black_clear`. The starter's grid compensation uses its own recovery subsection.
+3. **New Main Behaviour:** Poll black without relying on a bright-marker interrupt, reverse clear, turn toward open space and find a new wall.
+4. **Replace Main:** Use the [Challenge 9 main](../app/starter-code/challenge-9.py) as `main.py`. Keep config and the visible turn helper's gain convention.
+
+Read the [shared workflow](Shared_Config_Workflow.md). Heading, clearance counts and state are runtime values, not config settings. The existing reference uses a direct wall-search threshold; the starter also applies grid compensation.
+
 ## Success Criteria
 
 When the robot enters a black zone, it runs the recovery sequence, reacquires a wall, and continues navigation.
@@ -27,7 +36,7 @@ New: explicit RECOVER sequence with heading-hold motion and open-space turn sele
 
 Unchanged: follow wall logic remains the primary navigation mode outside recovery.
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                                                  | Notes                                          |
 | ------- | ------------------------------------------------------------------------- | ---------------------------------------------- |
@@ -65,13 +74,13 @@ stateDiagram-v2
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. Recovery distances and thresholds.
 2. Reverse and forward phase limits.
 3. Black threshold.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. Recovery step order.
 2. Heading-hold correction sign.

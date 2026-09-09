@@ -2,11 +2,26 @@
 
 ## Purpose
 
-Integrate navigation, victim detection, scoring, display reporting, and rescue-kit deployment into one complete competition run.
+Add victim accounting, score estimates, display reporting and rescue-kit requests
+to the marker-corridor exercise. Combining this with full maze navigation and
+black-zone recovery is a separate extension.
+
+## Shared Config Transition
+
+1. **Keep These Settings:** Robot Setup, Driving and Colour Detection in [config.py](../project/config.py). Navigation/recovery tuning stays saved but is not used by this corridor main.
+2. **Tune These Settings:** Competition: victim pause and score constants; review the optional rescue-kit servo setting.
+3. **New Main Behaviour:** The existing scaffold adds counters, a score function and OLED setup. Complete its victim and finish TODO branches in main.
+4. **Replace Main:** Use the [Challenge 10 main](../app/starter-code/challenge-10.py) as `main.py`. Keep config; counters and marker history reset for each run.
+
+Read the [shared workflow](Shared_Config_Workflow.md). The teacher reference implements victim/finish branches; it uses the same config, not separate hidden tuning.
 
 ## Success Criteria
 
-The robot identifies red and green victims, updates score and counts, deploys rescue kit on harmed victims, shows live OLED status, and completes the run at silver finish.
+The robot identifies red and green victims, updates estimated score and counts,
+requests a rescue kit for each new harmed victim, shows live OLED status, and
+completes the run at silver finish. On hardware, separately verify kit movement.
+The simulator returns `False` from kit deployment; the estimate still includes
+the configured kit bonus per request, not a verified physical delivery.
 
 ## Before You Begin
 
@@ -27,7 +42,7 @@ New: competition scoring model and status output layer.
 
 Unchanged: core movement and color classification flow.
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                | Notes                                       |
 | ------- | --------------------------------------- | ------------------------------------------- |
@@ -72,13 +87,13 @@ stateDiagram-v2
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config (display labels remain editable in main):
 
 1. Scoring constants if competition rules change.
 2. Pause duration.
 3. OLED display text labels.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when completing or editing main:
 
 1. New-marker edge detection.
 2. Score-update formulas.
@@ -126,4 +141,6 @@ Pass when the Success Criteria are met in at least 3 consecutive simulator runs.
 
 ## What Is Next
 
-This challenge completes the student sequence. Next step is hardware calibration and transfer of tuned values to real-robot `main.py`.
+This challenge completes the student sequence. Next, calibrate on hardware and
+transfer the same `config.py` alongside `main.py`; do not copy tuning back into
+the main program.

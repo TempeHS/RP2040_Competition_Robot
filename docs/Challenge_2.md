@@ -4,6 +4,15 @@
 
 Extend Challenge 1 by adding derivative damping so the robot settles faster and oscillates less from a poor start pose.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** Robot Setup, Driving, wall target, steering limit and P gain in [config.py](../project/config.py).
+2. **Tune These Settings:** Wall PID: `side_Kd`. Retune speed or P only when observations justify it.
+3. **New Main Behaviour:** Add per-loop error-change damping. I remains inactive.
+4. **Replace Main:** Use the [Challenge 2 main](../app/starter-code/challenge-2.py) as `main.py`. Keep config without copying values.
+
+Read the [shared workflow](Shared_Config_Workflow.md). Settings live in config; previous error remains in main and resets for a new run.
+
 ## Success Criteria
 
 The robot follows the wall smoothly from an off-center, angled start and reaches the green exit zone with fewer oscillations than P-only.
@@ -12,7 +21,7 @@ The robot follows the wall smoothly from an off-center, angled start and reaches
 
 1. Complete Challenge 1 with stable `side_Kp`.
 2. Open simulator Challenge 2.
-3. Carry forward working values for speed, target distance, and steering clamp.
+3. Keep your existing config; speed, target distance and steering clamp are already retained.
 
 ## Maze Situation
 
@@ -34,7 +43,7 @@ side_derivative = error - side_previous_error
 steering = (side_Kp * error) + (side_Kd * side_derivative)
 ```
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                                        | Notes                   |
 | ------- | --------------------------------------------------------------- | ----------------------- |
@@ -60,7 +69,7 @@ flowchart TD
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. `BASE_SPEED`
 2. `TARGET_WALL_DISTANCE`
@@ -68,7 +77,7 @@ Safe to edit:
 4. `side_Kp`
 5. `side_Kd`
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. `side_previous_error = error` update at end of loop.
 2. The `my_robot.steer(...)` call.

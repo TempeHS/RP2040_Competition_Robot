@@ -1,6 +1,6 @@
 # Shared Configuration and Challenge Progression Plan
 
-Status: proposed implementation plan. No configuration, simulator, firmware, or test-code changes are implemented by this document.
+Status: implemented in source, with host and Skulpt contract tests. Documentation and final browser/release checks are being completed. Physical deployment and calibration remain unverified; the checked-in UF2 has not been rebuilt for this change. See the [student workflow](Shared_Config_Workflow.md).
 
 ## Goal
 
@@ -18,7 +18,7 @@ The algorithms remain visible and editable. Most student work is tuning configur
 - Students may edit the algorithms in each main program.
 - Later programs consume more configuration as the robot becomes more functional.
 
-## Current Implementation
+## Original Implementation
 
 - [Challenge templates](../app/starter-code/challenge-4.py) mix tuning values, fixed movement parameters, and runtime state. Several templates reset earlier tuning to zero.
 - [The current robot main](../project/main.py) is a ToF-based Challenge 4 controller using the library's built-in gyro turn.
@@ -29,7 +29,7 @@ The algorithms remain visible and editable. Most student work is tuning configur
 
 ## Configuration Contract
 
-The proposed canonical default is `project/config.py`. The simulator loads or stages this same default source; there must not be a second manually maintained set of browser defaults.
+The canonical default is [project/config.py](../project/config.py). The simulator loads or stages this same source; there is no second manually maintained set of browser defaults.
 
 Use flat Python assignments and explicit `import config` in each main. Preserve existing tuning names where practical so students can recognise the equations in the current guides. Do not use wildcard imports, configuration classes, nested settings dictionaries, or challenge-specific configuration files.
 
@@ -55,7 +55,7 @@ Configuration contains scalar settings and simple expressions based on other set
 | No-Go Recovery: Grid Compensation    | `GRID_CELL_MM`, `GRID_WALL_OFFSET_MM`, `GRID_ERROR_CLAMP_MM`                                                             | Grid geometry and bounded wall-distance compensation, all in mm.                                                   |
 | Competition                          | `VICTIM_PAUSE_TIME`, `POINTS_UNHARMED`, `POINTS_HARMED`, `POINTS_KIT`                                                    | Victim pause in seconds and scoring constants.                                                                     |
 
-The three Turn Mechanics rows are subsections of one advanced section. Recovery rows are similarly grouped under No-Go Recovery. Students should be able to fold advanced sections in the editor.
+The three Turn Mechanics rows are subsections of one advanced section. Recovery rows are similarly grouped under No-Go Recovery. Students can fold sections in the editor. Implementation also names the existing `TURN_PAUSE_TIME`, `NUDGE_SETTLE_STEPS`, and `NIB_PAUSE_TIME` mechanics so they are not hidden tuning literals in main.
 
 The front controller currently implements proportional slowdown, and the student turn controller uses P and D. Do not add unused front or turn integral gains merely to label these sections PID.
 
@@ -101,7 +101,7 @@ Earlier settings can need retuning for new geometry. Document that explicitly; n
 
 The existing Challenge 8 and 10 programs drive straight instead of retaining the earlier maze controller. The recommended design is to preserve navigation and layer marker handling, recovery, and scoring over it.
 
-This is a proposed behavior change beyond extracting configuration. Confirm this part of the design before implementing it, and make it a separate, tested phase. Define event priority explicitly: black recovery takes precedence over normal movement, front blockage precedes outside-corner detection, and marker handling must not repeatedly count or pause on the same tile.
+**Deferred:** this behavior change is not part of the config migration. Challenges 8 and 10 retain their marker-corridor algorithms; Challenge 9 retains its existing recovery exercise and the Challenge 10 starter retains its student TODOs. Earlier settings remain saved even when a main does not use them. A cumulative-navigation extension requires its own explicit scope and tests.
 
 Each guide should contain the same transition block:
 
@@ -151,7 +151,7 @@ Convert both learner templates and teacher references to this contract. Preserve
 
 ## Pytest Updates
 
-These are planned test changes to implement alongside the feature, not tests added by this planning task.
+The following test modules and fixtures have been added alongside the implementation. The original hardware diagnostic, motor/log and event-log regression tests are retained.
 
 ### Existing Suite and Collection
 
@@ -176,7 +176,7 @@ Add a root `pytest.ini` with `testpaths = tests` so ordinary host test discovery
 
 ### New Test Modules
 
-The following paths are proposed files, not existing tests.
+The following files now exist and test the configuration contract and progression behavior.
 
 | Proposed file                         | Required coverage                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -201,7 +201,7 @@ python -m pytest --collect-only -q tests
 python -m pytest -q tests/test_aidriver.py tests/test_eventlog.py tests/test_main.py
 ```
 
-Commands for implementation verification after the proposed files exist:
+Commands for implementation verification:
 
 ```sh
 python -m pip install -r requirements.txt

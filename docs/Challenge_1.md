@@ -4,6 +4,15 @@
 
 Build a clean baseline wall follower using only the side sensor and a proportional controller. This challenge establishes the control-loop structure reused in later challenges.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** Robot Setup in [config.py](../project/config.py); all sections already exist.
+2. **Tune These Settings:** Driving and Wall PID: `BASE_SPEED`, target distance, steering limit and `side_Kp`.
+3. **New Main Behaviour:** Proportional side-distance steering only. D and I remain inactive.
+4. **Replace Main:** Use the [Challenge 1 main](../app/starter-code/challenge-1.py) as `main.py`. Keep config and tune there, not in main.
+
+Read the [shared workflow](Shared_Config_Workflow.md) for saving, transfer and recovery. Runtime state belongs in main; table setting names below refer to config.
+
 ## Success Criteria
 
 The robot follows a straight wall through the corridor and reaches the green exit zone without hitting the wall.
@@ -12,7 +21,7 @@ The robot follows a straight wall through the corridor and reaches the green exi
 
 1. Complete the robot hardware setup.
 2. Open the simulator and select Challenge 1.
-3. Set `AIDriver("left")` or `AIDriver("right")` to match the wall side.
+3. Set `WALL_SIDE` and `DISTANCE_SENSOR` in config to match your robot.
 
 ## Maze Situation
 
@@ -30,11 +39,11 @@ Unchanged: basic loop timing and direct motor drive.
 Delta equation:
 
 ```python
-error = wall_distance - TARGET_WALL_DISTANCE
-steering = side_Kp * error
+error = wall_distance - config.TARGET_WALL_DISTANCE
+steering = config.side_Kp * error
 ```
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable               | Notes                            |
 | ------- | ---------------------- | -------------------------------- |
@@ -59,19 +68,19 @@ flowchart TD
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. `BASE_SPEED`
 2. `TARGET_WALL_DISTANCE`
 3. `MAX_STEERING`
 4. `side_Kp`
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. Sensor validation branch for `-1`.
 2. The `my_robot.steer(...)` call, which clamps the steering and applies it to
    the correct wheel for your chosen wall.
-3. Loop timing (`hold_state(0.05)`).
+3. A consistent loop interval (`hold_state(config.LOOP_DT)`).
 
 Optional debug edits:
 

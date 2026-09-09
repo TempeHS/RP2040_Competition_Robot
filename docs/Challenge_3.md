@@ -4,6 +4,15 @@
 
 Complete the wall-follow controller by adding the integral term so small persistent errors are corrected, especially around corner geometry.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** Driving and the working wall P/D values in [config.py](../project/config.py).
+2. **Tune These Settings:** Wall PID: `side_Ki` and `side_INTEGRAL_MAX`.
+3. **New Main Behaviour:** Accumulate bounded integral error and clear it when the wall is lost.
+4. **Replace Main:** Use the [Challenge 3 main](../app/starter-code/challenge-3.py) as `main.py`. Config stays unchanged until you tune it.
+
+Read the [shared workflow](Shared_Config_Workflow.md). Integral and derivative history remain in main, not in saved config.
+
 ## Success Criteria
 
 The robot follows the wall through the corridor and around the L corner, then reaches the green exit zone without sustained drift.
@@ -12,7 +21,7 @@ The robot follows the wall through the corridor and around the L corner, then re
 
 1. Complete Challenge 2 with stable PD gains.
 2. Open simulator Challenge 3.
-3. Carry forward all working values.
+3. Keep the same config, including your working P and D values.
 
 ## Maze Situation
 
@@ -34,7 +43,7 @@ side_integral = side_integral + error
 steering = (side_Kp * error) + (side_Ki * side_integral) + (side_Kd * side_derivative)
 ```
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                                                                          | Notes                      |
 | ------- | ------------------------------------------------------------------------------------------------- | -------------------------- |
@@ -63,13 +72,13 @@ flowchart TD
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. All prior tunables from Challenge 2.
 2. `side_Ki`.
 3. `side_INTEGRAL_MAX`.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. Integral reset when side wall is lost.
 2. The integral clamp and the `my_robot.steer(...)` call.

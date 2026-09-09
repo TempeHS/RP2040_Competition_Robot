@@ -5,47 +5,78 @@ A browser-based robot simulator for the AIDriver MicroPython Challenges. This we
 ## Features
 
 - **ACE Python Editor** - Syntax highlighting, auto-indentation, and error marking
-- **10 Progressive Challenges** - PID wall-following through a full Rescue-Maze competition run
+- **Shared Config Editor** - One purpose-organised Python config retained across challenges
+- **10 Progressive Challenges** - PID wall-following, maze navigation, markers and recovery
 - **Real-time Simulation** - See your robot move in a 2030×2030mm virtual arena
-- **Strict Validation** - Ensures code uses only the AIDriver library
+- **Strict Validation** - Checks the supported robot API and shared settings before movement
 - **Ultrasonic, Gyro & Colour Simulation** - Front/side distance, yaw rate, and ground-colour readings
 - **On-screen OLED Panel** - Mirrors the SSD1306 display for the competition challenge
 - **Pre-built Mazes** - Corner, outside-corner, dead-end and full-maze layouts
 
 ## Challenges
 
-| Challenge | Title                    | Focus                                    |
-| --------- | ------------------------ | ---------------------------------------- |
-| Debug     | Debug Script             | Hardware sanity test (`project/main.py`) |
-| 1         | Wall Follow — P Control  | Proportional steering                    |
-| 2         | Wall Follow — PD Control | Dampen oscillations                      |
-| 3         | Wall Follow — Full PID   | Integral drift correction                |
-| 4         | Corner Detection         | Front sensor + gyro turn                 |
-| 5         | Outside Corners          | Turn left at a nib                       |
-| 6         | Dead End Detection       | Dead ends + nibs                         |
-| 7         | Maze Solver              | Hand-on-wall full maze                   |
-| 8         | Colour Markers           | TCS34725 detect & pause                  |
-| 9         | No-Go Zones              | Detect black & recover                   |
-| 10        | Competition Run          | Victims, score & OLED                    |
+| Challenge | Title                    | Focus                                               |
+| --------- | ------------------------ | --------------------------------------------------- |
+| Debug     | Debug Script             | [Hardware sanity test](../project/hardware_test.py) |
+| 1         | Wall Follow — P Control  | Proportional steering                               |
+| 2         | Wall Follow — PD Control | Dampen oscillations                                 |
+| 3         | Wall Follow — Full PID   | Integral drift correction                           |
+| 4         | Corner Detection         | Front sensor + gyro turn                            |
+| 5         | Outside Corners          | Turn left at a nib                                  |
+| 6         | Dead End Detection       | Dead ends + nibs                                    |
+| 7         | Maze Solver              | Hand-on-wall full maze                              |
+| 8         | Colour Markers           | TCS34725 detect & pause                             |
+| 9         | No-Go Zones              | Detect black & recover                              |
+| 10        | Competition Run          | Victims, score & OLED                               |
+
+## Shared Configuration
+
+Open **Config** above the main editor to edit the shared Python settings.
+All sections are available from the start. Keep this file when changing
+challenges; only the main algorithm changes. Config and each challenge main
+are saved independently in this browser's local storage.
+
+Download `config.py` from Config and `main.py` from the main editor. Transfer
+both to the robot initially, then replace only main unless you deliberately
+retune. Use firmware built from this implementation, which includes the
+configuration checker. The checked-in UF2 may predate that helper.
+
+**Reset Main** and **Reset Robot** preserve config. **Reset Config** requires
+confirmation. Existing saved mains are preserved and are not automatically
+rewritten; reset a main explicitly to load its new template.
+
+See the [shared workflow](../docs/Shared_Config_Workflow.md) for section meanings,
+import/export, validation, timing conventions and recovery.
 
 ## AIDriver API (Simulated)
 
-The simulator implements the same AIDriver methods as the firmware:
+Run implements the robot API with live simulated sensors. Step uses a captured
+trace with placeholder sensor values, not a live feedback simulation. Neither
+mode verifies real sensor health, actuator movement or hardware calibration.
+The following calls belong inside the main program:
 
 ```python
 from aidriver import AIDriver, hold_state
+from config_check import validate_config
 import aidriver
+import config
 
-aidriver.DEBUG_AIDRIVER = False        # True to print sensor + motor values
-my_robot = AIDriver("left")            # "left" or "right" — match the scene
+validate_config(config, AIDriver.MIN_MOTOR_SPEED)
+aidriver.DEBUG_AIDRIVER = config.DEBUG_AIDRIVER
+my_robot = AIDriver(
+    config.WALL_SIDE,
+    distance_sensor=config.DISTANCE_SENSOR,
+    min_approach_speed=config.MIN_APPROACH_SPEED,
+    kit_servo_pin=config.KIT_SERVO_PIN,
+)
 
 # Motor control (signed speeds, dead zone handled for you)
 my_robot.drive(right_speed, left_speed)   # -255…255
 my_robot.brake()
 
 # Gyro turns (closed-loop, LSM6DS3 gyroscope)
-my_robot.turn_90("left")               # exactly 90° (or "right")
-my_robot.turn_180("right")             # exactly 180°
+my_robot.turn_90("left")               # target 90° (or "right")
+my_robot.turn_180("right")             # target 180°
 my_robot.turn_degrees(135, "left")     # arbitrary angle
 rate = my_robot.read_gyro_z_dps()      # yaw rate, deg/s
 
@@ -66,46 +97,61 @@ my_robot.show_display(line1, line2, line3, line4)
 my_robot.deploy_rescue_kit()
 
 # Timing
-hold_state(seconds)                    # non-blocking wait
+hold_state(seconds)                    # retain motor outputs during the pause
 ```
+
+The motor floor is 120 PWM in hardware and both simulator paths. The visible
+student turn helper consumes the shared turn settings; the separate library
+turn methods have different gain conventions. Use `try/finally` to brake on
+exit, as the challenge templates do.
 
 ## Local Development
 
-Simply open `index.html` in a modern web browser. No server required!
-
-For development with live reload:
+Serve the **repository root**, not just this app directory. Fetching Python
+sources and guides requires HTTP; opening an HTML file directly is insufficient.
 
 ```bash
-# Using Python's built-in server
+# From the repository root
 python -m http.server 8000
-
-# Or with Node.js
-npx serve .
 ```
 
-Then open http://localhost:8000
+Then open http://localhost:8000/app/simulator.html?challenge=1.
+
+For host and simulator checks:
+
+```bash
+python -m pip install -r requirements.txt
+python -m pytest -q tests
+cd app
+npm install
+npm test -- --runInBand
+```
 
 ## Deployment to GitHub Pages
 
-1. Push the `app/` directory to your repository
-2. Go to repository Settings → Pages
-3. Set Source to "Deploy from a branch"
-4. Select `main` branch and `/app` folder (or root if app is at root)
-5. Save and wait for deployment
+Use the [Pages workflow](../.github/workflows/deploy-pages.yml) with repository
+Pages configured for **GitHub Actions**. It stages the app together with docs,
+firmware downloads and the canonical Python config/checker sources. Do not
+publish the app folder alone or maintain a second browser config default.
 
-Or use GitHub Actions for automatic deployment.
+To build the same static site locally, run `node app/scripts/stage-site.js _site`
+from the repository root. Serve the resulting directory over HTTP.
 
 ## File Structure
 
 ```
 app/
 ├── index.html          # Main HTML page
+├── simulator.html      # Main editor and simulator
+├── config.html         # Shared Python config editor
 ├── README.md           # This file
 ├── css/
 │   └── style.css       # Custom styles
 ├── js/
 │   ├── app.js          # Main application
 │   ├── editor.js       # ACE Editor module
+│   ├── config-editor.js # Config editing, import/export and validation
+│   ├── config-store.js # Independent storage and Skulpt config modules
 │   ├── simulator.js    # Physics engine
 │   ├── python-runner.js # Skulpt integration
 │   ├── aidriver-stub.js # AIDriver mock for Skulpt
@@ -124,7 +170,8 @@ app/
 - ACE Editor - Code editor
 - Skulpt - Python interpreter
 
-All dependencies are loaded from CDN - no npm install required!
+Runtime dependencies are loaded from CDN, so internet access is needed on first
+load. npm dependencies are required for development tests, not for using the site.
 
 ## Browser Support
 

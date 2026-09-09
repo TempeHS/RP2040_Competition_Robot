@@ -4,6 +4,15 @@
 
 Extend the state machine to handle outside corners where the side wall disappears.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** Wall PID, Front Distance Control and turn sections in [config.py](../project/config.py).
+2. **Tune These Settings:** Outside Corners: loss threshold, confirmation time, forward clearances and reacquisition budget.
+3. **New Main Behaviour:** Debounce wall loss, turn toward the followed wall and search for the new wall.
+4. **Replace Main:** Use the [Challenge 5 main](../app/starter-code/challenge-5.py) as `main.py`. No tuning values need copying.
+
+Read the [shared workflow](Shared_Config_Workflow.md). `nib_lost_time` and PID history stay in main. Debounce uses `config.LOOP_DT`.
+
 ## Success Criteria
 
 The robot detects side-wall loss at a nib, runs the wrap maneuver, reacquires the wall, and reaches the goal pocket.
@@ -12,7 +21,7 @@ The robot detects side-wall loss at a nib, runs the wrap maneuver, reacquires th
 
 1. Complete Challenge 4 with working turn behavior.
 2. Open simulator Challenge 5.
-3. Carry forward all tuned side and turn parameters.
+3. Keep the existing config with all tuned side and turn parameters.
 
 ## Maze Situation
 
@@ -27,7 +36,7 @@ New: wall-lost debounce and nib wrap state.
 
 Unchanged: front-triggered TURN state and side PID follow state.
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                  | Notes                                                           |
 | ------- | ----------------------------------------- | --------------------------------------------------------------- |
@@ -68,13 +77,13 @@ stateDiagram-v2
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. Nib wrap timing values.
 2. Nib loss thresholds if challenge explicitly allows.
 3. Existing front and side gains.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. Trigger priority order.
 2. Debounce logic structure.

@@ -4,6 +4,15 @@
 
 Move from a single control loop to a two-state machine so the robot can switch between wall following and turning when the front wall blocks the path.
 
+## Shared Config Transition
+
+1. **Keep These Settings:** Driving and Wall PID in [config.py](../project/config.py).
+2. **Tune These Settings:** Front Distance Control and Turn Control. Leave advanced Turn Mechanics at baseline initially.
+3. **New Main Behaviour:** Front approach slowdown, `FOLLOW_WALL`/`TURN` states and a visible gyro turn helper.
+4. **Replace Main:** Use the [Challenge 4 main](../app/starter-code/challenge-4.py) as `main.py`. Keep your existing config.
+
+Read the [shared workflow](Shared_Config_Workflow.md). All settings below live in config; `state` and PID history are runtime values in main.
+
 ## Success Criteria
 
 The robot follows the wall, detects a front wall, performs a 90 deg gyro turn away from the wall, and reaches the green exit zone.
@@ -12,7 +21,7 @@ The robot follows the wall, detects a front wall, performs a 90 deg gyro turn aw
 
 1. Complete Challenge 3 with stable side PID.
 2. Open simulator Challenge 4.
-3. Confirm your wall side selection in `AIDriver("left")` or `AIDriver("right")`.
+3. Confirm `WALL_SIDE` and `DISTANCE_SENSOR` in config.
 
 ## Maze Situation
 
@@ -32,7 +41,7 @@ State delta:
 1. `FOLLOW_WALL` handles normal corridor control.
 2. `TURN` performs gyro-closed-loop 90 deg turn.
 
-## Carry Forward From Previous Challenge
+## Settings Used In This Main
 
 | Group   | Variable                                                 | Notes                                            |
 | ------- | -------------------------------------------------------- | ------------------------------------------------ |
@@ -67,19 +76,19 @@ stateDiagram-v2
 
 ## Starter Code Contract
 
-Safe to edit:
+Safe to tune in shared config:
 
 1. Front approach tunables.
 2. Turn gains (`turn_Kp`, `turn_Kd`, `turn_tolerance`).
 3. Carry-forward side PID tunables.
 
-Do not edit unless instructed:
+Keep these algorithm invariants when editing main:
 
 1. State loop dispatch.
 2. Trigger ordering.
 3. Gyro integration structure.
 4. Safety timeouts and clamps.
-5. The fixed turn mechanics block (`TURN_KICK_*`, `TURN_COAST_TIME`, `NUDGE_*`).
+5. The advanced Turn Mechanics settings (`TURN_KICK_*`, `TURN_COAST_TIME`, `NUDGE_*`) retain their units and safety roles.
 
 Optional debug edits:
 
@@ -102,7 +111,10 @@ robot keeps rotating after the power is cut. It runs in three phases:
    at `NUDGE_SPEED`, because the motors stall below `MIN_TURN_SPEED` and cannot
    simply creep to the target.
 
-Only the three gains are tuned. Everything else is physics of this chassis.
+Begin with the P gain, D gain and tolerance in Turn Control. Advanced Turn
+Mechanics describe the chassis and its safety budgets; change them only after
+measuring a repeatable physical effect. `TURN_PAUSE_TIME` controls stationary
+pauses, and `NUDGE_SETTLE_STEPS` controls coast sampling after correction pulses.
 
 ## Tunables
 
