@@ -119,6 +119,10 @@ describe("Navbar consistency across pages", () => {
       const link = doc.querySelector(
         'a[href*="_Firmware/"][href$=".uf2"]:not([href*="Brick_recovery"]):not([href*="PiPico"])',
       );
+      expect(link).not.toBeNull();
+      expect(link.textContent.trim()).toBe("RP2040 Comp Custom Firmware");
+      expect(link.getAttribute("href")).toBe("_Firmware/THS_Comp_RP2040.uf2");
+      expect(link.hasAttribute("download")).toBe(true);
       firmwareLinks[file] = link ? link.getAttribute("href") : null;
     }
     const unique = new Set(Object.values(firmwareLinks).filter(Boolean));
