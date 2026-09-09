@@ -11,6 +11,7 @@
         "editor.formatOnSave": true
       },
       "extensions": [
+        "davidanson.vscode-markdownlint",
         "bierner.markdown-mermaid",
         "bierner.markdown-preview-github-styles",
         "esbenp.prettier-vscode",
