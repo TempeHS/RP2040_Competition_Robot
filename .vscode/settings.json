@@ -23,6 +23,7 @@
   "python.analysis.typeshedPaths": ["~/.micropico-stubs/included"],
   "python.analysis.extraPaths": [
     "~/.micropico-stubs/included",
+    "./robot/lib",
     "./examples/smooth_",
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.0.2/emulator/mock/typings",
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.0.2/emulator/mock/micropython",
@@ -35,7 +36,7 @@
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.3.46/emulator/mock/typings",
     "/root/.vscode-remote/extensions/benpaddlejones.pico-bridge-2.3.46/emulator/mock/micropython"
   ],
-  "micropico.syncFolder": "project",
+  "micropico.syncFolder": "robot",
   "workbench.colorTheme": "Visual Studio Dark",
   "workbench.iconTheme": "icons",
   "github.copilot.enable": {
